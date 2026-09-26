@@ -1,6 +1,7 @@
 import { recordingTuningSuffix } from './recording-tune.mjs';
 import { softeningProfile, recordingSofteningSuffix } from './recording-soften.mjs';
 import { scoringProfile } from './scoring.mjs';
+import { recordingVolume } from './recording-mix.mjs';
 import { rescoreRecording, remixRecording, wavBlob, delaySeconds, referenceForRescore, recordingDelaySuffix } from './recording-process.mjs';
 const $=id=>document.getElementById(id), BASE='http://127.0.0.1:4274';
 async function localRequest(path,body) {
@@ -49,6 +50,8 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     $('post-reference-source').disabled=busy||!editable;
     $('post-difficulty').disabled=busy||!editable;
     $('post-softening').disabled=busy||!editable;
+    $('post-voice-level').disabled=busy||!editable;
+    $('post-backing-level').disabled=busy||!editable||selected?.mode!=='mix';
     const current=reference();let referenceError='';
     if(editable&&$('post-reference-source').value==='current')try{referenceForRescore(selected.post,current);}catch(error){referenceError=error.message;}
     $('post-reference-info').textContent=editable?`錄音原始基準：${referenceName(selected.post.reference)}。目前已載入：${referenceName(current)}。${referenceError||($('post-reference-source').value==='current'?'這次使用目前已載入基準，保留錄音當時的遮罩、八度與評分範圍，難度使用「評分設定」中的重新評分難度。':'這次使用錄音當時的基準；換歌曲庫版本不會自動套用。')}`:'';
@@ -60,6 +63,9 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     $('rescore-status').textContent=selected?'已選取錄音，可調整設定後重新評分。':'請先保存一段演唱錄音。';
     $('post-reference-source').value='original';
     $('post-softening').value=selected?.vocalSoftening?.strength||'off';
+    const volume=recordingVolume(selected?.postVolume);
+    $('post-voice-level').value=volume.voice;$('post-backing-level').value=volume.backing;
+    volumeLabels();
     $('post-difficulty').value='relaxed';
     $('post-delay').value=selected?.postResult?.delayMs??selected?.post?.offsetMs??0;
     $('remix-delay').value=$('post-delay').value;
@@ -93,6 +99,11 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
   $('post-delay').addEventListener('input',()=>{$('remix-delay').value=$('post-delay').value;});
   $('remix-delay').addEventListener('input',()=>{$('post-delay').value=$('remix-delay').value;});
   $('post-reference-source').addEventListener('change',controls);
+  function volumeLabels(){
+    $('post-voice-value').textContent=$('post-voice-level').value+'%';
+    $('post-backing-value').textContent=$('post-backing-level').value+'%';
+  }
+  for(const id of ['post-voice-level','post-backing-level'])$(id).addEventListener('input',volumeLabels);
   $('post-rescore').addEventListener('click',()=>run(async row=>{
     const delayMs=Number($('post-delay').value);delaySeconds(delayMs);
     const referenceSource=$('post-reference-source').value;
@@ -109,16 +120,24 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
   $('post-remix').addEventListener('click',()=>run(async row=>{
     const delayMs=Number($('remix-delay').value);delaySeconds(delayMs);
     const softening=softeningProfile($('post-softening').value);
+    const volume=recordingVolume({voice:Number($('post-voice-level').value),backing:Number($('post-backing-level').value)});
     status('正在載入乾淨歌聲與配樂／和音…');
     const context=new AudioContext({sinkId:{type:'none'}});
     try{
-      const raw=await context.decodeAudioData(await (await store.blob(row,'voice')).arrayBuffer()),tracks=[];
+      const rawBlob=await store.blob(row,'voice');
+      if(!rawBlob.size||rawBlob.size!==row.rawBytes)throw new Error('原始歌聲不完整，無法另存可繼續後製的成品。');
+      const raw=await context.decodeAudioData(await rawBlob.arrayBuffer()),tracks=[];
       if(row.mode==='mix')for(const stem of row.stems){const response=await localRequest(`/library/${row.post.reference.cacheId}/${stem}`);tracks.push(await context.decodeAudioData(await response.arrayBuffer()));}
       status(softening.id==='off'?'正在校正歌聲位置並合成…':`正在套用${softening.label}歌聲柔化並合成…`);
-      const audio=await remixRecording(raw,tracks,row,delayMs,{softening:softening.id}),blob=wavBlob(audio);
+      const audio=await remixRecording(raw,tracks,row,delayMs,{softening:softening.id,volume}),blob=wavBlob(audio);
       const result={id:crypto.randomUUID(),title:row.title,videoId:row.videoId,mode:row.mode,stems:row.stems,mime:'audio/wav',created:Date.now(),seconds:audio.duration,bytes:blob.size,complete:true,parentId:row.id,delayMs,appliedDelayMs:delayMs,vocalSoftening:{version:2,strength:softening.id}};
-      await store.save(result,blob,0);refresh(await store.list());$('post-recording').value=result.id;choose();clearAudio();url=URL.createObjectURL(blob);$('post-audio').src=url;$('post-audio').hidden=false;
-      status(`已另存校正後錄音${softening.id==='off'?'':`（歌聲柔化：${softening.label}）`}，請按下方播放鍵試聽；可轉 MP3。原錄音保留，請選回原錄音比較或調整。`);
+      result.postVolume=volume;
+      result.rawBytes=rawBlob.size;result.rawMime=row.rawMime||rawBlob.type||row.mime;
+      result.post=structuredClone(row.post);result.post.offsetMs=delayMs;
+      result.balance=structuredClone(row.balance);
+      result.sourceSeconds=row.sourceSeconds??row.seconds;
+      await store.saveRemix(result,blob,rawBlob);refresh(await store.list());$('post-recording').value=result.id;choose();clearAudio();url=URL.createObjectURL(blob);$('post-audio').src=url;$('post-audio').hidden=false;
+      status(`已另存校正後錄音${softening.id==='off'?'':`（歌聲柔化：${softening.label}）`} · 歌唱者 ${volume.voice}%${row.mode==='mix'?` · 配樂／和音 ${volume.backing}%`:''}，請按播放器試聽；可轉 MP3。原錄音保留，這筆成品也可繼續後製。`);
       window.dispatchEvent(new Event('recording-post-saved'));
     }finally{await context.close();}
   }));

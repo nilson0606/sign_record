@@ -233,7 +233,12 @@ try {
   await page.locator('#post-remix').click();await page.waitForFunction(()=>document.querySelector('#post-status').textContent.includes('已另存校正後錄音'));
   const remixed=(await records()).find(r=>r.parentId===harmonyRecord.id);assert.ok(remixed&&remixed.mime==='audio/wav');
   const remixedAudio=await spectrum(remixed.id);assert.ok(remixedAudio.voice>.02&&remixedAudio.backing>.02&&remixedAudio.harmony>.02,JSON.stringify(remixedAudio));
-  assert.ok(await page.locator('#post-audio').isVisible());assert.ok(await page.locator('#post-rescore').isDisabled());assert.ok(await page.locator('#post-difficulty').isDisabled());
+  assert.ok(await page.locator('#post-audio').isVisible());assert.ok(await page.locator('#post-rescore').isEnabled());assert.ok(await page.locator('#post-difficulty').isEnabled());
+  assert.equal(remixed.rawBytes,harmonyRecord.rawBytes);assert.equal(remixed.rawMime,harmonyRecord.rawMime);
+  assert.deepEqual(remixed.balance,harmonyRecord.balance);assert.equal(remixed.post.offsetMs,175);
+  const blobHash=(row,track='mix')=>page.evaluate(async({row,track})=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await(await recordStore.blob(row,track)).arrayBuffer()))).join(','),{row,track});
+  const originalRemixHash=await blobHash(remixed);
+  assert.equal(await blobHash(remixed,'voice'),await blobHash(harmonyRecord,'voice'));
   const mp3download=page.waitForEvent('download');await page.locator('#post-mp3').click();assert.ok((await mp3download).suggestedFilename().endsWith('+175ms.mp3'));
   await page.waitForFunction(()=>document.querySelector('#post-status').textContent.includes('MP3 已轉換'));
   await page.evaluate(id=>recordStore.delete(id),remixed.id);
@@ -246,12 +251,27 @@ try {
   await page.locator('#post-softening').selectOption('light');
   await page.locator('#post-remix').click();await page.waitForFunction(()=>document.querySelector('#post-status').textContent.includes('歌聲柔化：輕度'));
   const softened=(await records()).find(r=>r.parentId===harmonyRecord.id&&r.vocalSoftening?.strength==='light');assert.ok(softened);
-  assert.ok(await page.locator('#post-softening').isDisabled());
+  assert.ok(await page.locator('#post-softening').isEnabled());
   assert.match(await page.locator('#post-recording').locator('option:checked').textContent(),/柔化輕度/);
   assert.deepEqual((await records()).find(r=>r.id===harmonyRecord.id),sourceBeforeSoftening,'softening must preserve source and its scoring data');
   const softDownload=page.waitForEvent('download');await page.locator('#post-mp3').click();assert.ok((await softDownload).suggestedFilename().endsWith('_柔化輕度+175ms.mp3'));
   await page.waitForFunction(()=>document.querySelector('#post-status').textContent.includes('MP3 已轉換'));
+  // A saved product remains editable; repeated rendering replaces settings instead of compounding them.
+  await page.locator('#post-voice-level').fill('150');await page.locator('#post-backing-level').fill('50');
+  assert.equal(await page.locator('#post-voice-value').textContent(),'150%');
+  await page.locator('#post-remix').click();await page.waitForFunction(id=>document.querySelector('#post-recording').value!==id,softened.id);
+  const child=(await records()).find(r=>r.parentId===softened.id);assert.ok(child?.post&&child.rawBytes);
+  assert.deepEqual(child.postVolume,{voice:150,backing:50});assert.equal(child.vocalSoftening.strength,'light');
+  assert.equal(await blobHash(child,'voice'),await blobHash(harmonyRecord,'voice'));
+  assert.equal(await page.locator('#post-voice-level').inputValue(),'150');assert.equal(await page.locator('#post-backing-level').inputValue(),'50');
   await page.evaluate(id=>recordStore.delete(id),softened.id);
+  await page.locator('#post-remix').click();await page.waitForFunction(id=>document.querySelector('#post-recording').value!==id,child.id);
+  const grandchild=(await records()).find(r=>r.parentId===child.id);assert.equal(await blobHash(grandchild),await blobHash(child),'same settings produce identical audio even after source product is deleted');
+  await page.locator('#post-softening').selectOption('off');
+  await page.locator('#post-voice-level').fill('100');await page.locator('#post-backing-level').fill('100');
+  await page.locator('#post-remix').click();await page.waitForFunction(id=>document.querySelector('#post-recording').value!==id,grandchild.id);
+  const restored=(await records()).find(r=>r.parentId===grandchild.id);assert.equal(await blobHash(restored),originalRemixHash,'turning effects off restores rendering from the untouched raw source');
+  for(const row of [child,grandchild,restored])await page.evaluate(id=>recordStore.delete(id),row.id);
 
   assert.equal(await page.locator('#post-tuning').count(),0,'MIDI option is removed');
   assert.equal(softened.vocalTuning,undefined,'new remixes do not generate synth effects');
@@ -396,6 +416,27 @@ try {
   const softValues=softeningSpectrum.values;
   for(let i=1;i<softValues.length;i++){assert.ok(softValues[i].high<softValues[i-1].high*.95,JSON.stringify(softValues));assert.ok(Math.abs(softValues[i].low/softValues[0].low-1)<.03);assert.ok(Math.abs(softValues[i].backing/softValues[0].backing-1)<.01);assert.equal(softValues[i].duration,softValues[0].duration);}
   assert.ok(softValues[2].high<softValues[1].high*.65&&softValues[3].high<softValues[2].high*.5,JSON.stringify(softValues));
+  const volumes=await page.evaluate(async()=>{
+    const {remixRecording}=await import(new URL('recording-process.mjs',document.querySelector('script[src*="app."]').src));
+    const c=new AudioContext({sampleRate:48000}),rate=c.sampleRate;
+    const sine=hz=>{const b=c.createBuffer(1,rate,rate);for(let i=0;i<rate;i++)b.getChannelData(0)[i]=.03*Math.sin(2*Math.PI*hz*i/rate);return b;};
+    const raw=sine(440),tracks=[sine(660),sine(880)],meta={seconds:1,mode:'mix',post:{segments:[{offset:0,songTime:0,duration:1}],samples:[]}};
+    const power=(a,hz)=>{let re=0,im=0;for(let i=rate/2;i<rate;i++){re+=a[i]*Math.cos(2*Math.PI*hz*i/rate);im+=a[i]*Math.sin(2*Math.PI*hz*i/rate);}return 4*Math.hypot(re,im)/rate;};
+    const results=[];
+    for(const volume of [undefined,{voice:100,backing:100},{voice:50,backing:150},{voice:0,backing:100},{voice:100,backing:0},{voice:0,backing:0}]){
+      const out=await remixRecording(raw,tracks,meta,0,{volume}),a=out.getChannelData(0);
+      results.push({voice:power(a,440),backing:power(a,660),harmony:power(a,880),peak:Math.max(...a.map(Math.abs))});
+    }
+    const delayed=await remixRecording(raw,tracks,meta,-500);
+    const reset=await remixRecording(raw,tracks,{...meta,seconds:delayed.duration,sourceSeconds:1},0);
+    await c.close();return{results,resetDuration:reset.duration};
+  });
+  const [base,neutral,adjusted,muteVoice,muteBacking,silent]=volumes.results;
+  assert.deepEqual(base,neutral);assert.ok(Math.abs(adjusted.voice/base.voice-.5)<.002);
+  assert.ok(Math.abs(adjusted.backing/base.backing-1.5)<.002);assert.ok(Math.abs(adjusted.harmony/base.harmony-1.5)<.002);
+  assert.ok(muteVoice.voice<1e-5&&muteVoice.backing>.01&&muteVoice.harmony>.01);
+  assert.ok(muteBacking.voice>.01&&muteBacking.backing<1e-5&&muteBacking.harmony<1e-5);
+  assert.equal(silent.peak,0);assert.equal(volumes.resetDuration,1);
   console.log('SOFTENING',JSON.stringify(softeningSpectrum));
   await page.setViewportSize({width:1280,height:900});await page.locator('#recording-post').screenshot({path:'test-results/recording-post.png'});
   assert.deepEqual(errors,[]);

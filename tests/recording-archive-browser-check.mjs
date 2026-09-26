@@ -35,7 +35,18 @@ try{
  // Interrupted publication retries keep disk's newer result, then remove duplicate local bytes.
  await page.evaluate(async row=>{await localStore.save(row,new Blob(['mix123']),0);await localStore.save(row,new Blob(['voice']),0,'voice');await diskStore.list();},meta);
  assert.equal((await archive.get(meta.id)).postResult.rhythm,50);
+ // Editable remixes persist their own raw audio/settings and survive parent removal in another browser.
+ const remix=await page.evaluate(async row=>{
+   const source=(await diskStore.list()).find(r=>r.id===row.id),voice=await diskStore.blob(source,'voice');
+   const result={...row,id:crypto.randomUUID(),parentId:row.id,postVolume:{voice:150,backing:50},vocalSoftening:{version:2,strength:'light'},balance:{manual:false,voice:70,backing:30},sourceSeconds:2};
+   await diskStore.saveRemix(result,new Blob(['mix456']),voice);return result;
+ },meta);
+ const savedRemix=(await other.page.evaluate(()=>diskStore.list())).find(r=>r.id===remix.id);
+ assert.deepEqual(savedRemix.postVolume,{voice:150,backing:50});assert.equal(savedRemix.vocalSoftening.strength,'light');
+ assert.equal(await readFile((await archive.audio(remix.id,'voice')).file,'utf8'),'voice');
  await other.page.evaluate(async id=>{await diskStore.delete(id);},meta.id);
+ assert.equal((await archive.get(remix.id)).rawBytes,5);
+ await other.page.evaluate(async id=>{await diskStore.delete(id);},remix.id);
  await page.evaluate(async row=>{await localStore.save(row,new Blob(['mix123']),0);await localStore.save(row,new Blob(['voice']),0,'voice');},meta);
  assert.equal((await page.evaluate(()=>diskStore.list())).length,0,'deleted disk record must not resurrect from stale browser');
  await page.evaluate(async()=>{for(let i=0;i<2;i++){const row={id:crypto.randomUUID(),title:'Remix '+i,mime:'audio/wav',created:Date.now(),seconds:1,bytes:3,complete:true};await diskStore.save(row,new Blob(['wav']),0);}});

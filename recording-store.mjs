@@ -35,6 +35,13 @@ export class BrowserRecordingStore {
       tx.objectStore('chunks').put({id:meta.id,index:0,blob});tx.objectStore('takes').put(meta);
     });
   }
+  saveRemix(meta,mix,voice) {
+    return this.transaction('readwrite',tx=>{
+      tx.objectStore('takes').put(meta);
+      tx.objectStore('chunks').put({id:meta.id,index:0,blob:mix});
+      tx.objectStore('chunks').put({id:meta.id+':voice',index:0,blob:voice});
+    });
+  }
   list() {
     return this.transaction('readonly', (tx, done) => {
       tx.objectStore('takes').getAll().onsuccess = event => done(event.target.result.filter(x => x.bytes > 0).sort((a,b) => b.created - a.created));
@@ -94,7 +101,16 @@ export class RecordingStore {
         this.diskRows=this.diskRows.map(r=>r.id===meta.id?stored:r);return;
       }
       await this.browser.save(meta,chunk,index,track);
-      if(meta.complete&&meta.bytes){try{const info=await this.info(),stored=await this.move(meta,info);if(stored){Object.assign(meta,stored);this.diskRows=[stored,...this.diskRows.filter(r=>r.id!==meta.id)];}this.status('已保存至 '+info.path+'。');}catch(error){this.status('暫存在此瀏覽器，尚未搬存：'+error.message);}}
+      await this.archiveCompleted(meta);
+    });
+  }
+  async archiveCompleted(meta){
+    if(meta.complete&&meta.bytes){try{const info=await this.info(),stored=await this.move(meta,info);if(stored){Object.assign(meta,stored);this.diskRows=[stored,...this.diskRows.filter(r=>r.id!==meta.id)];}this.status('已保存至 '+info.path+'。');}catch(error){this.status('暫存在此瀏覽器，尚未搬存：'+error.message);}}
+  }
+  saveRemix(meta,mix,voice){
+    return this.serial(async()=>{
+      await this.browser.saveRemix(meta,mix,voice);
+      await this.archiveCompleted(meta);
     });
   }
   list(){return this.serial(async()=>{

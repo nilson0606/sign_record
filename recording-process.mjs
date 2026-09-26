@@ -56,14 +56,14 @@ export function wavBlob(buffer) {
   for(let i=0;i<frames;i++)for(let c=0;c<channels;c++){const x=Math.max(-1,Math.min(1,data[c][i]));view.setInt16(44+2*(i*channels+c),Math.round(x*(x<0?32768:32767)),true);}
   return new Blob([bytes],{type:'audio/wav'});
 }
-export async function remixRecording(raw, tracks, meta, ms, {softening='off'}={}) {
+export async function remixRecording(raw, tracks, meta, ms, {softening='off',volume}={}) {
   const shift=delaySeconds(ms), rate=raw.sampleRate;
-  const duration=Math.max(raw.duration+Math.max(0,-shift),meta.seconds);
+  const duration=Math.max(raw.duration+Math.max(0,-shift),meta.sourceSeconds??meta.seconds);
   if(duration>3600)throw new Error('後處理一次最多一小時。');
   const context=new OfflineAudioContext(2,Math.ceil(duration*rate),rate), voice=context.createBufferSource();voice.buffer=raw;
   const p=voicePlacement(raw.duration,ms);
   const singer=await softenedVoice(context,voice,voice.buffer,p,softening);
-  const mix=createRecordingMix(context,singer,context.destination,{mode:meta.mode,settings:meta.balance,voiced:()=>false});
+  const mix=createRecordingMix(context,singer,context.destination,{mode:meta.mode,settings:meta.balance,voiced:()=>false,volume});
   if(p.duration>0)voice.start(p.when,p.source,p.duration);
   const rms=(buffer,time)=>{
     const a=buffer.getChannelData(0),start=Math.max(0,Math.floor(time*rate)),end=Math.min(a.length,start+Math.floor(.1*rate));
