@@ -75,3 +75,68 @@ header{gap:18px;flex-wrap:wrap}
 #recording-post{margin:18px 0;grid-column:1/-1;scroll-margin-top:88px}#recording-post select{width:100%;min-width:0;max-width:100%}#recording-post .button-row,#recording-list .button-row{flex-wrap:wrap}#recording-post .button-row button{flex:1 1 220px}#post-audio{width:100%;max-width:100%}#post-score,#post-status{overflow-wrap:anywhere}
 
 #prepare-settings{margin:0 0 18px}#prepare-settings>summary{color:var(--accent);font-size:17px;font-weight:700;border:1px solid var(--line);border-radius:10px;padding:14px 16px}#prepare-settings[open]>summary{margin-bottom:18px}
+
+/* The first UI revision keeps optional tools in native, keyboard-accessible folds. */
+.layout{align-items:start}
+.section-fold{margin:0;font-size:inherit}
+.section-fold>summary{color:var(--accent);font-size:17px;font-weight:700;padding:0;line-height:1.7}
+.fold-caption{font-size:12px;font-weight:400;color:var(--soft);margin-left:12px}
+.fold-body{padding-top:24px}
+.settings-fold>summary{color:var(--accent);font-size:17px;font-weight:700;border:1px solid var(--line);border-radius:10px;padding:14px 16px;line-height:1.7}
+.settings-fold[open]>summary{margin-bottom:20px}
+.settings-fold{margin:0 0 18px}
+.preset-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:20px 0 12px}
+.preset-heading h3{margin:0;color:var(--text)}
+.preparation-preset{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0}
+.preparation-preset>div{padding:14px 16px;border:1px solid var(--line);background:var(--inset-bg);border-radius:10px}
+.preparation-preset dt{color:var(--soft);font-size:12px;margin-bottom:6px}
+.preparation-preset dd{color:var(--text);font-size:14px;line-height:1.6;margin:0;overflow-wrap:anywhere}
+.settings-subsection{border-top:1px solid var(--line);padding-top:22px;margin-top:24px;min-width:0}
+.settings-subsection h3{font-size:18px;color:var(--accent);margin-bottom:14px}
+#score-settings>label:first-of-type{margin-top:18px}
+@media(max-width:760px){.preparation-preset{grid-template-columns:repeat(2,minmax(0,1fr))}.fold-caption{display:block;margin:5px 0 0 20px}}
+@media(max-width:420px){.preparation-preset{grid-template-columns:1fr}.preset-heading{flex-wrap:wrap}}
+
+#prepare-status:empty{min-height:0;margin:0}
+
+/* Player and live pitch share the first row; tools continue below. */
+.voice-settings{margin-bottom:18px}
+.layout{grid-template-columns:repeat(2,minmax(0,1fr))}
+.layout>.card,.layout>details{grid-column:1/-1}
+.layout>#player-section,.layout>#voice-section{grid-column:auto}
+.library-card{grid-column:1/-1}
+.library-card #library-panel{margin:0}
+.library-card #library-panel>summary{margin:0}
+.library-card #library-panel[open]>summary{margin-bottom:18px}
+#recording-settings>label:first-of-type{margin-top:18px}
+@media(max-width:760px){.layout{grid-template-columns:minmax(0,1fr)}}
+
+.player-session{border-top:1px solid var(--line);margin-top:20px;padding-top:16px;scroll-margin-top:88px}
+.player-session .score-title{margin:0 0 14px;overflow-wrap:anywhere}
+.player-session .score-grid{grid-template-columns:1.3fr repeat(3,minmax(0,1fr));gap:12px;margin:22px 0 16px}
+.player-session .status{overflow-wrap:anywhere}
+.player-session:focus{outline:none}
+
+.local-tools{margin:0 0 18px}
+.local-tools>summary{padding:0;color:var(--text);font-size:20px;font-weight:750;line-height:1.6}
+.local-tools>summary h2{display:inline}
+.local-tools[open]>summary{margin-bottom:20px}
+
+/* Keep every recording action group on the same right edge. */
+#recording-list li{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:6px 20px}
+#recording-list li>strong,#recording-list li>small{grid-column:1;min-width:0;overflow-wrap:anywhere}
+#recording-list .button-row{grid-column:2;grid-row:1 / span 2;display:flex;flex-direction:column;flex-wrap:nowrap;width:100%;margin:0;align-self:center}
+#recording-list .button-row button{flex:0 0 auto;width:100%}
+@media(max-width:600px){#recording-list li{grid-template-columns:minmax(0,1fr)}#recording-list .button-row{grid-column:1;grid-row:auto;justify-self:end;width:min(100%,220px)}}
+
+#recording-post #selected-recording-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px}
+#selected-recording-actions button{min-width:0}
+
+.layout>#recording-post,.layout>.score-card{margin:0}
+
+#voice-output{min-width:0;border:1px solid var(--line);border-radius:10px;padding:14px;margin:18px 0}
+#voice-output legend{color:var(--accent);font-size:14px}
+#voice-output .input-row{margin-bottom:16px}
+#voice-output-device{min-width:0;flex:1}
+#voice-output-volume-value{float:right;color:var(--accent)}
+#voice-output .footnote{margin-bottom:0}

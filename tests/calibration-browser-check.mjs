@@ -28,6 +28,7 @@ try {
   const page = await context.newPage(), errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('http://localhost:4273/');
+  await page.locator('#timing-section > summary').click();
   await page.locator('#calibration-panel summary').click();
   await page.locator('#cal-start').click();
   assert.match(await page.locator('#cal-status').innerText(), /先開啟麥克風/);

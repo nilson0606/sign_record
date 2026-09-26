@@ -24,11 +24,12 @@ try {
   await page.locator('#library-panel summary').click();
   await page.locator('#library-refresh').click();
   const sample = page.locator('#library-list li').filter({ hasText: 'Twinkle Twinkle Little Star' });
+  await page.locator('#timing-section > summary').click();
   await page.locator('#offset').fill('270');
   await sample.getByRole('button', { name: /^載入 / }).click();
   await page.waitForFunction(() => document.querySelector('#prepare-status').textContent.includes('直接載入本機基準'));
   assert.equal(await page.locator('#offset').inputValue(), '270', 'song loading must keep calibration');
-  await page.locator('#preview-panel summary').click();
+  await page.locator('#prepare-settings > summary').click();
   for (const stem of ['vocals', 'accompaniment']) {
     await page.locator('#preview-' + stem).click();
     await page.waitForFunction(() => {

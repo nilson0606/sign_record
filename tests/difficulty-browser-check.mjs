@@ -7,6 +7,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 const require = createRequire(process.env.PLAYWRIGHT_PACKAGE_ROOT || 'C:/Users/User/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/package.json');
 const { chromium } = require('playwright');
+const site = `http://localhost:${process.env.PORT || 4273}`;
 const root = path.resolve(import.meta.dirname, '..');
 const rate = 48000, data = Buffer.alloc(44 + rate * 3 * 2);
 data.write('RIFF'); data.writeUInt32LE(data.length - 8, 4); data.write('WAVEfmt ', 8); data.writeUInt32LE(16, 16);
@@ -18,7 +19,7 @@ const server = spawn(process.execPath, ['server.mjs'], { cwd: root, windowsHide:
 let browser;
 try {
   await new Promise((resolve, reject) => { server.stdout.once('data', resolve); server.once('error', reject); server.stderr.once('data', chunk => reject(new Error(chunk.toString()))); });
-  browser = await chromium.launch({ channel: process.env.BROWSER_CHANNEL || 'msedge', headless: true, args: ['--disable-gpu', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${fixture}`] });
+  browser = await chromium.launch({ channel: process.env.BROWSER_CHANNEL || 'msedge', headless: true, args: ['--mute-audio', '--disable-gpu', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${fixture}`] });
   const context = await browser.newContext();
   await context.addInitScript(() => {
     window.YT = { Player: class {
@@ -38,7 +39,7 @@ try {
   const bareRequests=[];
   if(process.env.KARAOKE_SITE_DIR) {
     // A returning browser may still have stale responses at these pre-versioning URLs.
-    await page.route('http://localhost:4273/**',async route=>{
+    await page.route(site+'/**',async route=>{
       const pathname=new URL(route.request().url()).pathname;
       if(/^\/[a-z-]+\.(?:mjs|css)$/.test(pathname)) {
         bareRequests.push(pathname);
@@ -49,29 +50,30 @@ try {
   let serial = 0;
   await page.route('http://127.0.0.1:4274/**', async route => {
     const req=route.request(), url=new URL(req.url()); let value={};
-    if(url.pathname==='/session')value={token:'fixture',features:['library','library-location','separation-progress','rebuild-song','lead-vocals']};
+    if(url.pathname==='/session')value={token:'fixture',features:['library','library-location','separation-progress','pitch-methods','rebuild-song','lead-vocals']};
     else if(url.pathname==='/library/location')value={configured:true,path:'C:/fixture-only'};
     else if(url.pathname==='/library')value={songs:[]};
     else if(req.method()==='DELETE') {removed.push(url.pathname);value={cleared:true};}
     else if(req.method()==='POST') {requests.push(req.postDataJSON());value={id:String(++serial).padStart(32,'0')};}
     else if(url.pathname.endsWith('/reference')) {
       const request=requests[Number(url.pathname.split('/')[2])-1];
-      value={version:1,videoId:request.videoId,vocalMode:request.vocalMode||'all',cacheId:request.videoId+(request.vocalMode==='lead'?'_30_lead_v1':'_30_v1'),title:'Preview fixture',step:.1,duration:30,frames:Array(300).fill(440),rangeSeconds:request.seconds,hasPreview:Number(url.pathname.split('/')[2]) > 1,beats:[],bpm:0};
+      value={version:1,videoId:request.videoId,vocalMode:request.vocalMode||'all',cacheId:request.videoId+(request.vocalMode==='lead'?'_30_lead_v1':'_30_v1'),title:'Preview fixture',pitchMethod:request.pitchMethod||'yin',step:.1,duration:30,frames:Array(300).fill(440),rangeSeconds:request.seconds,hasPreview:Number(url.pathname.split('/')[2]) > 1,beats:[],bpm:0};
     } else if(url.pathname.startsWith('/library/')) {
-      await route.fulfill({body:data,contentType:'audio/wav',headers:{'Access-Control-Allow-Origin':'http://localhost:4273'}});return;
+      await route.fulfill({body:data,contentType:'audio/wav',headers:{'Access-Control-Allow-Origin':site}});return;
     } else value={stage:'ready',ready:true,message:'ready'};
-    await route.fulfill({json:value,headers:{'Access-Control-Allow-Origin':'http://localhost:4273'}});
+    await route.fulfill({json:value,headers:{'Access-Control-Allow-Origin':site}});
   });
-  await page.goto('http://localhost:4273/');
+  await page.goto(site+'/');
   assert.equal(await page.locator('#prepare-settings').getAttribute('open'),null);
   await page.locator('#prepare-settings > summary').click();
-  await page.locator('#pitch-method').selectOption('yin'); // This scenario uses a saved YIN fixture.
-  await page.locator('#separation-method').selectOption('single');
-  await page.locator('#separation-model').selectOption('demucs');await page.locator('#vocal-mode').selectOption('all');
+  await page.locator('#score-settings > summary').click();
   assert.equal(await page.locator('#score-range').inputValue(),'performed');
-  assert.equal(await page.locator('#score-difficulty').inputValue(),'standard');
+  assert.equal(await page.locator('#score-difficulty').inputValue(),'relaxed');
+  // Scoring-only fixtures do not provide saved backing tracks.
+  // The recording suite separately verifies the default mix and missing-stem guard.
+  await page.locator('#recording-settings > summary').click();
+  await page.locator('#recording-mode').selectOption('off');
   await page.locator('#url').fill('https://youtu.be/M7lc1UVf-VE');
-  await page.locator('#clip-seconds').selectOption('30');
   await page.locator('#prepare-song').click();
   await page.waitForFunction(()=>document.querySelector('#prepare-status').textContent.startsWith('已就緒'));
   for(const [difficulty,label] of [['standard','標準'],['strict','嚴格'],['relaxed','寬鬆']]) {

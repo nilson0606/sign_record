@@ -1,11 +1,12 @@
 // Bookmarks only change page position; they never touch playback or the current take.
 const nav = document.querySelector('.section-nav');
 function visit(hash) {
-  const link = [...nav.querySelectorAll('a')].find(item => item.hash === hash);
-  if (!link) return;
+  if (!hash.startsWith('#')) return;
   const target = document.getElementById(hash.slice(1));
   if (!target) return;
-  if (target instanceof HTMLDetailsElement) target.open = true;
+  for (let node = target; node; node = node.parentElement) {
+    if (node instanceof HTMLDetailsElement) node.open = true;
+  }
   target.focus({ preventScroll: true });
   target.scrollIntoView({ block: 'start' });
 }

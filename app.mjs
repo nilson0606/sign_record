@@ -49,18 +49,175 @@ $('environment').textContent = supported ? '桌機收音環境就緒。可測試
 $('environment').classList.toggle('error', !supported);
 $('mic-start').disabled = !supported;
 const status = text => { $('player-status').textContent = text; };
+const voiceOutput = createVoiceOutput();
+function createVoiceOutput() {
+  const toggle=$('voice-output-enabled'), device=$('voice-output-device');
+  const volume=$('voice-output-volume'), message=$('voice-output-status');
+  let input=null, nativeInput=null, request=0, deviceRequest=0, output=null;
+  const canChoose=typeof AudioContext.prototype.setSinkId==='function';
+  device.disabled=!canChoose;
+  function release(session){
+    if(!session)return;
+    if(session.speaker){session.speaker.disconnect();return;}
+    session.context.onstatechange=null;
+    session.nativeSource?.disconnect();session.source?.disconnect();session.gain?.disconnect();
+    if(session.context.state!=='closed')session.context.close().catch(()=>{});
+  }
+  function detach(){const previous=output;output=null;release(previous);}
+  function setVolume(){
+    output?.speaker?.setVolume(Number(volume.value)/100);
+    if(output?.gain)output.gain.gain.setTargetAtTime(Number(volume.value)/100,output.context.currentTime,.005);
+    $('voice-output-volume-value').textContent=volume.value+'%';
+  }
+  function silence(text){
+    request++;detach();toggle.checked=false;
+    message.textContent=text|| (input?'歌聲輸出已關閉，麥克風仍持續收音。':'請先開啟麥克風，再勾選歌聲輸出。');
+  }
+  async function play(){
+    const current=++request, source=input, native=nativeInput, sinkId=device.value;
+    detach();
+    if(!toggle.checked||!source||source.getAudioTracks().every(t=>t.readyState!=='live'))return silence();
+    message.textContent='正在啟動低延遲歌聲輸出…';
+    let session;
+    try{
+      if(native?.createSpeakerMonitor){
+        session={speaker:native.createSpeakerMonitor({deviceId:sinkId,volume:Number(volume.value)/100,onError:error=>{if(current===request)silence('歌聲輸出中斷：'+error.message);}})};
+        output=session;
+        await session.speaker.ready;
+        if(current!==request||source!==input||!toggle.checked){release(session);return;}
+        message.textContent='本機歌聲直送喇叭中 · '+device.selectedOptions[0].textContent;
+        return;
+      }
+      const context=new AudioContext({latencyHint:'interactive',...(native?.createMonitorSource?{sampleRate:native.monitorSampleRate}:{})});
+      session={context,source:null,gain:null};output=session;
+      await Promise.all([context.resume(),canChoose?context.setSinkId(sinkId):Promise.resolve()]);
+      if(current!==request||source!==input||!toggle.checked){release(session);return;}
+      if(native?.createMonitorSource){
+        session.nativeSource=await native.createMonitorSource(context,error=>{if(current===request)silence('歌聲輸出中斷：'+error.message);});
+        if(current!==request||source!==input||!toggle.checked){release(session);return;}
+        session.source=session.nativeSource.node;
+      }else session.source=context.createMediaStreamSource(source);
+      session.gain=context.createGain();
+      session.gain.gain.value=Number(volume.value)/100;
+      session.source.connect(session.gain);session.gain.connect(context.destination);
+      context.onstatechange=()=>{if(output===session&&context.state!=='running')silence('歌聲輸出已暫停，請確認喇叭後重新開啟。');};
+      message.textContent='低延遲歌聲輸出中 · '+device.selectedOptions[0].textContent;
+    }catch(error){
+      release(session);
+      if(current!==request)return;
+      silence(error.name==='NotAllowedError'?'歌聲輸出未獲允許，請確認瀏覽器的音訊播放與輸出裝置權限後重試。':error.name==='NotFoundError'?'找不到選取的喇叭，請重新整理並選擇輸出裝置。':'歌聲輸出失敗：'+error.message);
+    }
+  }
+  async function refreshDevices(){
+    const current=++deviceRequest, previous=device.value, native=nativeInput;
+    try{
+      const devices=native?.speakerDevices?await native.speakerDevices():await navigator.mediaDevices?.enumerateDevices();
+      if(current!==deviceRequest)return;
+      device.disabled=!(native?.speakerDevices||canChoose);
+      device.replaceChildren(new Option('系統預設喇叭',''));
+      if(native?.speakerDevices||canChoose)for(const [i,d] of (devices||[]).filter(d=>d.kind==='audiooutput'&&d.deviceId&&d.deviceId!=='default').entries())device.append(new Option(d.label||'喇叭 '+(i+1),d.deviceId));
+      if([...device.options].some(o=>o.value===previous))device.value=previous;
+      else if(toggle.checked)silence('原輸出裝置已離線，請重新選擇喇叭並開啟歌聲輸出。');
+      if(!native?.speakerDevices&&!canChoose&&!toggle.checked)message.textContent='此瀏覽器使用系統預設喇叭；開啟麥克風後可勾選歌聲輸出。';
+    }catch{if(current===deviceRequest&&!toggle.checked)message.textContent='無法取得喇叭清單；可先使用系統預設喇叭。';}
+  }
+  toggle.addEventListener('change',()=>{if(toggle.checked)play();else silence();});
+  device.addEventListener('change',()=>{if(toggle.checked)play();});
+  volume.addEventListener('input',setVolume);
+  $('voice-output-refresh').addEventListener('click',refreshDevices);
+  setVolume();refreshDevices();
+  return {
+    attach(source,native=null){input=source;nativeInput=native;device.value='';toggle.disabled=false;refreshDevices();},
+    stop(){input=null;nativeInput=null;toggle.disabled=true;silence();refreshDevices();},
+    refreshDevices
+  };
+}
+
 function resetOffset() { $('offset').value = $('offset').defaultValue; $('offset-value').textContent = `${$('offset').value} ms`; }
 function loadAPI() {
   if (window.YT?.Player) return Promise.resolve();
   if (apiPromise) return apiPromise;
   apiPromise = new Promise((resolve, reject) => {
+    // iframe_api sets YT.loading before it fetches www-widgetapi. If the latter
+    // fails, loading iframe_api again is a no-op. Retry the observed official
+    // widget URL instead; do not mutate YouTube's private loading flags.
+    const previous = document.getElementById('www-widgetapi-script');
+    const widgetUrl = previous?.src;
+    const retryWidget = !!widgetUrl && /^https:\/\/www\.youtube\.com\/s\/player\/[a-zA-Z0-9_./-]+\/www-widgetapi\.js$/.test(widgetUrl);
     const script = document.createElement('script');
-    const fail = () => { clearTimeout(timer); script.remove(); apiPromise = null; reject(new Error('YouTube 載入失敗或逾時，請檢查網路並重試。')); };
-    const timer = setTimeout(fail, 15000);
-    window.onYouTubeIframeAPIReady = () => { clearTimeout(timer); resolve(); };
-    script.src = 'https://www.youtube.com/iframe_api'; script.onerror = fail; document.head.append(script);
+    let settled = false;
+    const cleanup = () => {
+      clearTimeout(timer); window.removeEventListener('error', resourceError, true);
+      script.onerror = null;
+      if (window.onYouTubeIframeAPIReady === ready) window.onYouTubeIframeAPIReady = undefined;
+    };
+    const fail = text => {
+      if (settled) return;
+      settled = true; cleanup();
+      // Keep the failed widget element's URL for the next explicit retry.
+      if (!retryWidget) script.remove();
+      apiPromise = null; reject(new Error(text));
+    };
+    const ready = () => {
+      if (settled || !window.YT?.Player) return;
+      settled = true; cleanup(); resolve();
+    };
+    const resourceError = event => {
+      if (event.target?.id === 'www-widgetapi-script') fail('YouTube 播放器程式（第二段）載入失敗，請按「載入影片」重試。歌曲基準仍保留在本機。');
+    };
+    const timer = setTimeout(() => fail('YouTube 播放器程式載入逾時，請按「載入影片」重試。這不是本機歌曲基準或安裝失敗。'), 15000);
+    window.onYouTubeIframeAPIReady = ready;
+    window.addEventListener('error', resourceError, true);
+    script.src = retryWidget ? widgetUrl : 'https://www.youtube.com/iframe_api';
+    script.onerror = () => fail('YouTube 播放器入口程式連線失敗，請按「載入影片」重試。歌曲基準仍保留在本機。');
+    if (retryWidget) { script.id = 'www-widgetapi-script'; previous.replaceWith(script); }
+    else document.head.append(script);
   });
   return apiPromise;
+}
+function initializePlayer(id) {
+  if (playerReady) return playerReady;
+  const attempt = { active: true, ready: false, instance: null };
+  let readyTimeout;
+  playerReady = new Promise((resolve, reject) => {
+    readyTimeout = setTimeout(() => reject(new Error('YouTube 播放器初始化逾時，請按「載入影片」重試；不需要重新安裝本機工具。')), 20000);
+    attempt.instance = player = new YT.Player('player', { width: '100%', height: '100%', videoId: id,
+      playerVars: { playsinline: 1, origin: location.origin, autoplay: 0 },
+      events: {
+        onReady: () => {
+          if (!attempt.active) return;
+          attempt.ready = true; clearTimeout(readyTimeout); resolve();
+          $('video-placeholder').style.display = 'none'; status('請按影片上的播放按鈕。');
+        },
+        onStateChange: e => {
+          if (!attempt.active) return;
+          tracePlayback('youtube-state',{state:e.data});
+          status(({ '-1': '尚未開始', 0: '影片結束', 1: '播放中', 2: '暫停', 3: '緩衝中', 5: '已就緒' }[e.data] || '播放器狀態變更'));
+          if (e.data === 1) calibration?.cancel(); singing.playerState(e.data);
+        },
+        onAutoplayBlocked: () => { if (attempt.active) status('請直接點影片上的播放按鈕。'); },
+        onError: e => {
+          if (!attempt.active) return;
+          clearTimeout(readyTimeout);
+          const text = `影片無法播放（${e.data}）。可能禁止嵌入、已移除或需登入；請換影片。`;
+          if (!attempt.ready) reject(new Error(text));
+          status(text); singing.playerState(2);
+        }
+      }
+    });
+  }).catch(error => {
+    // A failed iframe cannot be reused. Ignore its late callbacks and restore
+    // the mount so the next user request starts a fresh player.
+    attempt.active = false; clearTimeout(readyTimeout);
+    try { attempt.instance?.destroy?.(); } catch {}
+    player = null; playerReady = null;
+    const mount = document.createElement('div'); mount.id = 'player';
+    if ($('player')) $('player').replaceWith(mount);
+    else $('video-placeholder').after(mount);
+    $('video-placeholder').style.display = '';
+    throw error;
+  });
+  return playerReady;
 }
 async function loadVideo(e) {
   e?.preventDefault();
@@ -72,20 +229,10 @@ async function loadVideo(e) {
     tracePlayback('load-video-request',{videoId:id});
     await singing.changeSong(id);
     await loadAPI();
-    if (player) { player.cueVideoById(id); status('影片已切換，請在播放器內按播放。'); }
-    else { playerReady = new Promise((resolve, reject) => {
-      const readyTimeout = setTimeout(() => reject(new Error('播放器初始化逾時，請重新載入頁面。')), 20000);
-      player = new YT.Player('player', { width: '100%', height: '100%', videoId: id,
-      playerVars: { playsinline: 1, origin: location.origin, autoplay: 0 },
-      events: {
-        onReady: () => { clearTimeout(readyTimeout); resolve(); $('video-placeholder').style.display = 'none'; status('請按影片上的播放按鈕。'); },
-        onStateChange: e => { tracePlayback('youtube-state',{state:e.data}); status(({ '-1': '尚未開始', 0: '影片結束', 1: '播放中', 2: '暫停', 3: '緩衝中', 5: '已就緒' }[e.data] || '播放器狀態變更')); if (e.data === 1) calibration?.cancel(); singing.playerState(e.data); },
-        onAutoplayBlocked: () => status('請直接點影片上的播放按鈕。'),
-        onError: e => { clearTimeout(readyTimeout); reject(new Error(`影片無法播放（${e.data}），請換影片。`)); status(`影片無法播放（${e.data}）。可能禁止嵌入、已移除或需登入；請換影片。`); singing.playerState(2); }
-      }
-    });
-    }); }
-    await playerReady; tracePlayback('load-video-ready',{videoId:id}); return true;
+    const existing = !!playerReady;
+    await initializePlayer(id);
+    if (existing) { player.cueVideoById(id); status('影片已切換，請在播放器內按播放。'); }
+    tracePlayback('load-video-ready',{videoId:id}); return true;
   } catch (err) { status(err.message); return false; } finally { button.disabled = false; }
 }
 $('song-form').addEventListener('submit', loadVideo);
@@ -138,7 +285,7 @@ $('probe').addEventListener('click', async () => {
 function latency(x) { return Number.isFinite(x) ? `${Math.round(x * 1000)} ms（估計）` : '未提供，不能當作 0 ms'; }
 $('offset').addEventListener('input', () => { $('offset-value').textContent = `${$('offset').value} ms`; });
 async function stopMic(message = '收音已停止，麥克風已釋放；錄音結果請查看下方錄音狀態。', rewind = false) {
-  generation++; clearInterval(micTimer); calibration?.cancel();
+  generation++; clearInterval(micTimer); calibration?.cancel(); voiceOutput.stop();
   const recordingEnd = singing.stopRecording();
   micAbort?.abort(); micAbort=null; nativeCapture?.stop(); nativeCapture=null;
   const oldStream = stream, oldContext = context;
@@ -184,6 +331,7 @@ async function activateMic() {
     track.onunmute = () => { $('mic-status').textContent = '收音已恢復。'; };
     context.onstatechange = () => { if (context?.state !== 'running') $('mic-status').textContent = '音訊處理暫停，請停止後重新開啟。'; };
     $('mic-badge').textContent = '● 收音中'; $('mic-status').textContent = '持續唱「啊」試試。單獨測試麥克風不保存；按「從頭開始唱」依錄音選項保存。';
+    voiceOutput.attach(stream,nativeCapture);
     micTimer = setInterval(readMic, 65); tracePlayback('mic-before-session'); singing.micStarted(); tracePlayback('mic-after-session');
     setTimeout(()=>{if(token===generation)tracePlayback('mic-after-1s');},1000); return true;
   } catch (err) {
@@ -262,7 +410,7 @@ setInterval(() => {
   if (!player?.getCurrentTime) return; const t = player.getCurrentTime(); if (!Number.isFinite(t)) return;
   $('player-time').textContent = `${t.toFixed(2)} s`; $('aligned-time').textContent = `${alignedTime(t, Number($('offset').value)).toFixed(2)} s`;
 }, 100);
-navigator.mediaDevices?.addEventListener('devicechange', () => { resetOffset(); if (stream) stopMic('裝置已變更，補償已回到預設＋150 ms。請重新開啟收音並校正。'); });
+navigator.mediaDevices?.addEventListener('devicechange', () => { voiceOutput.refreshDevices(); resetOffset(); if (stream) stopMic('裝置已變更，補償已回到預設＋150 ms。請重新開啟收音並校正。'); });
 function cleanup() { probeController?.abort(); stopBeats(); stopMic('頁面已離開前景，收音已停止。請重新開啟。'); }
 document.addEventListener('visibilitychange', () => { if (document.hidden) cleanup(); }); window.addEventListener('pagehide', cleanup);
 

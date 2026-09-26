@@ -32,6 +32,7 @@ try {
   await page.getByRole('button', { name: '停止收音', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('#mic-stop').disabled);
   assert.equal(await page.locator('#note').innerText(), '—');
+  await page.locator('#timing-section > summary').click();
   await page.getByRole('button', { name: '啟動節拍燈' }).click();
   assert.equal(await page.locator('#beats .active').count(), 1);
   await page.getByRole('button', { name: '停止節拍燈' }).click();

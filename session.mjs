@@ -180,7 +180,7 @@ export function createKaraokeSession(options) {
     if (!reference || take || ['preparing','finishing','restarting'].includes(phase)) return;
     $('url').value = `https://www.youtube.com/watch?v=${reference.videoId}`;
     $('clip-seconds').value = String(reference.rangeSeconds);
-    prepareSong(true);
+    prepareSong(true, true);
   });
   $('preview-build').addEventListener('click', () => {
     if (!reference || reference.hasPreview || take || ['preparing','finishing','restarting'].includes(phase)) return;
@@ -191,7 +191,7 @@ export function createKaraokeSession(options) {
     $('pitch-method').value = reference.pitchMethod || 'yin';
     $('separation-method').value = reference.separationMethod || 'single';
     $('keep-preview').checked = true;
-    $('prepare-song').click();
+    prepareSong(false, true);
   });
   function stopPreview() {
     previewSerial++; previewRequest?.abort(); previewRequest = null;
@@ -252,7 +252,7 @@ export function createKaraokeSession(options) {
           $('pitch-method').value = song.pitchMethod || 'yin';
           $('separation-method').value = song.separationMethod || 'single';
           $('clip-seconds').value = String(song.seconds); $('vocal-mode').value = song.vocalMode || 'all';
-          $('prepare-song').click();
+          prepareSong(false, true);
         });
         remove.addEventListener('click', async () => {
           if (['preparing','finishing','restarting'].includes(phase)) return;
@@ -382,10 +382,16 @@ export function createKaraokeSession(options) {
       $('install-guide').open = true;
     }
   }
-  async function prepareSong(force = false) {
+  async function prepareSong(force = false, preserveVersion = false) {
     const id = youtubeId($('url').value.trim());
     if (maskBusy) return;
     if (!id) { $('prepare-status').textContent = '請先填入有效的 YouTube 影片網址。'; return; }
+    // New preparations use the fixed UI preset. Explicit library/rebuild actions
+    // retain the saved version, including old ranges, models and four-stem audio.
+    if (!preserveVersion) {
+      for (const [control, value] of Object.entries({ 'clip-seconds': '0', 'pitch-method': 'rmvpe', 'separation-model': 'demucs', 'separation-method': 'single', 'vocal-mode': 'all' })) $(control).value = value;
+    }
+    $('keep-preview').checked = true;
     requestedVocalMode = $('vocal-mode').value; requestedModel = $('separation-model').value; requestedPitch = $('pitch-method').value; requestedMethod = $('separation-method').value;
     const clearing = clear('正在連接本機工具…');
     const current = generation; loadedVideo = id;
@@ -401,7 +407,7 @@ export function createKaraokeSession(options) {
       if (requestedVocalMode === 'lead' && !helper.features?.includes('lead-vocals')) throw new Error('本機工具需要更新才能使用主唱／和音分離，請更新工具包並重新執行 setup-local.ps1。');
       if (force && !helper.features?.includes('rebuild-song')) throw new Error('本機工具需要更新才能重新分離，請更新工具包並重新啟動。');
       if (!libraryLocation.configured) throw new Error('請先指定歌曲庫資料夾，再準備歌曲。');
-      if (!await options.loadVideo()) throw new Error('播放器尚未就緒，請重新載入影片後再試。');
+      if (!await options.loadVideo()) throw new Error('播放器未就緒：' + $('player-status').textContent);
       if (current !== generation) return;
       options.player()?.pauseVideo?.();
       await ensureSession();
@@ -412,7 +418,7 @@ export function createKaraokeSession(options) {
     } catch (error) {
       if (current !== generation) return;
       phase = 'idle'; $('prepare-progress-panel').hidden = true; $('prepare-status').textContent = '無法準備歌曲：' + (error instanceof TypeError || error.name === 'TimeoutError' ? '請先啟動本機工具，並允許本機網路存取。' : error.message);
-      $('install-guide').open = true; controls();
+      controls();
     }
   }
   $('prepare-song').addEventListener('click', () => prepareSong());

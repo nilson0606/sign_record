@@ -66,6 +66,12 @@ test('helper enforces setup, auth and idle-only changes; selected library surviv
     assert.equal((await request('/microphone/stream','POST',{deviceId:''},false)).status,403);
     assert.equal((await request('/microphone/stream','POST',{})).status,400);
     assert.equal((await request('/microphone/stream','GET')).status,405);
+    assert.ok((await(await request('/session')).json()).features.includes('native-speaker-output'));
+    assert.equal((await request('/microphone/outputs','GET',undefined,false)).status,403);
+    assert.equal((await request('/microphone/monitor','POST',{},false)).status,403);
+    assert.equal((await request('/microphone/monitor','POST',{})).status,400);
+    assert.equal((await request('/microphone/monitor','POST',{action:'set',captureId:'stale',sequence:1,enabled:true,deviceId:'',volume:2})).status,400);
+    assert.equal((await request('/microphone/monitor','POST',{action:'set',captureId:'stale',sequence:1,enabled:true,deviceId:'',volume:.3})).status,409);
     assert.equal((await request('/recordings/mp3','POST',{},false)).status,403);
     assert.equal((await request('/recordings','GET',undefined,false)).status,403);
     assert.equal((await request('/recordings/mp3','POST',{})).status,400);

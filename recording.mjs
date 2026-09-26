@@ -14,7 +14,7 @@ export function createSingerRecorder(options) {
     $('recording-manual').checked = saved.manual; $('recording-voice-level').value = saved.voice; $('recording-backing-level').value = saved.backing;
   } catch {}
   function balanceSettings() { return mixSettings({manual:$('recording-manual').checked,voice:Number($('recording-voice-level').value),backing:Number($('recording-backing-level').value)}); }
-  const post = createRecordingPost({store, stop:()=>stop(), reference:options.reference, pause:options.pausePlayer});
+  const post = createRecordingPost({store, stop:()=>stop(), reference:options.reference, pause:()=>{options.pausePlayer();$('recording-audio').pause();}, download, onDelete:async()=>{clearPreview();await render();}});
   const status = text => { $('recording-status').textContent = text; };
   function controls() {
     const mode=$('recording-mode').value, manual=$('recording-manual').checked;
@@ -33,8 +33,12 @@ export function createSingerRecorder(options) {
     const audio = $('recording-audio'); audio.pause(); audio.removeAttribute('src'); audio.load(); audio.hidden = true;
     if (previewURL) URL.revokeObjectURL(previewURL); previewURL = null;
   }
-  async function render() {
+  async function render(savedId = null) {
     const rows = await store.list(), list = $('recording-list'); list.replaceChildren(); post.refresh(rows);
+    if(savedId && rows.some(row=>row.id===savedId&&row.complete)){
+      post.select(savedId,{scroll:false});
+      $('post-status').textContent='已選取最新錄音，可試聽、下載或後處理。';
+    }
     if (!rows.length) { const li = document.createElement('li'); li.textContent = '尚無演唱錄音。'; list.append(li); }
     for (const row of rows) {
       const li = document.createElement('li'), label = document.createElement('strong'), info = document.createElement('small'), buttons = document.createElement('div');
@@ -169,6 +173,7 @@ export function createSingerRecorder(options) {
       a.mix.disconnect(); a.destination.stream.getTracks().forEach(t=>t.stop());
       if (!wasStarted || !a.meta.bytes) { status('未開始播放，沒有保存空白錄音。'); return; }
       a.meta.seconds = a.elapsed;
+      let savedId=null;
       try {
         if (a.error) throw a.error;
         let correctionError='';
@@ -182,7 +187,7 @@ export function createSingerRecorder(options) {
             await store.replaceMix(corrected,blob);Object.assign(a.meta,corrected);
           }catch(error){correctionError=error.message;}finally{await decoder.close().catch(()=>{});}
         }
-        a.meta.complete=true;await store.save(a.meta);
+        a.meta.complete=true;await store.save(a.meta);savedId=a.meta.id;
         status(correctionError?'延時校正未完成，已保存未校正的原錄音，可到後處理重試：'+correctionError:`演唱錄音已保存 · 歌聲校正 ${a.meta.appliedDelayMs} ms，可在下方試聽或下載。`);
       } catch (error) {
         const panel = $('recording-rescue'); panel.hidden = false;
@@ -190,7 +195,7 @@ export function createSingerRecorder(options) {
         link.textContent = `下載未保存錄音：${a.meta.title}（${new Date(a.meta.created).toLocaleTimeString()}）`; panel.append(link);
         status('錄音未完整保存，請先按「下載未保存錄音」備份：'+error.message);
       }
-      await render().catch(error=>status('無法讀取錄音清單：'+error.message));
+      await render(savedId).catch(error=>status('無法讀取錄音清單：'+error.message));
     })();
     return stopping;
   }
