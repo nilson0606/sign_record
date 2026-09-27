@@ -1,0 +1,52 @@
+import {createRequire} from 'node:module';
+import {spawn} from 'node:child_process';
+import assert from 'node:assert/strict';
+import {mkdir} from 'node:fs/promises';
+const {chromium}=createRequire(process.env.PLAYWRIGHT_PACKAGE_ROOT||'C:/Users/User/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/package.json')('playwright');
+const port='4288',site='http://localhost:'+port;
+const server=spawn(process.execPath,['server.mjs'],{cwd:new URL('../',import.meta.url),env:{...process.env,PORT:port},windowsHide:true,stdio:['ignore','pipe','pipe']});
+let browser;
+try{
+  await new Promise((resolve,reject)=>{server.stdout.once('data',resolve);server.once('error',reject);server.stderr.once('data',x=>reject(new Error(x.toString())));});
+  browser=await chromium.launch({channel:process.env.BROWSER_CHANNEL||'msedge',headless:true,args:['--mute-audio']});
+  const page=await browser.newPage();
+  await page.route(site+'/fixture',r=>r.fulfill({contentType:'text/html',body:'<title>Effects audio checks</title>'}));await page.goto(site+'/fixture');
+  const result=await page.evaluate(async()=>{
+    const {remixRecording}=await import('/recording-process.mjs');
+    const c=new AudioContext({sampleRate:48000}),rate=c.sampleRate;
+    const buffer=(seconds,fn)=>{const b=c.createBuffer(1,Math.round(seconds*rate),rate),a=b.getChannelData(0);for(let i=0;i<a.length;i++)a[i]=fn(i/rate);return b;};
+    const meta=seconds=>({seconds,mode:'mix',balance:{manual:true,voice:100,backing:100},post:{segments:[{offset:0,songTime:0,duration:seconds}],samples:[]}});
+    const render=(raw,effects,tracks=[])=>remixRecording(raw,tracks,meta(raw.duration),0,{effects});
+    const rms=(b,start,end)=>{const a=b.getChannelData(0);let sum=0,n=0;for(let i=Math.round(start*rate);i<Math.min(a.length,Math.round(end*rate));i++){sum+=a[i]*a[i];n++;}return Math.sqrt(sum/Math.max(1,n));};
+    const power=(b,hz)=>{const a=b.getChannelData(0);let re=0,im=0;for(let i=rate/2;i<rate;i++){re+=a[i]*Math.cos(2*Math.PI*hz*i/rate);im+=a[i]*Math.sin(2*Math.PI*hz*i/rate);}return 4*Math.hypot(re,im)/rate;};
+    const same=(a,b)=>a.length===b.length&&a.getChannelData(0).every((v,i)=>v===b.getChannelData(0)[i]);
+    const voice=buffer(1,t=>.05*Math.sin(2*Math.PI*440*t)),rawCopy=voice.getChannelData(0).slice(),base=await render(voice),neutral=await render(voice,{eq:{low:0,mid:0,high:0},compression:'off',reverb:0,regions:[]});
+    const local=await render(voice,{regions:[{start:.2,end:.6,volume:50}]}),muted=await render(voice,{regions:[{start:.2,end:.6,volume:0}]});
+    const tones=buffer(1,t=>.015*(Math.sin(2*Math.PI*60*t)+Math.sin(2*Math.PI*1500*t)+Math.sin(2*Math.PI*10000*t)));
+    const flat=await render(tones),low=await render(tones,{eq:{low:6}}),mid=await render(tones,{eq:{mid:-6}}),high=await render(tones,{eq:{high:6}});
+    const dynamic=buffer(2,t=>(t<1?.015:.35)*Math.sin(2*Math.PI*440*t)),uncompressed=await render(dynamic),light=await render(dynamic,{compression:'light'}),compressed=await render(dynamic,{compression:'medium'});
+    const short=buffer(.4,t=>t>.25?.15*Math.sin(2*Math.PI*440*t):0),wet=await render(short,{reverb:15}),again=await render(short,{reverb:15});
+    const silence=buffer(1,()=>0),back=buffer(1,t=>.03*Math.sin(2*Math.PI*880*t));
+    const backBase=await render(silence,undefined,[back]),backEffects=await render(silence,{eq:{low:12,mid:12,high:12},compression:'medium',reverb:20,regions:[{start:.1,end:.9,volume:0}]},[back]);
+    const all=await render(tones,{eq:{low:12,mid:12,high:12},compression:'medium',reverb:20,regions:[{start:0,end:1,volume:200}]});
+    const answer={neutralIdentical:same(base,neutral),unchanged:rawCopy.every((x,i)=>x===voice.getChannelData(0)[i]),localRatio:rms(local,.3,.5)/rms(base,.3,.5),outsideRatio:rms(local,.75,.95)/rms(base,.75,.95),muted:rms(muted,.3,.5),eq:{low:power(low,60)/power(flat,60),mid:power(mid,1500)/power(flat,1500),high:power(high,10000)/power(flat,10000)},compression:[uncompressed,light,compressed].map(b=>rms(b,1.4,1.8)/rms(b,.4,.8)),reverb:{duration:wet.duration,tail:rms(wet,.42,.7),repeatable:same(wet,again)},backingUnchanged:backBase.getChannelData(0).every((x,i)=>Math.abs(x-backEffects.getChannelData(0)[i])<1e-6),finite:all.getChannelData(0).every(Number.isFinite),peak:all.getChannelData(0).reduce((a,x)=>Math.max(a,Math.abs(x)),0)};
+    await c.close();return answer;
+  });
+  assert.ok(result.neutralIdentical&&result.unchanged);assert.ok(Math.abs(result.localRatio-.5)<.01);assert.ok(Math.abs(result.outsideRatio-1)<.01);assert.ok(result.muted<1e-5);
+  assert.ok(result.eq.low>1.8&&result.eq.mid<.56&&result.eq.high>1.7,JSON.stringify(result.eq));
+  assert.ok(result.compression[1]<result.compression[0]*.9&&result.compression[2]<result.compression[1],JSON.stringify(result.compression));
+  assert.ok(Math.abs(result.reverb.duration-1.2)<.001&&result.reverb.tail>1e-6&&result.reverb.repeatable);
+  assert.ok(result.backingUnchanged&&result.finite&&result.peak<=.981);
+  console.log('Vocal effects audio checks passed:',JSON.stringify(result));
+  await page.route('**/app.mjs',r=>r.fulfill({contentType:'text/javascript',body:''}));
+  await page.goto(site);await page.setViewportSize({width:1280,height:1000});
+  await page.evaluate(async()=>{
+    const {createRecordingPost}=await import('/recording-post.mjs');
+    const post=createRecordingPost({store:{},stop:async()=>{},pause:()=>{},download:()=>{},onDelete:()=>{}});
+    post.refresh([{id:'effects-preview',title:'人聲後製範例',mode:'mix',complete:true,rawBytes:100,created:Date.now(),seconds:30,post:{reference:{duration:30},segments:[{offset:0,songTime:0,duration:30}]},vocalEffects:{eq:{low:2,mid:0,high:-2},compression:'light',reverb:8,regions:[{start:12,end:18,volume:80}]}}]);
+  });
+  await page.locator('#post-effects-panel > summary').click();
+  assert.equal(await page.locator('#post-regions [data-field=start]').inputValue(),'12');
+  assert.ok(await page.locator('#post-compression').isEnabled());
+  await mkdir('test-results',{recursive:true});await page.locator('#post-effects-panel').screenshot({path:'test-results/recording-effects.png'});
+}finally{await browser?.close();server.kill();}

@@ -1,4 +1,4 @@
-import { softenedVoice } from './recording-soften.mjs';
+import { softenedVoice, vocalEffects, processedVoice, vocalReverbTail } from './recording-soften.mjs';
 import { ScoringTake, validateReference } from './scoring.mjs';
 import { balanceGains, createRecordingMix } from './recording-mix.mjs';
 // Describe the audio that was actually rendered, never a pending score correction.
@@ -56,14 +56,16 @@ export function wavBlob(buffer) {
   for(let i=0;i<frames;i++)for(let c=0;c<channels;c++){const x=Math.max(-1,Math.min(1,data[c][i]));view.setInt16(44+2*(i*channels+c),Math.round(x*(x<0?32768:32767)),true);}
   return new Blob([bytes],{type:'audio/wav'});
 }
-export async function remixRecording(raw, tracks, meta, ms, {softening='off',volume}={}) {
+export async function remixRecording(raw, tracks, meta, ms, {softening='off',volume,effects}={}) {
   const shift=delaySeconds(ms), rate=raw.sampleRate;
-  const duration=Math.max(raw.duration+Math.max(0,-shift),meta.sourceSeconds??meta.seconds);
+  const sourceDuration=Math.max(raw.duration+Math.max(0,-shift),meta.sourceSeconds??meta.seconds);
+  const recipe=vocalEffects(effects,sourceDuration),duration=sourceDuration+(recipe.reverb?vocalReverbTail:0);
   if(duration>3600)throw new Error('後處理一次最多一小時。');
   const context=new OfflineAudioContext(2,Math.ceil(duration*rate),rate), voice=context.createBufferSource();voice.buffer=raw;
   const p=voicePlacement(raw.duration,ms);
   const singer=await softenedVoice(context,voice,voice.buffer,p,softening);
-  const mix=createRecordingMix(context,singer,context.destination,{mode:meta.mode,settings:meta.balance,voiced:()=>false,volume});
+  const processed=processedVoice(context,singer,recipe);
+  const mix=createRecordingMix(context,processed.output,context.destination,{mode:meta.mode,settings:meta.balance,voiced:()=>false,volume});
   if(p.duration>0)voice.start(p.when,p.source,p.duration);
   const rms=(buffer,time)=>{
     const a=buffer.getChannelData(0),start=Math.max(0,Math.floor(time*rate)),end=Math.min(a.length,start+Math.floor(.1*rate));
@@ -85,5 +87,5 @@ export async function remixRecording(raw, tracks, meta, ms, {softening='off',vol
     mix.setLevels(balanceGains({mode:meta.mode,settings:meta.balance,voiceRms:rms(raw,sourceTime),backingRms,voiced}),t);
     if(Math.round(t*10)%100===0)await new Promise(resolve=>setTimeout(resolve,0));
   }
-  const rendered=await context.startRendering();mix.disconnect();singer.disconnect();return rendered;
+  const rendered=await context.startRendering();mix.disconnect();processed.disconnect();singer.disconnect();return rendered;
 }

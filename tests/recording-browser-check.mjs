@@ -259,9 +259,16 @@ try {
   // A saved product remains editable; repeated rendering replaces settings instead of compounding them.
   await page.locator('#post-voice-level').fill('150');await page.locator('#post-backing-level').fill('50');
   assert.equal(await page.locator('#post-voice-value').textContent(),'150%');
+  await page.locator('#post-effects-panel > summary').click();
+  await page.locator('#post-eq-low').fill('3');await page.locator('#post-eq-mid').fill('-2');await page.locator('#post-eq-high').fill('1');
+  await page.locator('#post-compression').selectOption('light');await page.locator('#post-reverb').fill('8');
+  await page.locator('#post-region-add').click();
+  await page.locator('#post-regions [data-field=start]').fill('0.2');await page.locator('#post-regions [data-field=end]').fill('0.6');await page.locator('#post-regions [data-field=volume]').fill('70');
   await page.locator('#post-remix').click();await page.waitForFunction(id=>document.querySelector('#post-recording').value!==id,softened.id);
   const child=(await records()).find(r=>r.parentId===softened.id);assert.ok(child?.post&&child.rawBytes);
   assert.deepEqual(child.postVolume,{voice:150,backing:50});assert.equal(child.vocalSoftening.strength,'light');
+  assert.deepEqual(child.vocalEffects,{version:1,eq:{low:3,mid:-2,high:1},compression:'light',reverb:8,regions:[{start:.2,end:.6,volume:70}]});
+  assert.equal(await page.locator('#post-eq-low').inputValue(),'3');assert.equal(await page.locator('#post-compression').inputValue(),'light');assert.equal(await page.locator('#post-reverb').inputValue(),'8');assert.equal(await page.locator('#post-regions [data-field=volume]').inputValue(),'70');
   assert.equal(await blobHash(child,'voice'),await blobHash(harmonyRecord,'voice'));
   assert.equal(await page.locator('#post-voice-level').inputValue(),'150');assert.equal(await page.locator('#post-backing-level').inputValue(),'50');
   // Solo preview retains saved processing, excludes both backing tracks, and never writes a take.
@@ -298,6 +305,14 @@ try {
   await page.evaluate(id=>recordStore.delete(id),softened.id);
   await page.locator('#post-remix').click();await page.waitForFunction(id=>document.querySelector('#post-recording').value!==id,child.id);
   const grandchild=(await records()).find(r=>r.parentId===child.id);assert.equal(await blobHash(grandchild),await blobHash(child),'same settings produce identical audio even after source product is deleted');
+  assert.equal(grandchild.seconds,child.seconds,'reverb tails do not grow across saved generations');
+  const countBeforeInvalid=(await records()).length;
+  await page.locator('#post-region-add').click();
+  await page.locator('#post-regions [data-field=start]').last().fill('0.3');await page.locator('#post-regions [data-field=end]').last().fill('0.7');
+  await page.locator('#post-remix').click();await page.waitForFunction(()=>document.querySelector('#post-status').textContent.includes('不可重疊'));
+  assert.equal((await records()).length,countBeforeInvalid,'invalid regions do not save a new product');
+  await page.locator('#post-effects-reset').click();
+  assert.equal(await page.locator('#post-regions input').count(),0);assert.equal(await page.locator('#post-compression').inputValue(),'off');
   await page.locator('#post-softening').selectOption('off');
   await page.locator('#post-voice-level').fill('100');await page.locator('#post-backing-level').fill('100');
   await page.locator('#post-remix').click();await page.waitForFunction(id=>document.querySelector('#post-recording').value!==id,grandchild.id);
