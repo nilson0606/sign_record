@@ -45,6 +45,8 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     $('post-diagnostic').disabled=busy||!editable;
     for(const action of ['preview','download','delete'])$('selected-recording-'+action).disabled=busy||!selected;
     $('selected-recording-edit').disabled=busy||!editable;
+    $('selected-recording-voice').disabled=busy||!selected||!(selected.mode==='voice'||editable);
+    $('selected-recording-voice').title=selected&&selected.mode!=='voice'&&!editable?'這筆錄音未保留獨立歌聲，無法只聽人聲。':'';
     $('post-recording').disabled=busy;$('score-recording').disabled=busy;
     $('post-delay').disabled=busy||!editable;$('remix-delay').disabled=busy||!editable;
     $('post-reference-source').disabled=busy||!editable;
@@ -80,6 +82,24 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     clearAudio();url=URL.createObjectURL(await store.blob(row));
     $('post-audio').src=url;$('post-audio').hidden=false;await $('post-audio').play();
     status('正在試聽：'+row.title+recordingDelaySuffix(row));
+  }));
+  $('selected-recording-voice').addEventListener('click',()=>run(async row=>{
+    clearAudio();status('正在準備人聲試聽…');
+    let blob;
+    if(row.mode==='voice')blob=await store.blob(row);
+    else{
+      const context=new AudioContext({sinkId:{type:'none'}});
+      try{
+        const source=await store.blob(row,'voice');
+        if(!source.size||source.size!==row.rawBytes)throw new Error('原始歌聲不完整，無法只聽人聲。');
+        const raw=await context.decodeAudioData(await source.arrayBuffer());
+        // Audition the saved recipe, never pending edits or a re-scoring offset.
+        const delayMs=row.appliedDelayMs??(row.parentId?row.delayMs:0)??0;
+        blob=wavBlob(await remixRecording(raw,[],row,delayMs,{softening:row.vocalSoftening?.strength||'off',volume:row.postVolume}));
+      }finally{await context.close();}
+    }
+    url=URL.createObjectURL(blob);$('post-audio').src=url;$('post-audio').hidden=false;await $('post-audio').play();
+    status('只聽人聲：'+row.title+recordingSofteningSuffix(row)+recordingDelaySuffix(row)+'（已保存的效果）');
   }));
   $('selected-recording-download').addEventListener('click',()=>run(async row=>{
     download(await store.blob(row),row);status('已開始下載選取的錄音。');

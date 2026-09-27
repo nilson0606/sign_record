@@ -140,10 +140,12 @@
     <label for="post-recording">選擇已保存的錄音</label><select id="post-recording"><option value="">尚無錄音</option></select>
     <div id="selected-recording-actions" class="button-row" aria-label="選取錄音的操作">
       <button id="selected-recording-preview" type="button" class="secondary" disabled>試聽</button>
+      <button id="selected-recording-voice" type="button" class="secondary" disabled aria-describedby="post-preview-help">只聽人聲</button>
       <button id="selected-recording-download" type="button" class="secondary" disabled>下載</button>
       <button id="selected-recording-edit" type="button" class="secondary" disabled>後處理</button>
       <button id="selected-recording-delete" type="button" class="secondary" disabled>刪除</button>
     </div>
+    <p id="post-preview-help" class="help">「試聽」播放完整成品；「只聽人聲」播放歌唱者音軌，不加入配樂／和音，沿用這筆錄音已保存的音量、延時與柔化設定。更改後製設定後需先重新合成，才能試聽新效果。</p>
     <audio id="post-audio" controls hidden></audio>
     <p id="post-status" class="status" role="status">請選擇一筆錄音。</p>
     <p id="post-info" class="help"></p><p id="recording-storage-status" class="help" role="status">連接本機錄音目錄中…</p>

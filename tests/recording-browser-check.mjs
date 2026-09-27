@@ -94,7 +94,7 @@ try {
   async function start(){await page.locator('#sing-start').click();await page.waitForFunction(()=>document.querySelector('#recording-status').textContent.includes('● 錄音中'));}
   async function delay(ms){await page.waitForTimeout(ms);}
   async function spectrum(id,offset=.35,track='mix'){return page.evaluate(async ({id,offset,track})=>{
-    const rows=await recordStore.list(),row=rows.find(x=>x.id===id),blob=await recordStore.blob(row,track),ctx=new AudioContext();
+    const rows=await recordStore.list(),row=rows.find(x=>x.id===id),blob=id==='preview'?await(await fetch(document.querySelector('#post-audio').src)).blob():await recordStore.blob(row,track),ctx=new AudioContext();
     const audio=await ctx.decodeAudioData(await blob.arrayBuffer()),samples=audio.getChannelData(0),rate=audio.sampleRate;
     const from=Math.floor(rate*offset),length=Math.min(Math.floor(rate*.5),samples.length-from);
     function power(hz){let c=0,s=0;for(let i=0;i<length;i++){c+=samples[from+i]*Math.cos(2*Math.PI*hz*i/rate);s+=samples[from+i]*Math.sin(2*Math.PI*hz*i/rate);}return 2*Math.hypot(c,s)/length;}
@@ -264,6 +264,37 @@ try {
   assert.deepEqual(child.postVolume,{voice:150,backing:50});assert.equal(child.vocalSoftening.strength,'light');
   assert.equal(await blobHash(child,'voice'),await blobHash(harmonyRecord,'voice'));
   assert.equal(await page.locator('#post-voice-level').inputValue(),'150');assert.equal(await page.locator('#post-backing-level').inputValue(),'50');
+  // Solo preview retains saved processing, excludes both backing tracks, and never writes a take.
+  const beforeSolo=await records(),stemsBeforeSolo=stemRequests.length;
+  await page.locator('#selected-recording-voice').click();
+  await page.waitForFunction(()=>document.querySelector('#post-status').textContent.startsWith('只聽人聲：'));
+  const solo=await spectrum('preview'),fullChild=await spectrum(child.id);
+  assert.ok(solo.voice>.05&&solo.backing<.001&&solo.harmony<.001,JSON.stringify(solo));
+  assert.ok(Math.abs(solo.voice/fullChild.voice-1)<.03,'saved voice volume and softening survive solo playback');
+  assert.equal(solo.duration,fullChild.duration);assert.equal(stemRequests.length,stemsBeforeSolo,'solo needs no library backing tracks');
+  assert.deepEqual(await records(),beforeSolo,'preview must not modify recordings');
+  const previewHash=()=>page.evaluate(async()=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await(await fetch(document.querySelector('#post-audio').src)).arrayBuffer()))).join(','));
+  const savedSoloHash=await previewHash();
+  await page.locator('#post-voice-level').fill('0');await page.locator('#remix-delay').fill('-100');await page.locator('#post-softening').selectOption('strong');
+  await page.locator('#selected-recording-voice').click();await page.waitForFunction(()=>!document.querySelector('#selected-recording-voice').disabled);
+  assert.equal(await previewHash(),savedSoloHash,'unsaved settings must not change saved-product preview');
+  await page.locator('#selected-recording-preview').click();await page.waitForFunction(()=>!document.querySelector('#selected-recording-preview').disabled);
+  assert.equal(await previewHash(),await blobHash(child),'ordinary preview switches back to full saved mix');
+  await page.locator('#post-recording').selectOption(voice.id);
+  await page.locator('#selected-recording-voice').click();await page.waitForFunction(()=>!document.querySelector('#selected-recording-voice').disabled);
+  assert.equal(await previewHash(),await blobHash(voice),'voice-only recordings use the already processed saved audio');
+  const legacy=await page.evaluate(async()=>{
+    const row={id:crypto.randomUUID(),title:'Legacy mix without source',mode:'mix',mime:'audio/wav',created:Date.now(),seconds:1,bytes:3,complete:true};
+    await recordStore.save(row,new Blob(['wav']),0);return row;
+  });
+  const recordingsWereOpen=await page.locator('#recordings-panel').evaluate(el=>el.open);
+  if(!recordingsWereOpen)await page.locator('#recordings-panel > summary').click();
+  await page.locator('#recording-refresh').click();
+  if(!recordingsWereOpen)await page.locator('#recordings-panel > summary').click();
+  await page.locator('#post-recording').selectOption(legacy.id);
+  assert.ok(await page.locator('#selected-recording-voice').isDisabled());assert.ok(await page.locator('#selected-recording-preview').isEnabled());
+  await page.evaluate(id=>recordStore.delete(id),legacy.id);
+  await page.locator('#post-recording').selectOption(child.id);
   await page.evaluate(id=>recordStore.delete(id),softened.id);
   await page.locator('#post-remix').click();await page.waitForFunction(id=>document.querySelector('#post-recording').value!==id,child.id);
   const grandchild=(await records()).find(r=>r.parentId===child.id);assert.equal(await blobHash(grandchild),await blobHash(child),'same settings produce identical audio even after source product is deleted');
@@ -346,7 +377,7 @@ try {
   await page.locator('#selected-recording-edit').click();
   assert.equal(await page.evaluate(()=>document.activeElement.id),'remix-delay');
   const positions=await page.locator('#selected-recording-actions button').evaluateAll(bs=>bs.map(b=>b.getBoundingClientRect().y));
-  assert.ok(positions.every(y=>Math.abs(y-positions[0])<1),'four actions share one horizontal row');
+  assert.ok(positions.every(y=>Math.abs(y-positions[0])<1),'five actions share one horizontal row');
   page.once('dialog',dialog=>dialog.dismiss());await page.locator('#selected-recording-delete').click();
   assert.equal((await records()).length,4);
   page.once('dialog',dialog=>dialog.accept());await page.locator('#selected-recording-delete').click();
@@ -377,7 +408,7 @@ try {
   assert.ok(await page.locator('#post-rescore').isDisabled());
   assert.ok(await page.locator('#post-remix').isDisabled());
 
-  for(const action of ['preview','download','edit','delete'])assert.ok(await page.locator('#selected-recording-'+action).isDisabled());
+  for(const action of ['preview','voice','download','edit','delete'])assert.ok(await page.locator('#selected-recording-'+action).isDisabled());
   const peak=await page.evaluate(async()=>{
     const script=document.querySelector('script[src*="app."]').src;
     const {createRecordingMix}=await import(new URL('recording-mix.mjs',script));
