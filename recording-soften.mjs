@@ -10,6 +10,24 @@ export function recordingSofteningSuffix(meta) {
   return id&&id!=='off'&&Object.hasOwn(presets,id)?`_柔化${id==="strong"&&!(meta.vocalSoftening.version>=2)?"較強":presets[id].label}`:'';
 }
 
+// Derive labels from the saved recipe without changing the original song title.
+export function recordingEffectsSuffix(meta) {
+  const parts=[],effects=meta.vocalEffects||{},volume=meta.postVolume||{};
+  const changed=x=>Number.isFinite(x)&&x!==0;
+  const signed=x=>(x>0?'+':'')+x;
+  if(Number.isFinite(volume.voice)&&volume.voice!==100)parts.push(`人聲${volume.voice}%`);
+  if(meta.mode==='mix'&&Number.isFinite(volume.backing)&&volume.backing!==100)parts.push(`配樂${volume.backing}%`);
+  const regions=Array.isArray(effects.regions)?effects.regions.filter(r=>Number.isFinite(r.volume)&&r.volume!==100):[];
+  if(regions.length)parts.push(`局部音量${regions.length}段`);
+  const eq=[['low','低'],['mid','中'],['high','高']].filter(([key])=>changed(effects.eq?.[key])).map(([key,label])=>label+signed(effects.eq[key])).join('');
+  if(eq)parts.push('EQ'+eq);
+  const compression={light:'輕度',medium:'中度'}[effects.compression];
+  if(compression)parts.push('壓縮'+compression);
+  if(Number.isFinite(effects.reverb)&&effects.reverb>0)parts.push(`殘響${effects.reverb}%`);
+  if(!meta.parentId&&!parts.length&&!recordingSofteningSuffix(meta))return '';
+  return '_人聲後製'+parts.map(part=>'_'+part).join('');
+}
+
 // Versioned, repeatable recipe. Times refer to the rendered recording, not YouTube.
 export function vocalEffects(value={},duration=3600) {
   if(value.version!==undefined&&value.version!==1)throw new Error('這筆人聲效果版本較新，請更新網頁後再編輯。');
