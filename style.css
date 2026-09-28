@@ -101,7 +101,8 @@ header{gap:18px;flex-wrap:wrap}
 
 /* Player and live pitch share the first row; tools continue below. */
 .voice-settings{margin-bottom:18px}
-.layout{grid-template-columns:repeat(2,minmax(0,1fr))}
+.layout{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+.voice-card .pitch-value,.voice-card .graph-heading,.voice-card .target-line{flex-wrap:wrap}
 .layout>.card,.layout>details{grid-column:1/-1}
 .layout>#player-section,.layout>#voice-section{grid-column:auto}
 .library-card{grid-column:1/-1}
@@ -138,7 +139,7 @@ header{gap:18px;flex-wrap:wrap}
 
 #voice-output{min-width:0;border:1px solid var(--line);border-radius:10px;padding:14px;margin:18px 0}
 #voice-output legend{color:var(--accent);font-size:14px}
-#voice-output .input-row{margin-bottom:16px}
-#voice-output-device{min-width:0;flex:1}
+#voice-output .input-row{margin-bottom:16px;flex-wrap:wrap}
+#voice-output-device{min-width:0;max-width:100%;flex:1 1 180px}
 #voice-output-volume-value{float:right;color:var(--accent)}
 #voice-output .footnote{margin-bottom:0}
