@@ -104,7 +104,7 @@ header{gap:18px;flex-wrap:wrap}
 .layout{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
 .voice-card .pitch-value,.voice-card .graph-heading,.voice-card .target-line{flex-wrap:wrap}
 .layout>.card,.layout>details{grid-column:1/-1}
-.layout>#player-section,.layout>#voice-section{grid-column:auto}
+.layout>#player-section,.layout>#voice-section{grid-column:auto;align-self:stretch}
 .library-card{grid-column:1/-1}
 .library-card #library-panel{margin:0}
 .library-card #library-panel>summary{margin:0}
