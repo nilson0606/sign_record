@@ -410,7 +410,7 @@ setInterval(() => {
   if (!player?.getCurrentTime) return; const t = player.getCurrentTime(); if (!Number.isFinite(t)) return;
   $('player-time').textContent = `${t.toFixed(2)} s`; $('aligned-time').textContent = `${alignedTime(t, Number($('offset').value)).toFixed(2)} s`;
 }, 100);
-navigator.mediaDevices?.addEventListener('devicechange', () => { voiceOutput.refreshDevices(); resetOffset(); if (stream) stopMic('裝置已變更，補償已回到預設＋150 ms。請重新開啟收音並校正。'); });
+navigator.mediaDevices?.addEventListener('devicechange', () => { voiceOutput.refreshDevices(); resetOffset(); if (stream) stopMic('裝置已變更，補償已回到預設＋200 ms。請重新開啟收音並校正。'); });
 function cleanup() { probeController?.abort(); stopBeats(); stopMic('頁面已離開前景，收音已停止。請重新開啟。'); }
 document.addEventListener('visibilitychange', () => { if (document.hidden) cleanup(); }); window.addEventListener('pagehide', cleanup);
 
@@ -430,7 +430,7 @@ async function refreshInputs() {
 }
 $('capture-mode').addEventListener('change',async()=>{await stopMic('已切換收音方式，請重新選擇麥克風並開啟。');$('input-device').replaceChildren(new Option('系統預設麥克風',''));try{localStorage.setItem('karaoke.capture-mode.v1',$('capture-mode').value);}catch{}await refreshInputs();});
 $('input-device').addEventListener('change', () => {
-  resetOffset(); stopMic('已切換麥克風，補償已回到預設＋150 ms。請按開啟麥克風使用新裝置。');
+  resetOffset(); stopMic('已切換麥克風，補償已回到預設＋200 ms。請按開啟麥克風使用新裝置。');
 });
 
 const localToolNames = { python: 'Python 環境', node: 'Node.js 22+', ffmpeg: 'FFmpeg', ffprobe: 'ffprobe', ytDlp: 'yt-dlp', demucs: 'Demucs', torch: 'PyTorch', torchaudio: 'TorchAudio', soundfile: 'SoundFile' };
