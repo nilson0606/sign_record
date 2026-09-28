@@ -217,6 +217,7 @@
     </details>
     <details id="recording-settings" class="settings-fold" tabindex="-1"><summary>錄音設定 <span class="fold-caption">錄音內容 · 歌聲延時 · 音量平衡</span></summary>
     <label for="recording-mode">演唱錄音儲存</label><select id="recording-mode"><option value="voice">歌唱者</option><option value="mix" selected>歌唱者＋配樂／和音（預設）</option><option value="off">不保存錄音</option></select>
+    <p class="help">新錄音使用同步無損 WAV，保留原始歌聲供後製，檔案會比壓縮錄音大；每輪最多 30 分鐘。</p>
     <p class="help">按「從頭開始唱」，影片開始播放時同步錄音；停止收音、結束並結算或影片播完時保存。暫停／緩衝時暫停錄音。依已載入版本自動選軌：兩軌版本加入伴奏；四軌版本加入伴奏＋和音，不加入原唱主唱或全部人聲。超過音軌長度後只錄歌唱者。請戴耳機，避免原唱從喇叭漏入麥克風。</p>
     <label for="recording-delay">錄音歌聲延時校正（毫秒）</label><input id="recording-delay" type="number" min="-2000" max="2000" step="1" value="150">
     <p class="help">預設＋150 ms：停止錄音後，成品中的歌聲往前移 150 ms，配樂與和音不移動。填入總校正量，不會累加。原始歌聲保留供後處理；即時評分仍使用上方時間補償設定。</p>

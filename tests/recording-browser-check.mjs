@@ -126,6 +126,7 @@ try {
   assert.equal(await page.locator('#post-audio').getAttribute('src'),null);
   await delay(1600);
   const chunksDuring=await records();assert.equal(chunksDuring.length,1);assert.equal(chunksDuring[0].complete,false);
+  assert.ok((await spectrum(chunksDuring[0].id)).duration>1,'in-progress PCM chunks must already have a playable WAV header');
   await page.locator('#mic-stop').click();await waitRecords(1);await expectLatestSaved();
   assert.equal(await page.locator('#voice-output-enabled').isChecked(),false);
   await page.waitForFunction(()=>fixturePlayer.getCurrentTime()<=.05);
@@ -134,7 +135,7 @@ try {
   assert.ok(voiceAudio.voice>.05,JSON.stringify(voiceAudio));assert.ok(voiceAudio.backing<.01,JSON.stringify(voiceAudio));assert.equal(backingRequests,0);
   await page.locator('#finish-song').click();await page.waitForFunction(()=>document.querySelector('#score-status').textContent.includes('已結算'));
   assert.equal((await records()).length,1,'manual scoring after stopping must not duplicate recording');
-  assert.equal(voice.appliedDelayMs,150,await page.locator('#recording-status').textContent());assert.equal(voice.post.offsetMs,150);assert.equal(voice.mime,'audio/wav');assert.ok(voice.rawMime.startsWith('audio/webm'));
+  assert.equal(voice.appliedDelayMs,150,await page.locator('#recording-status').textContent());assert.equal(voice.post.offsetMs,150);assert.equal(voice.mime,'audio/wav');assert.equal(voice.rawMime,'audio/wav');assert.equal(voice.captureClock.source,'audio-worklet-pcm');
   await page.locator('#recording-mode').selectOption('mix');
   await page.locator('#recording-manual').check();
   await page.locator('#recording-voice-level').fill('60');await page.locator('#recording-backing-level').fill('80');
@@ -276,7 +277,9 @@ try {
   await page.locator('#selected-recording-voice').click();
   await page.waitForFunction(()=>document.querySelector('#post-status').textContent.startsWith('只聽人聲：'));
   const solo=await spectrum('preview'),fullChild=await spectrum(child.id);
-  assert.ok(solo.voice>.05&&solo.backing<.001&&solo.harmony<.001,JSON.stringify(solo));
+  // Region gain ramps create small spectral sidebands even in a pure voice.
+  assert.ok(solo.voice>.05&&solo.backing<solo.voice*.01&&solo.harmony<solo.voice*.01,JSON.stringify(solo));
+  assert.ok(fullChild.backing>solo.backing*10&&fullChild.harmony>solo.harmony*10,'solo must exclude the actual accompaniment and harmony');
   assert.ok(Math.abs(solo.voice/fullChild.voice-1)<.03,'saved voice volume and softening survive solo playback');
   assert.equal(solo.duration,fullChild.duration);assert.equal(stemRequests.length,stemsBeforeSolo,'solo needs no library backing tracks');
   assert.deepEqual(await records(),beforeSolo,'preview must not modify recordings');
@@ -330,10 +333,12 @@ try {
   assert.equal(await page.evaluate(()=>recorderCreated),beforeMissing);assert.equal((await records()).length,2);
   missingHarmony=false;
   // Restarting saves the old recording and creates another one; finishing saves once.
-  await page.locator('#recording-mode').selectOption('voice');await start();await delay(650);
+  await page.locator('#recording-mode').selectOption('voice');await page.locator('#recording-delay').fill('0');await start();await delay(650);
   await start();await waitRecords(3);await delay(650);await page.locator('#finish-song').click();await waitRecords(4);await expectLatestSaved();
   await page.waitForFunction(()=>document.querySelector('#score-status').textContent.includes('已結算'));
   assert.equal(new Set((await records()).map(x=>x.id)).size,4);
+  const unshifted=(await records())[0];const unshiftedMix=await spectrum(unshifted.id,0),unshiftedRaw=await spectrum(unshifted.id,0,'voice');
+  assert.equal(unshiftedMix.duration,unshiftedRaw.duration);assert.equal(unshiftedMix.duration,unshifted.captureClock.frames/unshifted.captureClock.sampleRate);
   // Off leaves microphone scoring available and writes no audio.
   const beforeOff=await page.evaluate(()=>recorderCreated);
   await page.locator('#recording-mode').selectOption('off');await page.locator('#sing-start').click();await delay(650);await page.locator('#finish-song').click();
@@ -341,13 +346,16 @@ try {
   assert.equal(await page.evaluate(()=>recorderCreated),beforeOff,'off must not even construct a MediaRecorder');
   const selectionBeforeFailure=await page.locator('#post-recording').inputValue();
   // Storage exhaustion must preserve a downloadable in-memory backup, never report saved.
+  await page.locator('#recording-mode').selectOption('voice');await start();
   await page.evaluate(()=>{window.storeSave=Object.getPrototypeOf(recordStore).save;Object.getPrototypeOf(recordStore).save=async()=>{throw new DOMException('Fixture quota','QuotaExceededError');};});
-  await page.locator('#recording-mode').selectOption('voice');await start();await delay(1200);await page.locator('#finish-song').click();
+  await delay(1200);await page.locator('#finish-song').click();
   await page.waitForFunction(()=>document.querySelector('#recording-status').textContent.includes('錄音未完整保存'));
   assert.ok(await page.locator('#recording-rescue').isVisible());
   assert.equal(await page.locator('#post-recording').inputValue(),selectionBeforeFailure);
-  const rescueDownload=page.waitForEvent('download');await page.locator('#recording-rescue a').first().click();assert.ok((await rescueDownload).suggestedFilename().endsWith('.webm'));
-  await page.evaluate(()=>{Object.getPrototypeOf(recordStore).save=window.storeSave;});assert.equal((await records()).length,4);
+  const rescueDownload=page.waitForEvent('download');await page.locator('#recording-rescue a').first().click();assert.ok((await rescueDownload).suggestedFilename().endsWith('.wav'));
+  await page.evaluate(()=>{Object.getPrototypeOf(recordStore).save=window.storeSave;});
+  assert.equal((await records()).filter(r=>r.complete).length,4);
+  for(const partial of (await records()).filter(r=>!r.complete))await page.evaluate(id=>recordStore.delete(id),partial.id);
   // Waiting for autoplay cannot create a misleading empty recording.
   await page.evaluate(()=>{window.playOriginal=fixturePlayer.playVideo;fixturePlayer.playVideo=()=>{};});
   await page.locator('#sing-start').click();await page.waitForFunction(()=>document.querySelector('#score-status').textContent.includes('影片已回到開頭'));
@@ -368,7 +376,7 @@ try {
   await page.locator('#recording-list').getByRole('button',{name:'試聽',exact:true}).first().click();
   await page.waitForFunction(()=>document.querySelector('#recording-audio').currentTime>.1);
   const downloaded=page.waitForEvent('download');await page.locator('#recording-list').getByRole('button',{name:'下載',exact:true}).first().click();
-  assert.ok((await downloaded).suggestedFilename().endsWith('+150ms.wav'));
+  assert.ok((await downloaded).suggestedFilename().endsWith('+0ms.wav'));
   // Reload preserves all recordings; delete only removes the selected recording.
   await page.locator('#recording-mode').selectOption('off');
   await page.reload();assert.equal(await page.locator('#recording-mode').inputValue(),'off');assert.ok(await page.locator('#recording-manual').isChecked());assert.equal(await page.locator('#recording-voice-level').inputValue(),'60');assert.equal(await page.locator('#recording-backing-level').inputValue(),'80');await page.locator('#recordings-panel summary').click();await page.waitForFunction(()=>document.querySelectorAll('#recording-list li button').length===16);

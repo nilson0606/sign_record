@@ -4,6 +4,7 @@ import {remixRecording,wavBlob,delaySeconds,recordingDelaySuffix} from './record
 import { createRecordingPost } from './recording-post.mjs';
 import { createRecordingMix, mixSettings } from './recording-mix.mjs';
 import { RecordingStore } from './recording-store.mjs';
+import { createPCMRecorders } from './recording-pcm.mjs';
 const $ = id => document.getElementById(id);
 export function createSingerRecorder(options) {
   const store = new RecordingStore({status:text=>{$('recording-storage-status').textContent=text;}});
@@ -87,7 +88,7 @@ export function createSingerRecorder(options) {
     if (mode === 'off') { status('本輪不保存錄音。'); return; }
     const recordingDelayMs=Number($('recording-delay').value);delaySeconds(recordingDelayMs);
     const request = ++operation;
-    if (!window.MediaRecorder) throw new Error('瀏覽器不支援錄音，請使用桌機 Chrome／Edge，或選不保存錄音。');
+    if (!window.AudioWorkletNode) throw new Error('瀏覽器不支援同步錄音，請使用桌機 Chrome／Edge，或選不保存錄音。');
     status(mode === 'mix' ? '正在準備錄音配樂／和音…' : '正在準備演唱錄音…');
     const context = options.context(), stream = options.stream();
     if (!context || !stream) throw new Error('麥克風尚未就緒，無法開始錄音。');
@@ -106,28 +107,29 @@ export function createSingerRecorder(options) {
       if (buffers.some(buffer => Math.abs(buffer.duration - buffers[0].duration) > .15)) throw new Error('配樂與和音長度不一致，請補建音軌後再錄音。');
     }
     if (request !== operation || options.context() !== context) throw new Error('錄音準備已取消。');
-    const destination = context.createMediaStreamDestination(), mic = context.createMediaStreamSource(stream);
+    const destination = context.createGain(), mic = context.createMediaStreamSource(stream);
     // This separate recording branch never changes the input used for pitch scoring.
     const mix = createRecordingMix(context,mic,destination,{mode,settings:balanceSettings(),voiced:()=>options.voiced?.() === true});
-    const mime = ['audio/webm;codecs=opus','audio/webm','audio/mp4'].find(value => MediaRecorder.isTypeSupported(value));
     let recorder, rawRecorder;
-    try { recorder = new MediaRecorder(destination.stream, mime ? {mimeType:mime} : {}); rawRecorder = new MediaRecorder(stream, mime ? {mimeType:mime} : {}); }
-    catch (error) { mix.disconnect(); destination.stream.getTracks().forEach(t=>t.stop()); throw error; }
+    try { ({recorder,rawRecorder}=await createPCMRecorders(context,mic,destination)); }
+    catch (error) { mix.disconnect(); destination.disconnect(); throw error; }
+    if(request!==operation||options.context()!==context){recorder.dispose();mix.disconnect();destination.disconnect();throw new Error('錄音準備已取消。');}
     const meta = { id: crypto.randomUUID(), title: reference.title, videoId: reference.videoId, mode, mime: recorder.mimeType, rawMime:rawRecorder.mimeType, appliedDelayMs:0, recordingDelayMs, created: Date.now(), seconds: 0, bytes: 0, complete: false, balance: mix.settings, stems, rawBytes:0, post:{version:1, reference:structuredClone(reference), scoring, offsetMs:recordingDelayMs, liveOffsetMs:Number($('offset').value), segments:[], samples:[]} };
-    const a = { recorder, rawRecorder, rawCount:0, segment:null, context, mic, mix, destination, buffers, meta, chunks: [], queue: Promise.resolve(), count: 0, elapsed: 0, since: null, backing: [], error: null };
+    meta.captureClock={version:1,source:'audio-worklet-pcm',sampleRate:context.sampleRate};
+    const a = { recorder, rawRecorder, rawCount:0, segment:null, context, mic, mix, destination, buffers, meta, chunks: [], queue: Promise.resolve(), count: 0, backing: [], error: null };
     active = a; controls();
     rawRecorder.ondataavailable = event => {
       if (!event.data.size) return;
       meta.rawBytes += event.data.size;
-      const index=a.rawCount++, snapshot=structuredClone(meta);
-      a.queue=a.queue.then(()=>store.save(snapshot,event.data,index,'voice')).catch(error=>{a.error=error;status('乾淨歌聲保存失敗：'+error.message);});
+      const index=a.rawCount++, snapshot=structuredClone(meta),header=recorder.voiceHeader();
+      a.queue=a.queue.then(async()=>{await store.save(snapshot,event.data,index,'voice');if(index>0)await store.save(snapshot,header,0,'voice');}).catch(error=>{a.error=error;status('乾淨歌聲保存失敗：'+error.message);});
     };
     rawRecorder.onerror = event => { a.error = event.error || new Error('乾淨歌聲錄音中斷'); stop(); };
     recorder.ondataavailable = event => {
       if (!event.data.size) return;
-      a.chunks.push(event.data); meta.bytes += event.data.size; meta.seconds = elapsed(a);
-      const index = a.count++, snapshot = structuredClone(meta);
-      a.queue = a.queue.then(()=>store.save(snapshot,event.data,index)).catch(error => { a.error = error; status('自動保存失敗，停止後請下載備份：' + error.message); });
+      a.chunks.push(event.data);meta.bytes+=event.data.size;meta.seconds=recorder.frames/context.sampleRate;
+      const index=a.count++,snapshot=structuredClone(meta),header=recorder.header();a.chunks[0]=header;
+      a.queue=a.queue.then(async()=>{await store.save(snapshot,event.data,index);if(index>0)await store.save(snapshot,header,0);}).catch(error=>{a.error=error;status('自動保存失敗，停止後請下載備份：'+error.message);});
     };
     recorder.onerror = event => { a.error = event.error || new Error('錄音中斷'); stop(); };
     status(`錄音已就緒${mode === 'mix' ? (stems.includes('backing') ? ' · 已載入伴奏＋和音' : ' · 已載入伴奏（此版本無獨立和音）') : ''}，影片開始播放時同步錄製。`);
@@ -144,37 +146,41 @@ export function createSingerRecorder(options) {
     const a=active; if(!a || a.recorder.state!=='recording')return;
     a.meta.post.samples.push({time,hz,offset:elapsed(a)});
   }
-  function elapsed(a) { return a.elapsed + (a.since === null ? 0 : (performance.now()-a.since)/1000); }
+  function elapsed(a) { return a.recorder.clock.frames(a.context.currentTime)/a.context.sampleRate; }
   function playerState(state, time) {
     const a = active; if (!a) return;
     if (state === 1) {
       if (a.recorder.state === 'inactive') { a.recorder.start(1000); a.rawRecorder.start(1000); }
       else if (a.recorder.state === 'paused') { a.recorder.resume(); a.rawRecorder.resume(); }
-      if (a.since === null) a.since = performance.now();
       syncTimeline(a,time); syncBacking(a,time); status(`● 錄音中 · ${a.meta.mode === 'mix' ? (a.meta.stems.includes('backing') ? '歌唱者＋配樂／和音' : '歌唱者＋配樂（無獨立和音）') : '歌唱者'}（錄製中暫存，停止後存入歌曲庫）`);
     } else if (state === 0) { stop(); }
     else {
-      closeSegment(a);
-      if (a.since !== null) { a.elapsed = elapsed(a); a.since = null; }
       if (a.recorder.state === 'recording') { a.recorder.pause(); a.rawRecorder.pause(); }
+      closeSegment(a);
       stopBacking(a); status(a.recorder.state === 'inactive' ? '錄音已就緒，等待影片播放。' : '錄音暫停，會隨影片續播。');
     }
   }
   function stop() {
     operation++;
     const a = active; if (!a) return stopping;
-    closeSegment(a); active = null; a.elapsed = elapsed(a); a.since = null; stopBacking(a); controls();
+    if(a.recorder.state==='recording')a.recorder.pause();
+    closeSegment(a); active = null; stopBacking(a); controls();
     const wasStarted = a.recorder.state !== 'inactive' || a.count > 0;
     const ended = Promise.all([a.recorder,a.rawRecorder].map(recorder=>new Promise(resolve=>{
       if(recorder.state==='inactive')resolve();else {recorder.onstop=resolve;recorder.stop();}
     })));
     stopping = (async () => {
       await ended; await a.queue;
-      a.mix.disconnect(); a.destination.stream.getTracks().forEach(t=>t.stop());
+      a.recorder.dispose();a.mix.disconnect();a.destination.disconnect();
       if (!wasStarted || !a.meta.bytes) { status('未開始播放，沒有保存空白錄音。'); return; }
-      a.meta.seconds = a.elapsed;
+      // Rewrite only the fixed-size WAV headers; PCM chunks stay intact in IDB.
+      a.meta.seconds=a.recorder.frames/a.context.sampleRate;
+      a.meta.captureClock.frames=a.recorder.frames;
+      a.chunks[0]=a.recorder.header();
       let savedId=null;
       try {
+        await store.save(a.meta,a.recorder.header(),0);
+        await store.save(a.meta,a.recorder.voiceHeader(),0,'voice');
         if (a.error) throw a.error;
         let correctionError='';
         if(a.meta.recordingDelayMs!==0){
@@ -191,7 +197,7 @@ export function createSingerRecorder(options) {
         status(correctionError?'延時校正未完成，已保存未校正的原錄音，可到後處理重試：'+correctionError:`演唱錄音已保存 · 歌聲校正 ${a.meta.appliedDelayMs} ms，可在下方試聽或下載。`);
       } catch (error) {
         const panel = $('recording-rescue'); panel.hidden = false;
-        const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob(a.chunks,{type:a.recorder.mimeType})); link.download = '演唱錄音.'+(a.recorder.mimeType.includes('mp4')?'m4a':'webm');
+        const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob(a.chunks,{type:a.recorder.mimeType})); link.download = '演唱錄音.wav';
         link.textContent = `下載未保存錄音：${a.meta.title}（${new Date(a.meta.created).toLocaleTimeString()}）`; panel.append(link);
         status('錄音未完整保存，請先按「下載未保存錄音」備份：'+error.message);
       }
