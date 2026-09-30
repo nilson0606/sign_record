@@ -284,9 +284,9 @@ $('probe').addEventListener('click', async () => {
 });
 function latency(x) { return Number.isFinite(x) ? `${Math.round(x * 1000)} ms（估計）` : '未提供，不能當作 0 ms'; }
 $('offset').addEventListener('input', () => { $('offset-value').textContent = `${$('offset').value} ms`; });
-async function stopMic(message = '收音已停止，麥克風已釋放；錄音結果請查看下方錄音狀態。', rewind = false) {
+async function stopMic(message = '收音已停止，麥克風已釋放；錄音結果請查看下方錄音狀態。', rewind = false, captureError = null) {
   generation++; clearInterval(micTimer); calibration?.cancel(); voiceOutput.stop();
-  const recordingEnd = singing.stopRecording();
+  const recordingEnd = singing.stopRecording(captureError);
   micAbort?.abort(); micAbort=null; nativeCapture?.stop(); nativeCapture=null;
   const oldStream = stream, oldContext = context;
   stream = context = analyser = samples = null; micPitch = null; history = [];
@@ -313,13 +313,13 @@ async function activateMic() {
     pendingContext = new AudioContext({ latencyHint: 'interactive', ...(native?{sampleRate:48000}:{}), sinkId: { type: 'none' } });
     const resumed = pendingContext.resume().catch(() => {});
     tracePlayback('mic-context-created',{sink:pendingContext.sinkId});
-    if(native){pendingNative=await openNativeMicrophone(pendingContext,{deviceId:$('input-device').value,signal:controller.signal,onError:error=>{if(token===generation)stopMic(error.message);}});pendingStream=pendingNative.stream;}
+    if(native){pendingNative=await openNativeMicrophone(pendingContext,{deviceId:$('input-device').value,signal:controller.signal,onError:error=>{if(token===generation)stopMic(error.message,false,error);}});pendingStream=pendingNative.stream;}
     else pendingStream = await navigator.mediaDevices.getUserMedia({ audio: { ...($('input-device').value ? { deviceId: { exact: $('input-device').value } } : {}), echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false });
     tracePlayback('mic-stream-acquired',{input:pendingStream.getAudioTracks()[0]?.label});
     await resumed;
     if (token !== generation) { pendingNative?.stop(); pendingStream.getTracks().forEach(t => t.stop()); await pendingContext.close(); return; }
     stream = pendingStream; context = pendingContext; nativeCapture=pendingNative;
-    const source = context.createMediaStreamSource(stream);
+    const source = nativeCapture?.source || context.createMediaStreamSource(stream);
     analyser = context.createAnalyser(); analyser.fftSize = 4096; source.connect(analyser);
     samples = new Float32Array(analyser.fftSize);
     const track = stream.getAudioTracks()[0], settings = track.getSettings();
@@ -463,7 +463,7 @@ $('local-check').addEventListener('click', async () => {
   } finally { clearTimeout(timer); button.disabled = false; }
 });
 
-const singing = createKaraokeSession({ voiced: () => micPitch !== null, context: () => context, stream: () => stream, player: () => player, micReady: () => !!stream && context?.state === 'running', stopMic: () => stopMic(), startMic, stopBeats, loadVideo: () => loadVideo(), cancelCalibration: () => calibration?.cancel() });
+const singing = createKaraokeSession({ voiced: () => micPitch !== null, context: () => context, stream: () => stream, inputSource: () => nativeCapture?.source, player: () => player, micReady: () => !!stream && context?.state === 'running', stopMic: () => stopMic(), startMic, stopBeats, loadVideo: () => loadVideo(), cancelCalibration: () => calibration?.cancel() });
 
 calibration = createCalibration({ context: () => context, micReady: () => !!stream && context?.state === 'running', beforeStart: () => singing.pauseForCalibration() });
 

@@ -26,3 +26,31 @@ test('independent monitor rendering does not consume or modify recording samples
  const original=[];for(let i=0;i<15;i++)original.push(...render(recording.p));
  assert.deepEqual(original,Array.from(packet));
 });
+
+test('a real capture stall is reported once and cannot resume with silently shifted audio',()=>{
+ const {p,messages}=processor();p.receive(new Float32Array(1920).fill(.2));for(let i=0;i<15;i++)render(p);
+ render(p);assert.equal(messages.filter(x=>x.error).length,1);
+ p.receive(new Float32Array(960).fill(.4));assert.ok(render(p).every(x=>x===0));assert.equal(messages.filter(x=>x.error).length,1);
+});
+
+test('15 minute mismatched capture/render clocks and packet jitter stay continuous and bounded',()=>{
+ for(const ppm of [-2000,0,2000]){
+  const {p,messages}=processor(),rate=48000*(1+ppm/1e6),duration=900,packet=960;
+  let next=0,produced=0,minimum=Infinity,maximum=0,maxJump=0,last=null,zeroSamples=0;
+  // A nonzero test waveform makes any inserted silence unambiguous.
+  const feed=()=>{const a=Float32Array.from({length:packet},(_,i)=>.3+.1*Math.sin(2*Math.PI*220*(produced+i)/rate));produced+=packet;p.receive(a);};
+  for(let frame=0;frame<duration*48000;frame+=128){
+   const time=frame/48000;
+   while(next<=time){feed();const packetIndex=produced/packet;next=packetIndex*packet/rate+(packetIndex%61===0?.011:0);}
+   const started=p.started,out=render(p);
+   assert.equal(p.failed,false,JSON.stringify({ppm,time,count:p.count,messages}));
+   if(started){minimum=Math.min(minimum,p.count);maximum=Math.max(maximum,p.count);for(const x of out){if(x===0)zeroSamples++;if(last!==null)maxJump=Math.max(maxJump,Math.abs(x-last));last=x;}}
+  }
+  assert.equal(zeroSamples,0);assert.ok(maxJump<.004,JSON.stringify({ppm,maxJump}));
+  assert.ok(minimum>0&&maximum<4000,JSON.stringify({ppm,minimum,maximum}));
+  // Input position follows elapsed capture time with a bounded fixed buffer,
+  // not a drift that accumulates over the 15 minute recording.
+  const pendingMs=p.count/rate*1000;assert.ok(pendingMs<80,JSON.stringify({ppm,pendingMs}));
+  console.log('Native clock continuity',JSON.stringify({ppm,zeroSamples,maxJump,minimum,maximum,pendingMs}));
+ }
+});

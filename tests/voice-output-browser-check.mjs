@@ -67,15 +67,28 @@ try{
     return Response.json(window.nativeMonitorState);
    }
    if(url==='http://127.0.0.1:4274/microphone/stream'){
-    window.nativeStreams++;window.nativeActive++;window.nativeCaptureId='capture-'+window.nativeStreams;window.nativeMonitorState={state:'off',sequence:-1};let timer,closed=false,offset=0;
+    window.nativeStreams++;window.nativeActive++;window.nativeCaptureId='capture-'+window.nativeStreams;window.nativeMonitorState={state:'off',sequence:-1};let timer,closed=false,offset=0;const epoch=performance.now();
     const finish=()=>{if(closed)return;closed=true;clearInterval(timer);window.nativeActive--;window.nativeMonitorState.state='off';};
     return new Response(new ReadableStream({start(controller){
      controller.enqueue(new TextEncoder().encode(JSON.stringify({sampleRate:48000,channels:1,label:'Synthetic native PCM',captureId:window.nativeCaptureId})+'\n'));
-     timer=setInterval(()=>{if(closed)return;const pcm=Float32Array.from({length:960},()=>.2*Math.sin(2*Math.PI*440*offset++/48000));controller.enqueue(new Uint8Array(pcm.buffer));},20);
+     timer=setInterval(()=>{if(closed)return;const due=Math.floor((performance.now()-epoch)/20)*960;while(offset<due){const pcm=Float32Array.from({length:960},()=>.2*Math.sin(2*Math.PI*440*offset++/48000));controller.enqueue(new Uint8Array(pcm.buffer));}},5);
      init.signal?.addEventListener('abort',()=>{finish();controller.error(new DOMException('aborted','AbortError'));},{once:true});
     },cancel(){finish();}}));
    }
    return originalFetch(input,init);
+  };
+  // This suite mocks hardware/speaker APIs in the window. Reuse the production
+  // transport with that mock fetch; native-capture-browser-check separately
+  // verifies a real background Worker and HTTP stream during UI stalls.
+  const NativeWorker=window.Worker;
+  window.Worker=class{
+   constructor(url,options){
+    if(!String(url).endsWith('/native-microphone.mjs'))return new NativeWorker(url,options);
+    this.scope={postMessage:data=>queueMicrotask(()=>this.onmessage?.({data}))};
+    this.loaded=import(url).then(({installNativeTransport})=>installNativeTransport(this.scope));
+   }
+   postMessage(data){this.loaded.then(()=>this.scope.onmessage({data})).catch(()=>this.onerror?.());}
+   terminate(){this.loaded.then(()=>this.scope.onmessage({data:{type:'stop'}}));}
   };
  });
 

@@ -83,7 +83,7 @@ try {
     window.recorderCreated=0;const NativeRecorder=window.MediaRecorder;window.MediaRecorder=class extends NativeRecorder{constructor(...args){super(...args);window.recorderCreated++;}};
   });
   const records=()=>page.evaluate(()=>recordStore.list());
-  async function waitRecords(count){const end=Date.now()+20000;while(Date.now()<end){if((await records()).filter(x=>x.complete).length===count)return;await delay(50);}assert.fail('Recording did not finish saving');}
+  async function waitRecords(count){const end=Date.now()+20000;while(Date.now()<end){if((await records()).filter(x=>x.complete).length===count)return;await delay(50);}assert.fail('Recording did not finish saving: '+JSON.stringify({status:await page.locator('#recording-status').textContent(),rows:(await records()).map(r=>({complete:r.complete,seconds:r.seconds,clock:r.captureClock,error:r.captureError}))}));}
   async function expectLatestSaved(){
     const latest=(await records()).find(row=>row.complete);
     assert.ok(latest);
@@ -145,7 +145,7 @@ try {
   await start();assert.ok(await page.locator('#recording-manual').isDisabled());await delay(1000);
   await page.evaluate(()=>fixturePlayer.pauseVideo());await delay(900);
   const pauseSeconds=(await records())[0].seconds;
-  const balanceStatus=await page.locator('#recording-balance-status').textContent();assert.match(balanceStatus,/人聲修正.*配樂／和音修正/);
+  const balanceStatus=await page.locator('#recording-balance-status').textContent();assert.match(balanceStatus,/人聲修正.*配樂／和音修正/,await page.locator('#recording-status').textContent());
   await page.evaluate(()=>fixturePlayer.seekTo(10));await delay(60);
   await page.evaluate(()=>fixturePlayer.playVideo());await delay(900);
   await page.evaluate(()=>fixturePlayer.endVideo());await waitRecords(2);await expectLatestSaved();
@@ -212,7 +212,12 @@ try {
   await page.waitForFunction(()=>document.querySelector('#post-score').textContent.includes('改用已載入基準 RMVPE'));
   const updated=(await records()).find(r=>r.id===harmonyRecord.id);
   assert.equal(updated.postResult.referenceSource,'current');assert.equal(updated.postResult.reference.pitchMethod,'rmvpe');
-  assert.equal(updated.postResult.pitch,0);assert.equal(updated.postResult.baseline.pitch,0);
+  // The relaxed profile now gives partial credit at this ~300-cent mismatch.
+  // Switching reference must reduce pitch credit using the selected profile.
+  const updatedExpected=rescoreRecording({...updated.post,reference:updated.postResult.reference,scoring:updated.postResult.scoring},175);
+  assert.equal(updated.postResult.pitch,updatedExpected.pitch);
+  assert.equal(updated.postResult.baseline.pitch,rescoreRecording({...updated.post,reference:updated.postResult.reference,scoring:updated.postResult.scoring},0).pitch);
+  assert.ok(updated.postResult.pitch<original175.pitch);
   assert.deepEqual(updated.post.reference,harmonyRecord.post.reference,'old snapshot and remix stem identity must survive');
   assert.deepEqual(updated.post.audioAnalysis,rescored.post.audioAnalysis,'reuse the same voice analysis');
   await page.locator('#post-reference-source').selectOption('original');await page.locator('#post-rescore').click();
@@ -369,6 +374,11 @@ try {
   await page.evaluate(()=>{Object.getPrototypeOf(recordStore).save=window.storeSave;});
   assert.equal((await records()).filter(r=>r.complete).length,4);
   for(const partial of (await records()).filter(r=>!r.complete))await page.evaluate(id=>recordStore.delete(id),partial.id);
+  // Direct fixture cleanup bypasses the UI delete action; refresh its list so
+  // later preview clicks cannot target a stale, already deleted partial take.
+  const beforeCleanupRefresh=await page.locator('#recording-list li').first().elementHandle();
+  await page.evaluate(()=>document.querySelector('#recording-refresh').click());
+  await beforeCleanupRefresh.waitForElementState('hidden');
   // Waiting for autoplay cannot create a misleading empty recording.
   await page.evaluate(()=>{window.playOriginal=fixturePlayer.playVideo;fixturePlayer.playVideo=()=>{};});
   await page.locator('#sing-start').click();await page.waitForFunction(()=>document.querySelector('#score-status').textContent.includes('影片已回到開頭'));
@@ -387,7 +397,7 @@ try {
   await page.locator('#clear-history').click();assert.equal(await page.evaluate(()=>localStorage.getItem('karaoke.scores.v1')),null);assert.equal((await records()).length,4);
   await page.locator('#recordings-panel summary').click();
   await page.locator('#recording-list').getByRole('button',{name:'試聽',exact:true}).first().click();
-  await page.waitForFunction(()=>document.querySelector('#recording-audio').currentTime>.1);
+  await page.waitForFunction(()=>document.querySelector('#recording-audio').currentTime>.1).catch(async error=>{console.error('Preview failure',await page.evaluate(()=>{const a=document.querySelector('#recording-audio');return {time:a.currentTime,duration:a.duration,paused:a.paused,ready:a.readyState,error:a.error?.message,status:document.querySelector('#recording-status').textContent,src:a.src};}));throw error;});
   const downloaded=page.waitForEvent('download');await page.locator('#recording-list').getByRole('button',{name:'下載',exact:true}).first().click();
   assert.ok((await downloaded).suggestedFilename().endsWith('+0ms.wav'));
   // Reload preserves all recordings; delete only removes the selected recording.

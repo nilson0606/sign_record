@@ -10,37 +10,47 @@ export async function nativeInputDevices(){
 }
 export async function openNativeMicrophone(context,{deviceId='',signal,onError}){
  const controller=new AbortController();const abort=()=>controller.abort();signal.addEventListener('abort',abort,{once:true});if(signal.aborted)abort();
- let reader,node,destination,stopped=false,started=false,resolveReady,rejectReady;
+ let worker,node,destination,silent,stopped=false,started=false,resolveReady,rejectReady,resolveMeta,rejectMeta;
  const monitors=new Set();let speaker=null,speakerSequence=0;
  const ready=new Promise((resolve,reject)=>{resolveReady=resolve;rejectReady=reject;});
+ const metadata=new Promise((resolve,reject)=>{resolveMeta=resolve;rejectMeta=reject;});metadata.catch(()=>{});
  // Attach a handler immediately: setup can fail before the ready promise is awaited.
  ready.catch(()=>{});
  const timer=setTimeout(()=>{rejectReady(Error('本機收音啟動逾時。'));controller.abort();},30000);
- const stop=()=>{if(stopped)return;stopped=true;speaker?.disconnect();clearTimeout(timer);controller.abort();signal.removeEventListener('abort',abort);reader?.cancel().catch(()=>{});for(const monitor of [...monitors])monitor.disconnect();node?.disconnect();destination?.stream.getTracks().forEach(t=>t.stop());};
- const fail=error=>{rejectReady(error);if(started&&!stopped)onError(error);stop();};
+ // Recording owns its connections and must flush before releasing them.
+ // Stop only this capture's compatibility stream and silent render branch.
+ const stop=()=>{if(stopped)return;stopped=true;speaker?.disconnect();clearTimeout(timer);controller.abort();signal.removeEventListener('abort',abort);for(const monitor of [...monitors])monitor.disconnect();worker?.terminate();if(node){node.port.onmessage=null;node.port.close();if(destination)node.disconnect(destination);if(silent)node.disconnect(silent);}silent?.disconnect();destination?.stream.getTracks().forEach(t=>t.stop());};
+ const fail=error=>{rejectReady(error);rejectMeta(error);const notify=started&&!stopped;stop();if(notify)onError(error);};
+ controller.signal.addEventListener('abort',()=>fail(new DOMException('已取消','AbortError')),{once:true});
  try{
   const s=await session(controller.signal);
   await context.audioWorklet.addModule(new URL('./native-mic-worklet.mjs',import.meta.url));
-  const response=await fetch(base+'/microphone/stream',{method:'POST',headers:{'Content-Type':'application/json','X-Karaoke-Token':s.token},body:JSON.stringify({deviceId}),signal:controller.signal});
-  if(!response.ok){const e=await response.json();throw Error(e.error||'本機收音無法啟動。');}
-  reader=response.body.getReader();let prefix=new Uint8Array(0),meta;
-  while(!meta){const {done,value}=await reader.read();if(done)throw Error('本機收音在啟動前中斷。');const bytes=new Uint8Array(prefix.length+value.length);bytes.set(prefix);bytes.set(value,prefix.length);prefix=bytes;const n=prefix.indexOf(10);if(n>=0){meta=JSON.parse(new TextDecoder().decode(prefix.subarray(0,n)));prefix=prefix.slice(n+1);}else if(prefix.length>4096)throw Error('本機收音回應過大。');}
-  if(meta.sampleRate!==context.sampleRate||meta.channels!==1)throw Error('本機收音取樣率不相容。');
   node=new AudioWorkletNode(context,'local-microphone',{numberOfInputs:0,numberOfOutputs:1,outputChannelCount:[1]});
   destination=context.createMediaStreamDestination();node.connect(destination);
+  // Keep the worklet on this render clock, even before the analysis/recording
+  // consumers attach. The MediaStream is only for legacy track/monitor APIs.
+  silent=context.createGain();silent.gain.value=0;node.connect(silent);silent.connect(context.destination);
   node.port.onmessage=({data})=>{if(data.error)fail(Error(data.error));if(data.ready)resolveReady();};
-  let carry=new Uint8Array(0);
-  const feed=bytes=>{const all=new Uint8Array(carry.length+bytes.length);all.set(carry);all.set(bytes,carry.length);const n=all.length-all.length%4;carry=all.slice(n);if(n){const pcm=new Float32Array(all.buffer.slice(0,n));for(const monitor of monitors){const copy=pcm.slice();monitor.node.port.postMessage(copy,[copy.buffer]);}node.port.postMessage(pcm,[pcm.buffer]);}};
-  feed(prefix);
-  const pump=(async()=>{while(!stopped){const {done,value}=await reader.read();if(done)throw Error('本機收音連線已中斷。');feed(value);}})();pump.catch(error=>{if(!stopped)fail(error);});
+  node.onprocessorerror=()=>fail(Error('本機收音音訊執行緒中斷，請重新開啟收音。'));
+  worker=new Worker(new URL('./native-microphone.mjs',import.meta.url),{type:'module'});
+  worker.onmessage=({data})=>{if(data.meta)resolveMeta(data.meta);if(data.error)fail(Error(data.error));};
+  worker.onerror=()=>fail(Error('本機音訊背景傳輸中斷，請重新開啟收音。'));
+  const channel=new MessageChannel();node.port.postMessage({streamPort:channel.port2},[channel.port2]);
+  worker.postMessage({type:'start',token:s.token,deviceId,port:channel.port1},[channel.port1]);
+  const meta=await metadata;
+  if(meta.sampleRate!==context.sampleRate||meta.channels!==1)throw Error('本機收音取樣率不相容。');
   await ready;clearTimeout(timer);if(controller.signal.aborted)throw new DOMException('已取消','AbortError');started=true;
   async function createMonitorSource(outputContext,onMonitorError){
    if(stopped)throw Error('本機收音已停止。');
    if(outputContext.sampleRate!==meta.sampleRate)throw Error('歌聲輸出取樣率不相容。');
    await outputContext.audioWorklet.addModule(new URL('./native-mic-worklet.mjs',import.meta.url));
    if(stopped||outputContext.state==='closed')throw Error('本機收音已停止。');
-   const monitorNode=new AudioWorkletNode(outputContext,'local-microphone',{numberOfInputs:0,numberOfOutputs:1,outputChannelCount:[1],processorOptions:{prebufferFrames:960}});
-   const monitor={node:monitorNode,disconnect(){monitors.delete(monitor);monitorNode.port.onmessage=null;monitorNode.disconnect();monitorNode.port.close();}};
+   // Legacy browser monitoring also needs two packets of jitter headroom.
+   // Modern helpers use createSpeakerMonitor and bypass this browser buffer.
+   const monitorNode=new AudioWorkletNode(outputContext,'local-microphone',{numberOfInputs:0,numberOfOutputs:1,outputChannelCount:[1]});
+   const id=crypto.randomUUID(),channel=new MessageChannel();monitorNode.port.postMessage({streamPort:channel.port2},[channel.port2]);
+   worker.postMessage({type:'attach',id,port:channel.port1},[channel.port1]);
+   const monitor={node:monitorNode,disconnect(){monitors.delete(monitor);worker.postMessage({type:'detach',id});monitorNode.port.onmessage=null;monitorNode.disconnect();monitorNode.port.close();}};
    monitorNode.port.onmessage=({data})=>{if(data.error){monitor.disconnect();onMonitorError(Error(data.error));}};
    monitors.add(monitor);return monitor;
   }
@@ -94,7 +104,45 @@ export async function openNativeMicrophone(context,{deviceId='',signal,onError})
    });
    return handle;
   }
-  return{stream:destination.stream,label:meta.label,stop,createMonitorSource,monitorSampleRate:meta.sampleRate,
+  return{stream:destination.stream,source:node,label:meta.label,stop,createMonitorSource,monitorSampleRate:meta.sampleRate,
    ...(s.features?.includes('native-speaker-output')&&typeof meta.captureId==='string'?{createSpeakerMonitor,speakerDevices}:{})};
  }catch(error){stop();throw error;}
 }
+
+// Own fetch, byte framing and worklet delivery off the UI thread. A long page
+// task must not hold up microphone packets. Ports go straight to AudioWorklets.
+export function installNativeTransport(scope) {
+ let controller;const ports=new Map();
+ const close=()=>{controller?.abort();for(const port of ports.values())port.close();ports.clear();};
+ scope.onmessage=({data})=>{
+  if(data.type==='stop'){close();return;}
+  if(data.type==='attach'){ports.set(data.id,data.port);return;}
+  if(data.type==='detach'){ports.get(data.id)?.close();ports.delete(data.id);return;}
+  if(data.type!=='start'||controller)return;
+  controller=new AbortController();ports.set('capture',data.port);
+  (async()=>{
+   const response=await fetch(base+'/microphone/stream',{method:'POST',headers:{'Content-Type':'application/json','X-Karaoke-Token':data.token},body:JSON.stringify({deviceId:data.deviceId}),signal:controller.signal});
+   if(!response.ok){const e=await response.json();throw Error(e.error||'本機收音無法啟動。');}
+   const reader=response.body.getReader();let pending=new Uint8Array(0),meta;
+   while(true){
+    const {done,value}=await reader.read();if(done)throw Error('本機收音連線已中斷。');
+    const bytes=new Uint8Array(pending.length+value.length);bytes.set(pending);bytes.set(value,pending.length);pending=bytes;
+    if(!meta){
+     const newline=pending.indexOf(10);
+     if(newline<0){if(pending.length>4096)throw Error('本機收音回應過大。');continue;}
+     if(newline>4096)throw Error('本機收音回應過大。');
+     meta=JSON.parse(new TextDecoder().decode(pending.subarray(0,newline)));pending=pending.slice(newline+1);
+     if(meta.sampleRate!==48000||meta.channels!==1||typeof meta.label!=='string')throw Error('本機收音格式不相容。');
+     scope.postMessage({meta});
+    }
+    const size=pending.length-pending.length%4;
+    if(size){
+     const pcm=new Float32Array(pending.buffer.slice(pending.byteOffset,pending.byteOffset+size));pending=pending.slice(size);
+     const consumers=[...ports.values()];
+     for(let i=0;i<consumers.length;i++){const copy=i===consumers.length-1?pcm:pcm.slice();consumers[i].postMessage(copy,[copy.buffer]);}
+    }
+   }
+  })().catch(error=>{if(!controller.signal.aborted)scope.postMessage({error:error.message});close();});
+ };
+}
+if(typeof WorkerGlobalScope!=='undefined'&&self instanceof WorkerGlobalScope)installNativeTransport(self);
