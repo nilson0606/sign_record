@@ -1,4 +1,5 @@
 import { recordingTuningSuffix } from './recording-tune.mjs';
+import { PITCH_DETECTOR_VERSION } from './audio.mjs';
 import { softeningProfile, recordingSofteningSuffix, recordingEffectsSuffix, vocalEffects } from './recording-soften.mjs';
 import { scoringProfile } from './scoring.mjs';
 import { recordingVolume } from './recording-mix.mjs';
@@ -160,7 +161,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     const referenceSource=$('post-reference-source').value;
     const scoringReference=referenceSource==='current'?referenceForRescore(row.post,reference()):structuredClone(row.post.reference);
     status(`正在以 ${referenceName(scoringReference)} 重新評分…`);
-    if(row.post.audioAnalysis?.source!=='decoded-voice-v1') {
+    if(row.post.audioAnalysis?.source!=='decoded-voice-v1'||row.post.audioAnalysis.detectorVersion!==PITCH_DETECTOR_VERSION) {
       status('正在從保存的乾淨歌聲重新擷取音高…');
       row.post.audioAnalysis=await recordedAnalysis(await store.blob(row,'voice'),percent=>status(`正在分析乾淨歌聲 ${percent}%…`));
     }

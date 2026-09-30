@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import { normalizeMasks } from '../scoring.mjs';
 import {rescoreRecording} from '../recording-process.mjs';
+import {PITCH_DETECTOR_VERSION} from '../audio.mjs';
 const require = createRequire(process.env.PLAYWRIGHT_PACKAGE_ROOT || 'C:/Users/User/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/package.json');
 const { chromium } = require('playwright');
 const site = `http://localhost:${process.env.PORT || 4273}`;
@@ -177,6 +178,17 @@ try {
   await page.locator('#score-settings > summary').click();
   assert.equal(await page.locator('#score-settings #post-difficulty').count(),1);
   assert.equal(await page.locator('#score-settings #post-reference-source').count(),1);
+  // A previous release's analysis must not hide a detector fix on explicit rescore.
+  await page.evaluate(async id=>{
+    const row=(await recordStore.list()).find(r=>r.id===id);
+    row.post.audioAnalysis={version:1,source:'decoded-voice-v1',duration:row.seconds,samples:[{offset:.3,hz:110}]};
+    await recordStore.save(row);
+  },harmonyRecord.id);
+  const oldRecordingList=await page.locator('#recording-list li').first().elementHandle();
+  await page.locator('#recordings-panel > summary').click();
+  await page.locator('#recording-refresh').click();
+  await oldRecordingList.waitForElementState('hidden');
+  await page.locator('#recordings-panel > summary').click();
   await page.locator('#score-recording').selectOption(harmonyRecord.id);
   assert.equal(await page.locator('#post-recording').inputValue(),harmonyRecord.id);
   await page.locator('#post-delay').fill('100');
@@ -184,6 +196,7 @@ try {
   await page.locator('#post-rescore').click();await page.waitForFunction(()=>document.querySelector('#rescore-status').textContent.includes('重評完成'));
   const rescored=(await records()).find(r=>r.id===harmonyRecord.id);
   assert.equal(rescored.postResult.delayMs,100);assert.equal(rescored.postResult.source,'decoded-voice-v1');assert.ok(rescored.post.audioAnalysis.samples.length>20);
+  assert.equal(rescored.post.audioAnalysis.detectorVersion,PITCH_DETECTOR_VERSION);
   assert.ok(rescored.post.audioAnalysis.samples.some(s=>s.hz>435&&s.hz<445));
   await page.locator('#post-delay').fill('175');await page.locator('#post-rescore').click();await page.waitForFunction(()=>document.querySelector('#post-score').textContent.includes('校正 175 ms'));
   assert.match(await page.locator('#post-score').textContent(),/同音檔 0 ms 進拍/);

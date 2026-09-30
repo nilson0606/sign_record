@@ -1,4 +1,4 @@
-import { detectPitch } from './audio.mjs';
+import { detectPitch, PITCH_DETECTOR_VERSION } from './audio.mjs';
 // Centered windows on the decoded recording clock, independent of live UI timestamps.
 export function analyzeRecordedVoice(audio, sampleRate, progress=()=>{}) {
   if(!(audio instanceof Float32Array)||!Number.isFinite(sampleRate)||sampleRate<8000)throw new Error('錄音取樣資料無效。');
@@ -9,7 +9,7 @@ export function analyzeRecordedVoice(audio, sampleRate, progress=()=>{}) {
     samples.push({offset:center/sampleRate,hz:detectPitch(window,sampleRate).hz});
     if(samples.length%100===0)progress(Math.round(100*center/audio.length));
   }
-  progress(100);return {version:1,source:'decoded-voice-v1',duration:audio.length/sampleRate,samples};
+  progress(100);return {version:1,source:'decoded-voice-v1',detectorVersion:PITCH_DETECTOR_VERSION,duration:audio.length/sampleRate,samples};
 }
 if(typeof WorkerGlobalScope!=='undefined'&&self instanceof WorkerGlobalScope){
   self.onmessage=({data})=>{try{const result=analyzeRecordedVoice(data.audio,data.sampleRate,progress=>self.postMessage({progress}));self.postMessage({result});}catch(error){self.postMessage({error:error.message});}};
