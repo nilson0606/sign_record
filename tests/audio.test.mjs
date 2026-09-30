@@ -64,7 +64,7 @@ test('waveform-to-score accepts a low octave but still deducts wrong notes and s
     reference.frames.forEach((hz, i) => take.sample(i * .1, factor ? detectPitch(breathyVoice(hz * factor, rate, i + 1), rate).hz : null));
     return take.result();
   }
-  const normal = score(1), low = score(.5), wrong = score(.5 * 2 ** (3 / 12));
+  const normal = score(1), low = score(.5), wrong = score(.5 * 2 ** (4 / 12));
   assert.equal(normal.score, 100); assert.equal(low.score, 100);
   assert.equal(score(.5, false).pitch, 0);
   assert.ok(wrong.pitch < 10); assert.equal(score(0).score, 0);

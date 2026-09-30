@@ -43,7 +43,7 @@ export function pitchDifference(actual, expected, allowOctave = false) {
 export const SCORING_PROFILES = Object.freeze({
   standard: Object.freeze({ id: 'standard', label: '標準', pitchFull: 25, pitchZero: 200, rhythmFull: .08, rhythmFade: .27, rhythmWindow: .351 }),
   strict: Object.freeze({ id: 'strict', label: '嚴格', pitchFull: 15, pitchZero: 100, rhythmFull: .04, rhythmFade: .16, rhythmWindow: .201 }),
-  relaxed: Object.freeze({ id: 'relaxed', label: '寬鬆', pitchFull: 50, pitchZero: 300, rhythmFull: .12, rhythmFade: .38, rhythmWindow: .501 }),
+  relaxed: Object.freeze({ id: 'relaxed', label: '寬鬆', pitchFull: 75, pitchZero: 350, rhythmFull: .20, rhythmFade: .50, rhythmWindow: .701 }),
 });
 export function scoringProfile(difficulty = 'standard') {
   return Object.hasOwn(SCORING_PROFILES, difficulty) ? SCORING_PROFILES[difficulty] : SCORING_PROFILES.standard;

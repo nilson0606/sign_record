@@ -130,6 +130,20 @@ test('difficulty changes pitch and timing tolerance without rewarding silence or
   assert.ok(rhythm[0]<rhythm[1]&&rhythm[1]<rhythm[2],JSON.stringify(rhythm));
 });
 
+test('relaxed singing gives gentle pitch and timing errors more room but still penalizes large errors',()=>{
+  for(const [cents,expected] of [[75,100],[100,91],[200,55],[350,0]]){
+    const take=new ScoringTake(reference(),{difficulty:'relaxed',allowOctave:true});
+    for(let i=0;i<100;i++)take.sample(i*.1,220*2**(cents/1200));
+    assert.equal(take.result().pitch,expected,`${cents} cents in the lower octave`);
+  }
+  const ref=reference();ref.frames=ref.frames.map((hz,i)=>i>=10&&i<70?hz:null);
+  for(const sign of [-1,1])for(const [seconds,expected] of [[.2,100],[.4,60],[.6,20],[.7,0]]){
+    const take=new ScoringTake(ref,{difficulty:'relaxed',allowOctave:true});
+    for(let i=0;i<100;i++)take.sample(i*.1+sign*seconds,ref.frames[i]===null?null:220);
+    assert.equal(take.result().rhythm,expected,`${sign*seconds} second timing error`);
+  }
+});
+
 test('choose closest timestamp, not latest or best pitch; replay still replaces the previous singing',()=>{
  const take=new ScoringTake(reference());
  take.sample(.101,523.25);take.sample(.14,440);assert.equal(take.observations.get(1),523.25);
