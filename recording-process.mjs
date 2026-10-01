@@ -1,4 +1,4 @@
-import { softenedVoice, vocalEffects, processedVoice, vocalReverbTail } from './recording-soften.mjs';
+import { softenedVoice, vocalEffects, processedVoice, reverbDuration } from './recording-soften.mjs';
 import { ScoringTake, validateReference } from './scoring.mjs';
 import { balanceGains, createRecordingMix } from './recording-mix.mjs';
 // Describe the audio that was actually rendered, never a pending score correction.
@@ -56,10 +56,32 @@ export function wavBlob(buffer) {
   for(let i=0;i<frames;i++)for(let c=0;c<channels;c++){const x=Math.max(-1,Math.min(1,data[c][i]));view.setInt16(44+2*(i*channels+c),Math.round(x*(x<0?32768:32767)),true);}
   return new Blob([bytes],{type:'audio/wav'});
 }
-export async function remixRecording(raw, tracks, meta, ms, {softening='off',volume,effects}={}) {
+export function recordingEdit(value={},duration=3600){
+  if(value.version!==undefined&&value.version!==1)throw Error('剪輯設定版本不支援。');
+  const {start=0,end=null,fadeIn=0,fadeOut=0}=value;
+  if(!Number.isFinite(duration)||duration<=0||!Number.isFinite(start)||start<0||start>=duration||
+    (end!==null&&(!Number.isFinite(end)||end<=start||end>duration)))throw Error('剪輯起訖需在原始錄音範圍內，結束必須晚於開始。');
+  const length=(end??duration)-start;
+  if(![fadeIn,fadeOut].every(n=>Number.isFinite(n)&&n>=0&&n<=30)||fadeIn+fadeOut>length+1e-9)throw Error('淡入淡出各需介於 0 與 30 秒，合計不可超過保留長度。');
+  return {version:1,start,end,fadeIn,fadeOut};
+}
+export function editRecordingAudio(buffer,value={}){
+  const edit=recordingEdit(value,buffer.duration),rate=buffer.sampleRate;
+  const start=Math.round(edit.start*rate),end=edit.end===null?buffer.length:Math.min(buffer.length,Math.round(edit.end*rate)),frames=end-start;
+  if(frames<1)throw Error('剪輯範圍太短，至少需保留一個音訊取樣。');
+  if(start===0&&end===buffer.length&&!edit.fadeIn&&!edit.fadeOut)return buffer;
+  const result=new AudioBuffer({numberOfChannels:buffer.numberOfChannels,length:frames,sampleRate:rate});
+  for(let c=0;c<buffer.numberOfChannels;c++){
+    const source=buffer.getChannelData(c),out=result.getChannelData(c);
+    for(let i=0;i<frames;i++)out[i]=source[start+i]*Math.min(1,edit.fadeIn?i/(edit.fadeIn*rate):1,edit.fadeOut?(frames-1-i)/(edit.fadeOut*rate):1);
+  }
+  return result;
+}
+export async function remixRecording(raw, tracks, meta, ms, {softening='off',volume,effects,edit=meta.postEdit}={}) {
   const shift=delaySeconds(ms), rate=raw.sampleRate;
   const sourceDuration=Math.max(raw.duration+Math.max(0,-shift),meta.sourceSeconds??meta.seconds);
-  const recipe=vocalEffects(effects,sourceDuration),duration=sourceDuration+(recipe.reverb?vocalReverbTail:0);
+  const recipe=vocalEffects(effects,sourceDuration),duration=sourceDuration+reverbDuration(recipe);
+  const cuts=recordingEdit(edit,duration);
   if(duration>3600)throw new Error('後處理一次最多一小時。');
   const context=new OfflineAudioContext(2,Math.ceil(duration*rate),rate), voice=context.createBufferSource();voice.buffer=raw;
   const p=voicePlacement(raw.duration,ms);
@@ -87,5 +109,5 @@ export async function remixRecording(raw, tracks, meta, ms, {softening='off',vol
     mix.setLevels(balanceGains({mode:meta.mode,settings:meta.balance,voiceRms:rms(raw,sourceTime),backingRms,voiced}),t);
     if(Math.round(t*10)%100===0)await new Promise(resolve=>setTimeout(resolve,0));
   }
-  const rendered=await context.startRendering();mix.disconnect();processed.disconnect();singer.disconnect();return rendered;
+  const rendered=await context.startRendering();mix.disconnect();processed.disconnect();singer.disconnect();return editRecordingAudio(rendered,cuts);
 }

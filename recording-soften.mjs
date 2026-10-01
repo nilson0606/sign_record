@@ -24,6 +24,11 @@ export function recordingEffectsSuffix(meta) {
   const compression={light:'輕度',medium:'中度'}[effects.compression];
   if(compression)parts.push('壓縮'+compression);
   if(Number.isFinite(effects.reverb)&&effects.reverb>0)parts.push(`殘響${effects.reverb}%`);
+  if(effects.reverb>0&&effects.reverbOptions){const r=reverbProfile(effects.reverbOptions);parts.push(`${reverbSpaces[r.space]}${r.decay}s`, `預延遲${r.preDelayMs}ms`);}
+  const edit=meta.postEdit;
+  if(edit?.start>0||edit?.end!=null)parts.push(`剪輯${edit.start||0}-${edit.end??'末尾'}秒`);
+  if(edit?.fadeIn>0)parts.push(`淡入${edit.fadeIn}秒`);
+  if(edit?.fadeOut>0)parts.push(`淡出${edit.fadeOut}秒`);
   if(!meta.parentId&&!parts.length&&!recordingSofteningSuffix(meta))return '';
   return '_人聲後製'+parts.map(part=>'_'+part).join('');
 }
@@ -46,10 +51,39 @@ export function vocalEffects(value={},duration=3600) {
     if(regions[i].end<=regions[i].start)throw new Error('局部音量的結束時間必須晚於開始時間。');
     if(i&&regions[i].start<regions[i-1].end)throw new Error('局部音量區段不可重疊，請調整開始／結束時間。');
   }
-  return {version:1,eq,compression,reverb,regions};
+  const profile=reverbProfile(value.reverbOptions);
+  const custom=profile.space!=='classic'||profile.decay!==.8||profile.preDelayMs!==15;
+  return {version:1,eq,compression,reverb,regions,...(custom?{reverbOptions:profile}:{})};
 }
 
 export const vocalReverbTail=.8;
+export const reverbSpaces={classic:'原版',room:'房間',hall:'大廳',plate:'板式'};
+export function reverbProfile(value={}){
+  const {space='classic',decay=.8,preDelayMs=15}=value;
+  if(!Object.hasOwn(reverbSpaces,space))throw Error('無效的殘響空間類型。');
+  if(!Number.isFinite(decay)||decay<.2||decay>3)throw Error('殘響尾音長度需介於 0.2 與 3 秒。');
+  if(!Number.isFinite(preDelayMs)||preDelayMs<0||preDelayMs>150)throw Error('殘響預延遲需介於 0 與 150 ms。');
+  return {space,decay,preDelayMs};
+}
+export function reverbDuration(recipe){const r=reverbProfile(recipe.reverbOptions);return recipe.reverb?(recipe.reverbOptions?r.decay+r.preDelayMs/1000:vocalReverbTail):0;}
+export function reverbImpulse(context,recipe){
+  const r=reverbProfile(recipe.reverbOptions),legacy=!recipe.reverbOptions;
+  const impulse=context.createBuffer(2,Math.ceil(context.sampleRate*reverbDuration(recipe)),context.sampleRate);
+  const first=Math.floor(context.sampleRate*r.preDelayMs/1000);let seed=19237;
+  for(let c=0;c<2;c++){
+    const data=impulse.getChannelData(c);let energy=0;
+    for(let i=first;i<data.length;i++){
+      seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+      const t=(i-first)/context.sampleRate;
+      const attack=r.space==='hall'?1-Math.exp(-t/.025):r.space==='plate'?1-Math.exp(-t/.004):1;
+      data[i]=(seed/2147483648-1)*Math.exp(legacy?-7*i/data.length:-7*t/r.decay)*attack;
+    }
+    if(r.space==='room')for(const [time,level] of [[.011,.65],[.027,-.4],[.043,.3]]){const at=first+Math.round((time+c*.002)*context.sampleRate);if(at<data.length)data[at]+=level*Math.sqrt(context.sampleRate/48000);}
+    for(const sample of data)energy+=sample*sample;
+    const scale=.65/Math.sqrt(energy||1);for(let i=0;i<data.length;i++)data[i]*=scale;
+  }
+  return impulse;
+}
 export function processedVoice(context,source,recipe) {
   const nodes=[];let output=source;
   const append=node=>{output.connect(node);nodes.push(node);output=node;};
@@ -75,19 +109,9 @@ export function processedVoice(context,source,recipe) {
   }
   if(recipe.reverb){
     const dry=output,convolver=context.createConvolver(),wet=context.createGain(),sum=context.createGain(),damping=context.createBiquadFilter();
-    const impulse=context.createBuffer(2,Math.ceil(context.sampleRate*vocalReverbTail),context.sampleRate);
-    // A fixed seed keeps repeated edits and solo previews identical.
-    let seed=19237;
-    for(let c=0;c<2;c++){
-      const data=impulse.getChannelData(c);let energy=0;
-      for(let i=Math.floor(context.sampleRate*.015);i<data.length;i++){
-        seed=(Math.imul(seed,1664525)+1013904223)>>>0;
-        data[i]=(seed/2147483648-1)*Math.exp(-7*i/data.length);energy+=data[i]*data[i];
-      }
-      const scale=.65/Math.sqrt(energy||1);for(let i=0;i<data.length;i++)data[i]*=scale;
-    }
-    convolver.normalize=false;convolver.buffer=impulse;wet.gain.value=recipe.reverb/100;
-    damping.type='lowpass';damping.frequency.value=Math.min(5000,context.sampleRate*.45);
+    convolver.normalize=false;convolver.buffer=reverbImpulse(context,recipe);wet.gain.value=recipe.reverb/100;
+    const space=reverbProfile(recipe.reverbOptions).space;
+    damping.type='lowpass';damping.frequency.value=Math.min(({classic:5000,room:6000,hall:4000,plate:7000})[space],context.sampleRate*.45);
     dry.connect(sum);dry.connect(convolver);convolver.connect(damping);damping.connect(wet);wet.connect(sum);
     nodes.push(convolver,damping,wet,sum);output=sum;
   }

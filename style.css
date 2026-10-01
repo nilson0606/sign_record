@@ -143,3 +143,5 @@ header{gap:18px;flex-wrap:wrap}
 #voice-output-device{min-width:0;max-width:100%;flex:1 1 180px}
 #voice-output-volume-value{float:right;color:var(--accent)}
 #voice-output .footnote{margin-bottom:0}
+.post-edit-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.post-edit-grid>div{min-width:0}.post-edit-grid button{margin-top:8px;width:100%}.post-edit-grid input{width:100%}
+@media(max-width:650px){.post-eq-grid,.post-edit-grid{grid-template-columns:1fr}.post-region-row{grid-template-columns:1fr 1fr}.post-effects>summary{gap:12px;padding:14px}.post-effects-heading strong{font-size:18px}.post-effects-toggle{padding:8px;font-size:12px}}

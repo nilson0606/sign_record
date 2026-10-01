@@ -1,9 +1,9 @@
 import { recordingTuningSuffix } from './recording-tune.mjs';
 import { PITCH_DETECTOR_VERSION } from './audio.mjs';
-import { softeningProfile, recordingSofteningSuffix, recordingEffectsSuffix, vocalEffects } from './recording-soften.mjs';
+import { softeningProfile, recordingSofteningSuffix, recordingEffectsSuffix, vocalEffects, reverbProfile } from './recording-soften.mjs';
 import { scoringProfile } from './scoring.mjs';
 import { recordingVolume } from './recording-mix.mjs';
-import { rescoreRecording, remixRecording, wavBlob, delaySeconds, referenceForRescore, recordingDelaySuffix } from './recording-process.mjs';
+import { rescoreRecording, remixRecording, wavBlob, delaySeconds, referenceForRescore, recordingDelaySuffix, recordingEdit } from './recording-process.mjs';
 const $=id=>document.getElementById(id), BASE='http://127.0.0.1:4274';
 async function localRequest(path,body) {
   let response;
@@ -40,6 +40,8 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
   function effectLabels(){
     for(const band of ['low','mid','high'])$('post-eq-'+band+'-value').textContent=$('post-eq-'+band).value+' dB';
     $('post-reverb-value').textContent=$('post-reverb').value+'%';
+    $('post-reverb-decay-value').textContent=$('post-reverb-decay').value+' 秒';
+    $('post-reverb-predelay-value').textContent=$('post-reverb-predelay').value+' ms';
   }
   function addRegion(value){
     const row=document.createElement('div');row.className='post-region-row';
@@ -52,12 +54,20 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     const recipe=vocalEffects(value);
     for(const band of ['low','mid','high'])$('post-eq-'+band).value=recipe.eq[band];
     $('post-compression').value=recipe.compression;$('post-reverb').value=recipe.reverb;
+    const reverb=reverbProfile(recipe.reverbOptions);
+    $('post-reverb-space').value=reverb.space;$('post-reverb-decay').value=reverb.decay;$('post-reverb-predelay').value=reverb.preDelayMs;
     $('post-regions').replaceChildren();recipe.regions.forEach(addRegion);effectLabels();
   }
   function readEffects(){
     const regions=Array.from($('post-regions').children,row=>Object.fromEntries(Array.from(row.querySelectorAll('input'),input=>[input.dataset.field,input.value===''?NaN:Number(input.value)])));
-    return vocalEffects({eq:Object.fromEntries(['low','mid','high'].map(band=>[band,Number($('post-eq-'+band).value)])),compression:$('post-compression').value,reverb:Number($('post-reverb').value),regions});
+    return vocalEffects({eq:Object.fromEntries(['low','mid','high'].map(band=>[band,Number($('post-eq-'+band).value)])),compression:$('post-compression').value,reverb:Number($('post-reverb').value),reverbOptions:{space:$('post-reverb-space').value,decay:Number($('post-reverb-decay').value),preDelayMs:Number($('post-reverb-predelay').value)},regions});
   }
+  function setEdit(value){
+    const edit=recordingEdit(value);
+    for(const key of ['start','end','fadeIn','fadeOut'])$('post-edit-'+key).value=edit[key]??'';
+  }
+  function readEdit(){return recordingEdit(Object.fromEntries(['start','end','fadeIn','fadeOut'].map(key=>{const value=$('post-edit-'+key).value;return [key,value===''?(key==='end'?null:NaN):Number(value)];})));}
+  function originalPlayhead(){return Math.round((($('post-audio').currentTime||0)+(selected?.postEdit?.start||0))*100)/100;}
   function referenceName(ref) {
     if(!ref)return '尚未載入';
     return `${(ref.pitchMethod||'yin').toUpperCase()} · ${({demucs:'Demucs','bs-roformer':'BS-RoFormer','mel-roformer':'Mel-Band RoFormer'})[ref.separationModel]||'Demucs'} · ${ref.separationMethod==='residual'?'二次分離＋相減':'單次分離'} · ${ref.vocalMode==='lead'?'主唱':'人聲'} · ${Math.round(ref.duration??ref.frames.length*ref.step)} 秒`;
@@ -75,6 +85,8 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     $('post-difficulty').disabled=busy||!editable;
     $('post-softening').disabled=busy||!editable;
     $('post-effects-fields').disabled=busy||!editable;
+    $('post-edit-fields').disabled=busy||!editable;
+    for(const key of ['start','end'])$('post-edit-'+key+'-now').disabled=busy||!editable||!$('post-audio').getAttribute('src');
     $('post-voice-level').disabled=busy||!editable;
     $('post-backing-level').disabled=busy||!editable||selected?.mode!=='mix';
     const current=reference();let referenceError='';
@@ -89,6 +101,8 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     $('post-reference-source').value='original';
     $('post-softening').value=selected?.vocalSoftening?.strength||'off';
     setEffects(selected?.vocalEffects);
+    setEdit(selected?.postEdit);
+    $('post-edit-info').textContent=selected?`原始錄音約 ${(selected.sourceSeconds??selected.seconds).toFixed(2)} 秒；目前成品 ${selected.seconds.toFixed(2)} 秒。剪輯秒數以套用延時後、尚未裁切的完整錄音為準。${selected.postEdit?.start?`目前播放器 0 秒對應原始錄音 ${selected.postEdit.start} 秒。`:''}`:'';
     const volume=recordingVolume(selected?.postVolume);
     $('post-voice-level').value=volume.voice;$('post-backing-level').value=volume.backing;
     volumeLabels();
@@ -148,12 +162,18 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     $('post-backing-value').textContent=$('post-backing-level').value+'%';
   }
   for(const id of ['post-voice-level','post-backing-level'])$(id).addEventListener('input',volumeLabels);
-  for(const id of ['post-eq-low','post-eq-mid','post-eq-high','post-reverb'])$(id).addEventListener('input',effectLabels);
+  for(const id of ['post-eq-low','post-eq-mid','post-eq-high','post-reverb','post-reverb-decay','post-reverb-predelay'])$(id).addEventListener('input',effectLabels);
+  $('post-reverb-space').addEventListener('change',()=>{
+    const presets={classic:[.8,15],room:[.6,10],hall:[1.8,25],plate:[1.2,15]},[decay,pre]=presets[$('post-reverb-space').value];
+    $('post-reverb-decay').value=decay;$('post-reverb-predelay').value=pre;effectLabels();
+  });
   $('post-effects-reset').addEventListener('click',()=>setEffects());
+  $('post-edit-reset').addEventListener('click',()=>setEdit());
+  for(const key of ['start','end'])$('post-edit-'+key+'-now').addEventListener('click',()=>{$('post-edit-'+key).value=originalPlayhead();});
   $('post-region-add').addEventListener('click',()=>{
     if($('post-regions').children.length>=100){status('局部音量最多 100 個區段。');return;}
     const endLimit=selected?.sourceSeconds??selected?.seconds??0;
-    const start=Math.min(Math.max(0,endLimit-.1),Math.round(($('post-audio').currentTime||0)*100)/100);
+    const start=Math.min(Math.max(0,endLimit-.1),originalPlayhead());
     addRegion({start,end:Math.min(endLimit,start+5),volume:100});
   });
   $('post-rescore').addEventListener('click',()=>run(async row=>{
@@ -173,6 +193,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     const delayMs=Number($('remix-delay').value);delaySeconds(delayMs);
     const softening=softeningProfile($('post-softening').value);
     const effects=readEffects();
+    const edit=readEdit();
     const volume=recordingVolume({voice:Number($('post-voice-level').value),backing:Number($('post-backing-level').value)});
     status('正在載入乾淨歌聲與配樂／和音…');
     const context=new AudioContext({sinkId:{type:'none'}});
@@ -182,10 +203,11 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
       const raw=await context.decodeAudioData(await rawBlob.arrayBuffer()),tracks=[];
       if(row.mode==='mix')for(const stem of row.stems){const response=await localRequest(`/library/${row.post.reference.cacheId}/${stem}`);tracks.push(await context.decodeAudioData(await response.arrayBuffer()));}
       status(softening.id==='off'?'正在校正歌聲位置並合成…':`正在套用${softening.label}歌聲柔化並合成…`);
-      const audio=await remixRecording(raw,tracks,row,delayMs,{softening:softening.id,volume,effects}),blob=wavBlob(audio);
+      const audio=await remixRecording(raw,tracks,row,delayMs,{softening:softening.id,volume,effects,edit}),blob=wavBlob(audio);
       const result={id:crypto.randomUUID(),title:row.title,videoId:row.videoId,mode:row.mode,stems:row.stems,mime:'audio/wav',created:Date.now(),seconds:audio.duration,bytes:blob.size,complete:true,parentId:row.id,delayMs,appliedDelayMs:delayMs,vocalSoftening:{version:2,strength:softening.id}};
       result.postVolume=volume;
       result.vocalEffects=effects;
+      result.postEdit=edit;
       result.rawBytes=rawBlob.size;result.rawMime=row.rawMime||rawBlob.type||row.mime;
       result.post=structuredClone(row.post);result.post.offsetMs=delayMs;
       result.balance=structuredClone(row.balance);

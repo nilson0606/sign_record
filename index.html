@@ -160,7 +160,7 @@
     <details id="post-effects-panel" class="post-effects"><summary><span class="post-effects-heading"><strong>人聲進階後製</strong><span>局部音量 · EQ · 動態壓縮 · 少量殘響</span></span><span class="post-effects-toggle"><span class="when-closed">點此展開</span><span class="when-open">收合設定</span></span></summary>
       <fieldset id="post-effects-fields" disabled><legend>只處理歌唱者</legend>
         <p class="help">四項預設關閉或中性。按「重新合成」另存後試聽；每次從原始歌聲重算，效果不會疊加。配樂／和音不套用這些效果。</p>
-        <h3>局部音量</h3><p id="post-regions-help" class="help">依這筆錄音播放器的秒數設定開始與結束，不是 YouTube 時間。只調指定區段；100% 不變、0% 靜音，區段不可重疊。變更延時後請重新核對區段位置。殘響會自然延伸到區段外。</p>
+        <h3>局部音量</h3><p id="post-regions-help" class="help">以套用延時後、尚未剪輯的完整錄音秒數設定，不是 YouTube 時間。「從目前播放位置」會自動換算已剪輯成品的位置。100% 不變、0% 靜音，區段不可重疊。變更延時後請重新核對位置；殘響會自然延伸到區段外。</p>
         <div id="post-regions"></div><button id="post-region-add" type="button" class="secondary">新增區段（從目前播放位置）</button>
         <h3>EQ 音色</h3><div class="post-eq-grid">
           <div><label for="post-eq-low">低頻 · 厚度 <output id="post-eq-low-value">0 dB</output></label><input id="post-eq-low" type="range" min="-12" max="12" step="1" value="0"></div>
@@ -169,11 +169,29 @@
         </div><p class="help">0 dB 不變；往左減少、往右增加。先從 ±2～3 dB 比較。</p>
         <div class="post-eq-grid">
           <div><label for="post-compression">動態壓縮 · 穩定大小聲</label><select id="post-compression"><option value="off">關閉</option><option value="light">輕度 · 保留較多起伏</option><option value="medium">中度 · 更穩定</option></select></div>
-          <div><label for="post-reverb">少量殘響 <output id="post-reverb-value">0%</output></label><input id="post-reverb" type="range" min="0" max="20" step="1" value="0"><p class="help">0% 關閉；可先試 5～10%。開啟後保留 0.8 秒尾音。</p></div>
-        </div><button id="post-effects-reset" type="button" class="secondary">重設這四項效果</button>
+          <div><label for="post-reverb">殘響音量 <output id="post-reverb-value">0%</output></label><input id="post-reverb" type="range" min="0" max="20" step="1" value="0"><p class="help">0% 關閉；可先試 5～10%。</p></div>
+        </div>
+        <div class="post-eq-grid">
+          <div><label for="post-reverb-space">空間類型</label><select id="post-reverb-space"><option value="classic">原版（沿用舊殘響）</option><option value="room">房間 · 緊密、較短</option><option value="hall">大廳 · 寬廣、較長</option><option value="plate">板式 · 明亮、密集</option></select></div>
+          <div><label for="post-reverb-decay">尾音長度 <output id="post-reverb-decay-value">0.8 秒</output></label><input id="post-reverb-decay" type="range" min="0.2" max="3" step="0.1" value="0.8"></div>
+          <div><label for="post-reverb-predelay">預延遲 <output id="post-reverb-predelay-value">15 ms</output></label><input id="post-reverb-predelay" type="range" min="0" max="150" step="1" value="15"></div>
+        </div><p class="help">更換空間會帶入建議長度與預延遲，之後可各自微調。預延遲是原聲到殘響開始的間隔，不會移動你的乾聲或配樂，也不是歌聲延時校正。「原版」0.8 秒／15 ms 保持舊效果；延長尾音會讓成品更長，除非另設剪輯結束點。</p><button id="post-effects-reset" type="button" class="secondary">重設這四項效果</button>
       </fieldset>
     </details>
-    <div class="button-row"><button id="post-remix" type="button" disabled>重新合成（音量／延時／音色）</button><button id="post-mp3" type="button" class="secondary" disabled>轉 MP3 並下載</button></div>
+    <details id="post-edit-panel" class="post-effects"><summary><span class="post-effects-heading"><strong>剪輯與淡入淡出</strong><span>保留想要的段落 · 人聲與配樂一起平順收尾</span></span><span class="post-effects-toggle"><span class="when-closed">點此展開</span><span class="when-open">收合設定</span></span></summary>
+      <fieldset id="post-edit-fields" disabled><legend>套用到完整混音成品</legend>
+        <p id="post-edit-info" class="help"></p>
+        <div class="post-edit-grid">
+          <div><label for="post-edit-start">保留開始（秒）</label><input id="post-edit-start" type="number" min="0" max="3600" step="0.01" value="0"><button id="post-edit-start-now" type="button" class="secondary">用目前播放位置</button></div>
+          <div><label for="post-edit-end">保留結束（秒，可留白）</label><input id="post-edit-end" type="number" min="0" max="3600" step="0.01" placeholder="至末尾，含殘響尾音"><button id="post-edit-end-now" type="button" class="secondary">用目前播放位置</button></div>
+          <div><label for="post-edit-fadeIn">開頭淡入（秒）</label><input id="post-edit-fadeIn" type="number" min="0" max="30" step="0.1" value="0"></div>
+          <div><label for="post-edit-fadeOut">結尾淡出（秒）</label><input id="post-edit-fadeOut" type="number" min="0" max="30" step="0.1" value="0"></div>
+        </div>
+        <p class="help">淡入從保留段落的開頭開始，淡出在結尾結束；0 秒關閉，兩者合計不可超過保留長度。指定結束點會一起裁掉其後的殘響。每次從完整來源重算，不累加剪輯；重設後可恢復全段。原始歌聲及評分資料保留，重新評分仍依完整原始演唱。</p>
+        <button id="post-edit-reset" type="button" class="secondary">重設剪輯與淡入淡出</button>
+      </fieldset>
+    </details>
+    <div class="button-row"><button id="post-remix" type="button" disabled>重新合成（音量／延時／音色／剪輯）</button><button id="post-mp3" type="button" class="secondary" disabled>轉 MP3 並下載</button></div>
     <p class="help">重新合成會另存一筆，並保存獨立的原始歌聲與後製資料，可再次編輯或轉 MP3；原錄音保留。配樂／和音需歌曲庫中的同版本音軌。舊成品或單獨匯出的 WAV／MP3 若沒有原始歌聲及時間資料，無法直接分軌後製。選「不保存錄音」時不保留後處理資料。</p>
     <details id="recordings-panel"><summary>所有演唱錄音</summary><p class="help">停止錄音後自動保存於歌曲庫下的「錄音」目錄；Chrome 與 Edge 連到同一本機工具即可共用。既有瀏覽器錄音會自動搬存，成功確認後才清除舊副本；未搬存成功仍保留在瀏覽器。直接按 YouTube 播放只評分；要錄音請按「從頭開始唱」。</p><div class="button-row"><button id="recording-refresh" class="secondary" type="button">重新整理／搬存錄音</button><button id="recording-delete-all" class="secondary" type="button">全部刪除錄音</button></div><audio id="recording-audio" controls hidden></audio><ul id="recording-list" class="library-list"></ul></details>
   </section>

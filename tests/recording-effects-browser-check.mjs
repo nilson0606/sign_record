@@ -12,7 +12,7 @@ try{
   const page=await browser.newPage();
   await page.route(site+'/fixture',r=>r.fulfill({contentType:'text/html',body:'<title>Effects audio checks</title>'}));await page.goto(site+'/fixture');
   const result=await page.evaluate(async()=>{
-    const {remixRecording}=await import('/recording-process.mjs');
+    const {remixRecording,editRecordingAudio}=await import('/recording-process.mjs');
     const c=new AudioContext({sampleRate:48000}),rate=c.sampleRate;
     const buffer=(seconds,fn)=>{const b=c.createBuffer(1,Math.round(seconds*rate),rate),a=b.getChannelData(0);for(let i=0;i<a.length;i++)a[i]=fn(i/rate);return b;};
     const meta=seconds=>({seconds,mode:'mix',balance:{manual:true,voice:100,backing:100},post:{segments:[{offset:0,songTime:0,duration:seconds}],samples:[]}});
@@ -29,7 +29,13 @@ try{
     const silence=buffer(1,()=>0),back=buffer(1,t=>.03*Math.sin(2*Math.PI*880*t));
     const backBase=await render(silence,undefined,[back]),backEffects=await render(silence,{eq:{low:12,mid:12,high:12},compression:'medium',reverb:20,regions:[{start:.1,end:.9,volume:0}]},[back]);
     const all=await render(tones,{eq:{low:12,mid:12,high:12},compression:'medium',reverb:20,regions:[{start:0,end:1,volume:200}]});
+    const longer=await render(short,{reverb:15,reverbOptions:{space:'hall',decay:2,preDelayMs:100}});
+    const plate=await render(short,{reverb:15,reverbOptions:{space:'plate',decay:2,preDelayMs:100}});
+    const cut=editRecordingAudio(base,{start:.2,end:.8}),faded=editRecordingAudio(base,{start:.2,end:.8,fadeIn:.1,fadeOut:.2});
+    const cutData=cut.getChannelData(0),fadeData=faded.getChannelData(0),baseData=base.getChannelData(0);
+    const edits={frames:cut.length,exact:cutData.every((x,i)=>x===baseData[i+9600]),zeroEnds:fadeData[0]===0&&fadeData.at(-1)===0,middleIdentical:fadeData.slice(5000,18000).every((x,i)=>x===cutData[5000+i]),startRatio:rms(faded,.01,.04)/rms(cut,.01,.04),endRatio:rms(faded,.55,.58)/rms(cut,.55,.58)};
     const answer={neutralIdentical:same(base,neutral),unchanged:rawCopy.every((x,i)=>x===voice.getChannelData(0)[i]),localRatio:rms(local,.3,.5)/rms(base,.3,.5),outsideRatio:rms(local,.75,.95)/rms(base,.75,.95),muted:rms(muted,.3,.5),eq:{low:power(low,60)/power(flat,60),mid:power(mid,1500)/power(flat,1500),high:power(high,10000)/power(flat,10000)},compression:[uncompressed,light,compressed].map(b=>rms(b,1.4,1.8)/rms(b,.4,.8)),reverb:{duration:wet.duration,tail:rms(wet,.42,.7),repeatable:same(wet,again)},backingUnchanged:backBase.getChannelData(0).every((x,i)=>Math.abs(x-backEffects.getChannelData(0)[i])<1e-6),finite:all.getChannelData(0).every(Number.isFinite),peak:all.getChannelData(0).reduce((a,x)=>Math.max(a,Math.abs(x)),0)};
+    answer.edits=edits;answer.extendedReverb={duration:longer.duration,lateTail:rms(longer,1,1.2),differentSpace:!same(longer,plate)};
     await c.close();return answer;
   });
   assert.ok(result.neutralIdentical&&result.unchanged);assert.ok(Math.abs(result.localRatio-.5)<.01);assert.ok(Math.abs(result.outsideRatio-1)<.01);assert.ok(result.muted<1e-5);
@@ -37,6 +43,8 @@ try{
   assert.ok(result.compression[1]<result.compression[0]*.9&&result.compression[2]<result.compression[1],JSON.stringify(result.compression));
   assert.ok(Math.abs(result.reverb.duration-1.2)<.001&&result.reverb.tail>1e-6&&result.reverb.repeatable);
   assert.ok(result.backingUnchanged&&result.finite&&result.peak<=.981);
+  assert.equal(result.edits.frames,28800);assert.ok(result.edits.exact&&result.edits.zeroEnds&&result.edits.middleIdentical);assert.ok(result.edits.startRatio<.5&&result.edits.endRatio<.5);
+  assert.ok(Math.abs(result.extendedReverb.duration-2.5)<.001&&result.extendedReverb.lateTail>1e-7&&result.extendedReverb.differentSpace);
   console.log('Vocal effects audio checks passed:',JSON.stringify(result));
   await page.route('**/app.mjs',r=>r.fulfill({contentType:'text/javascript',body:''}));
   await page.goto(site);await page.setViewportSize({width:1280,height:1000});
