@@ -5,20 +5,25 @@ export function comparisonLevels(buffers,matched=true){
   const audible=rms.filter(x=>x>1e-6),target=audible.length?Math.min(...audible):0;
   return rms.map(x=>matched&&x>1e-6&&target?Math.min(1,target/x):1);
 }
-export function createRecordingAudition({read,apply,render,run,beforePlay,getPosition=()=>0}){
-  let row=null,slots={},cache={},busy=false,context=null,active=null,origin=0,source=null,gain=null,timer=null,generation=0,loading=null;
+export function createRecordingAudition({read,apply,render,run,beforePlay,onEditor=()=>{},getPosition=()=>0}){
+  let row=null,slots={},cache={},editor='b',busy=false,context=null,active=null,origin=0,source=null,gain=null,timer=null,generation=0,loading=null;
   const say=text=>$('status').textContent=text;
-  function selectTab(name){for(const key of ['a','b']){const current=key===name;$(key+'-tab').setAttribute('aria-selected',String(current));$(key+'-tab').tabIndex=current?0:-1;$(key+'-pane').hidden=!current;}}
+  function showTab(name){editor=name;for(const key of ['a','b']){const current=key===name;$(key+'-tab').setAttribute('aria-selected',String(current));$(key+'-tab').tabIndex=current?0:-1;$(key+'-pane').hidden=!current;$(key+'-edit').setAttribute('aria-pressed',String(current));}onEditor(name);$('current').textContent=`試聽目前 ${name.toUpperCase()} 設定`;}
+  // Read before switching so even dynamically added regions belong to their own draft.
+  // Invalid fields must stay visible instead of being silently lost on a tab change.
+  function remember(){if(!slots[editor])return;const next=structuredClone(read());if(JSON.stringify(next)!==JSON.stringify(slots[editor])){if(active)stop();delete cache[editor];slots[editor]=next;describe(editor);}}
+  function selectTab(name){remember();if(slots[name])apply(structuredClone(slots[name]));showTab(name);}
+  function switchEditor(name){try{selectTab(name);say(`正在調整 ${name.toUpperCase()}，兩組設定各自保留；按試聽才會播放新效果。`);return true;}catch(e){say(e.message);return false;}}
   function stop(){generation++;if(source){try{source.stop();}catch{}source.disconnect();source=null;}gain?.disconnect();gain=null;active=null;clearInterval(timer);timer=null;$('position').textContent='';if(context){void context.close();context=null;}controls(busy);}
   function invalidate(){stop();cache={};}
   function controls(value=busy){busy=value;const enabled=!!(row?.complete&&row.rawBytes&&row.post?.segments?.length);$('fields').disabled=busy||!enabled;
+    for(const name of ['a','b'])$(name+'-edit').disabled=busy||!enabled;
     for(const name of ['a','b'])for(const action of ['play','apply'])$(name+'-'+action).disabled=busy||!enabled||!slots[name];
     for(const name of ['a','b']){const button=$(name+'-play');button.setAttribute('aria-pressed',String(active===name));button.textContent=loading===name?`準備 ${name.toUpperCase()}…`:active===name?`● 正在聽 ${name.toUpperCase()}`:`▶ 試聽 ${name.toUpperCase()}`;}
     $('stop').disabled=!active&&!busy;$('mode').disabled=busy||!enabled||row?.mode==='voice';
   }
   function describe(name){const s=slots[name];$(name+'-info').textContent=s?`殘響 ${s.effects.reverb}% · 明亮 ${s.effects.reverbTone?.brightness??0} · 寬度 ${s.effects.reverbTone?.width??100}% · 回聲 ${s.effects.echo?.amount??0}% · ${s.effects.effectRegions?.length??0} 段局部效果 · 校正 ${s.delayMs} ms`:'尚未記住設定';}
-  function capture(name){slots[name]=structuredClone(read());invalidate();describe(name);selectTab(name);controls();say(`目前設定已記住為 ${name.toUpperCase()}，尚未另存錄音。`);}
-  function reset(value,settings){invalidate();row=value;slots=value?{a:structuredClone(settings)}:{};for(const name of ['a','b'])describe(name);selectTab('a');$('start').value=0;$('end').value=Math.min(10,value?.sourceSeconds??value?.seconds??10).toFixed(2);$('mode').value=value?.mode==='voice'?'voice':'mix';say(value?'A 已帶入這筆錄音保存的設定；調整後可試聽目前設定，或記住為 B。':'選取錄音後即可比較。');controls();}
+  function reset(value,settings){invalidate();row=value;slots=value?{a:structuredClone(settings),b:structuredClone(read())}:{};for(const name of ['a','b'])describe(name);showTab('b');$('start').value=0;$('end').value=Math.min(10,value?.sourceSeconds??value?.seconds??10).toFixed(2);$('mode').value=value?.mode==='voice'?'voice':'mix';say(value?'A 保留已保存的版本，B 帶入目前後製設定。預設調整 B；點標籤即可切換整組數值。':'選取錄音後即可比較。');controls();}
   function range(){const start=$('start').value===''?NaN:Number($('start').value),end=$('end').value===''?NaN:Number($('end').value);
     if(!Number.isFinite(start)||!Number.isFinite(end)||start<0||end<=start||end>3600||end-start>30)throw Error('試聽需設定有效起訖，每段最多 30 秒。');return {start,end};}
   function matchGain(){const names=Object.keys(cache),levels=comparisonLevels(names.map(n=>cache[n]),$('match').checked);return levels[names.indexOf(active)]??1;}
@@ -38,13 +43,13 @@ export function createRecordingAudition({read,apply,render,run,beforePlay,getPos
     say(`正在比較 ${name.toUpperCase()}：${interval.start}～${interval.end} 秒${$('match').checked?' · 近似音量匹配':''}。試聽不另存錄音。`);controls();
   },'post-audition-status');}
   for(const name of ['a','b']){
-    $(name+'-tab').addEventListener('click',()=>selectTab(name));
-    $(name+'-tab').addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const next=event.key==='Home'?'a':event.key==='End'?'b':name==='a'?'b':'a';selectTab(next);$(next+'-tab').focus();});
-    $(name+'-capture').addEventListener('click',()=>{try{capture(name);}catch(e){say(e.message);}});
+    $(name+'-tab').addEventListener('click',()=>switchEditor(name));
+    $(name+'-edit').addEventListener('click',()=>switchEditor(name));
+    $(name+'-tab').addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const next=event.key==='Home'?'a':event.key==='End'?'b':name==='a'?'b':'a';if(switchEditor(next))$(next+'-tab').focus();});
     $(name+'-play').addEventListener('click',()=>play(name));
-    $(name+'-apply').addEventListener('click',()=>{apply(structuredClone(slots[name]));say(`已套用 ${name.toUpperCase()} 設定，可繼續調整，或按「重新合成」另存。`);});
+    $(name+'-apply').addEventListener('click',()=>{if(switchEditor(name))document.getElementById('post-ab-editor').scrollIntoView({block:'start'});});
   }
-  $('current').addEventListener('click',()=>{try{capture('b');void play('b');}catch(e){say(e.message);}});
+  $('current').addEventListener('click',()=>{void play(editor);});
   $('from-playhead').addEventListener('click',()=>{const limit=row.sourceSeconds??row.seconds,start=Math.max(0,Math.min(getPosition(),limit-.1));invalidate();$('start').value=start.toFixed(2);$('end').value=Math.min(limit,start+10).toFixed(2);say(`已選 ${$('start').value}～${$('end').value} 秒，可按 A／B 試聽。`);});
   $('stop').addEventListener('click',()=>{stop();say('比較已停止，A／B 設定仍保留。');});
   for(const id of ['start','end','mode'])$(id).addEventListener('change',invalidate);

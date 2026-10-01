@@ -155,22 +155,24 @@
           <div><label for="post-audition-end">試聽結束（秒）</label><input id="post-audition-end" type="number" min="0" max="3600" step="0.01" value="10"></div>
           <div><label for="post-audition-mode">試聽內容</label><select id="post-audition-mode"><option value="mix">人聲＋配樂</option><option value="voice">只聽人聲</option></select></div>
         </div>
-        <div class="button-row"><button id="post-audition-from-playhead" type="button" class="secondary">從目前播放位置取 10 秒</button><button id="post-audition-current" type="button">試聽目前設定（更新 B）</button></div>
+        <div class="button-row"><button id="post-audition-from-playhead" type="button" class="secondary">從目前播放位置取 10 秒</button><button id="post-audition-current" type="button">試聽目前 B 設定</button></div>
         <label class="check-option"><input id="post-audition-match" type="checkbox" checked>近似音量匹配（只影響比較）</label>
-        <p class="help">A 起初是已保存的版本；調整效果後按「試聽目前設定」產生 B。兩組準備好後，用上方大按鈕切換，播放位置會接續。</p>
+        <p class="help">A（藍色）保留已保存的版本，預設從 B（紫色）開始調整。點標籤會帶出該組所有數值，切換時自動暫存各自的調整。用上方大按鈕試聽 A／B，播放位置會接續。</p>
         <div class="audition-settings">
           <div class="audition-tabs" role="tablist" aria-label="A／B 設定">
             <button id="post-audition-a-tab" class="audition-slot-a" type="button" role="tab" aria-selected="true" aria-controls="post-audition-a-pane">A 設定</button>
             <button id="post-audition-b-tab" class="audition-slot-b" type="button" role="tab" aria-selected="false" aria-controls="post-audition-b-pane" tabindex="-1">B 設定</button>
           </div>
-          <div id="post-audition-a-pane" class="audition-setting-pane audition-slot-a" role="tabpanel" aria-labelledby="post-audition-a-tab"><h3>A 組設定</h3><p id="post-audition-a-info" class="help">尚未選取錄音</p><div class="button-row"><button id="post-audition-a-capture" type="button" class="secondary">更新 A 設定</button><button id="post-audition-a-apply" type="button" class="secondary">套用 A 到後製</button></div></div>
-          <div id="post-audition-b-pane" class="audition-setting-pane audition-slot-b" role="tabpanel" aria-labelledby="post-audition-b-tab" hidden><h3>B 組設定</h3><p id="post-audition-b-info" class="help">尚未記住設定</p><div class="button-row"><button id="post-audition-b-capture" type="button" class="secondary">更新 B 設定</button><button id="post-audition-b-apply" type="button" class="secondary">套用 B 到後製</button></div></div>
+          <div id="post-audition-a-pane" class="audition-setting-pane audition-slot-a" role="tabpanel" aria-labelledby="post-audition-a-tab"><h3>A 組設定</h3><p id="post-audition-a-info" class="help">尚未選取錄音</p><div class="button-row"><button id="post-audition-a-apply" type="button" class="secondary">前往 A 後製設定</button></div></div>
+          <div id="post-audition-b-pane" class="audition-setting-pane audition-slot-b" role="tabpanel" aria-labelledby="post-audition-b-tab" hidden><h3>B 組設定</h3><p id="post-audition-b-info" class="help">尚未記住設定</p><div class="button-row"><button id="post-audition-b-apply" type="button" class="secondary">前往 B 後製設定</button></div></div>
         </div>
-        <details class="help"><summary>試聽與另存說明</summary><p>試聽以剪輯前完整錄音時間為準，每段最多 30 秒，暫不套用剪輯與淡入淡出。近似音量匹配會降低較大聲的一組，只影響比較。喜歡 A 或 B 時按「套用到後製」，再用下方「重新合成」另存。切換錄音或重整會清除暫存；首次準備需合成，之後可直接切換。</p></details>
+        <details class="help"><summary>試聽與另存說明</summary><p>試聽以剪輯前完整錄音時間為準，每段最多 30 秒，暫不套用剪輯與淡入淡出。近似音量匹配會降低較大聲的一組，只影響比較。選中喜歡的 A 或 B，再用下方「重新合成」另存目前這組。剪輯與淡入淡出共用一份設定。切換錄音或重整會清除兩組暫存；首次準備需合成，之後可直接切換。</p></details>
       </fieldset>
     </details>
     <p id="post-status" class="status" role="status">請選擇一筆錄音。</p>
     <p id="post-info" class="help"></p><p id="recording-storage-status" class="help" role="status">連接本機錄音目錄中…</p>
+    <div id="post-ab-editor" class="audition-slot-b" data-slot="b" aria-labelledby="post-ab-editor-heading">
+      <div class="ab-editor-heading"><div><h3 id="post-ab-editor-heading">正在調整 B 組</h3><p class="help">下方顯示這一組的數值；切換會保留各自調整。</p></div><div class="ab-editor-switch" role="group" aria-label="切換正在編輯的設定"><button id="post-audition-a-edit" class="audition-slot-a" type="button" aria-pressed="false" disabled>A 設定</button><button id="post-audition-b-edit" class="audition-slot-b" type="button" aria-pressed="true" disabled>B 設定</button></div></div>
     <div class="recording-levels">
       <div><label for="post-voice-level">歌唱者音量 <output id="post-voice-value" for="post-voice-level">100%</output></label><input id="post-voice-level" type="range" min="0" max="200" step="5" value="100" disabled aria-describedby="post-volume-help"></div>
       <div><label for="post-backing-level">配樂／和音音量 <output id="post-backing-value" for="post-backing-level">100%</output></label><input id="post-backing-level" type="range" min="0" max="200" step="5" value="100" disabled aria-describedby="post-volume-help"></div>
@@ -215,7 +217,8 @@
         <button id="post-effects-reset" type="button" class="secondary">重設全部人聲效果</button>
       </fieldset>
     </details>
-    <details id="post-edit-panel" class="post-effects"><summary><span class="post-effects-heading"><strong>剪輯與淡入淡出</strong><span>保留想要的段落 · 人聲與配樂一起平順收尾</span></span><span class="post-effects-toggle"><span class="when-closed">點此展開</span><span class="when-open">收合設定</span></span></summary>
+    </div>
+    <details id="post-edit-panel" class="post-effects"><summary><span class="post-effects-heading"><strong>剪輯與淡入淡出</strong><span>A／B 共用 · 保留想要的段落 · 人聲與配樂一起平順收尾</span></span><span class="post-effects-toggle"><span class="when-closed">點此展開</span><span class="when-open">收合設定</span></span></summary>
       <fieldset id="post-edit-fields" disabled><legend>套用到完整混音成品</legend>
         <p id="post-edit-info" class="help"></p>
         <div class="post-edit-grid">
