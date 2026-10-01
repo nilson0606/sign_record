@@ -34,9 +34,9 @@ export function comparisonLevels(buffers,matched=true){
   return rms.map(x=>matched&&x>1e-6&&target?Math.min(1,target/x):1);
 }
 export function createRecordingAudition({read,apply,render,run,beforePlay,onEditor=()=>{},getPosition=()=>0}){
-  let row=null,slots={},cache={},editor='b',busy=false,context=null,active=null,origin=0,source=null,gain=null,timer=null,generation=0,loading=null;
+  let row=null,slots={},initial={},cache={},editor='b',busy=false,context=null,active=null,origin=0,source=null,gain=null,timer=null,generation=0,loading=null;
   const say=text=>$('status').textContent=text;
-  function showTab(name){editor=name;for(const key of ['a','b']){const current=key===name;$(key+'-tab').setAttribute('aria-selected',String(current));$(key+'-tab').tabIndex=current?0:-1;$(key+'-pane').hidden=!current;$(key+'-edit').setAttribute('aria-pressed',String(current));}onEditor(name);refreshDifferences();}
+  function showTab(name){editor=name;for(const key of ['a','b']){const current=key===name;$(key+'-tab').setAttribute('aria-selected',String(current));$(key+'-tab').tabIndex=current?0:-1;$(key+'-pane').hidden=!current;$(key+'-edit').setAttribute('aria-pressed',String(current));}$('reset').textContent=`還原 ${name.toUpperCase()} 初始設定`;onEditor(name);refreshDifferences();}
   function refreshDifferences(){
     $('differences-body').replaceChildren();$('differences-table').hidden=true;
     if(!slots.a||!slots.b){$('differences-count').textContent='選取錄音後顯示差異。';return;}
@@ -56,12 +56,20 @@ export function createRecordingAudition({read,apply,render,run,beforePlay,onEdit
   function invalidate(){stop();cache={};}
   function controls(value=busy){busy=value;const enabled=!!(row?.complete&&row.rawBytes&&row.post?.segments?.length);$('fields').disabled=busy||!enabled;
     for(const name of ['a','b'])$(name+'-edit').disabled=busy||!enabled;
+    $('reset').disabled=busy||!enabled;
     for(const name of ['a','b'])for(const action of ['play','apply'])$(name+'-'+action).disabled=busy||!enabled||!slots[name];
     for(const name of ['a','b']){const button=$(name+'-play');button.setAttribute('aria-pressed',String(active===name));button.textContent=loading===name?`準備 ${name.toUpperCase()}…`:active===name?`● 正在聽 ${name.toUpperCase()}`:`▶ 試聽 ${name.toUpperCase()}`;}
     $('stop').disabled=!active&&!busy;$('mode').disabled=busy||!enabled||row?.mode==='voice';
   }
   function describe(name){const s=slots[name];$(name+'-info').textContent=s?`殘響 ${s.effects.reverb}% · 明亮 ${s.effects.reverbTone?.brightness??0} · 寬度 ${s.effects.reverbTone?.width??100}% · 回聲 ${s.effects.echo?.amount??0}% · ${s.effects.effectRegions?.length??0} 段局部效果 · 校正 ${s.delayMs} ms`:'尚未記住設定';}
-  function reset(value,settings){invalidate();row=value;slots=value?{a:structuredClone(settings),b:structuredClone(read())}:{};for(const name of ['a','b'])describe(name);showTab('b');$('start').value=0;$('end').value=Math.min(10,value?.sourceSeconds??value?.seconds??10).toFixed(2);$('mode').value=value?.mode==='voice'?'voice':'mix';say(value?'A 保留已保存的版本，B 帶入目前後製設定。預設調整 B；點標籤即可切換整組數值。':'選取錄音後即可比較。');controls();}
+  function reset(value,settings){invalidate();row=value;slots=value?{a:structuredClone(settings),b:structuredClone(read())}:{};initial=structuredClone(slots);for(const name of ['a','b'])describe(name);showTab('b');$('start').value=0;$('end').value=Math.min(10,value?.sourceSeconds??value?.seconds??10).toFixed(2);$('mode').value=value?.mode==='voice'?'voice':'mix';say(value?'A 保留已保存的版本，B 帶入目前後製設定。預設調整 B；點標籤即可切換整組數值。':'選取錄音後即可比較。');controls();}
+  function restoreEditor(){
+    if(busy||!initial[editor])return;
+    // Skip reading the draft: restoring must also recover incomplete/invalid fields.
+    stop();delete cache[editor];slots[editor]=structuredClone(initial[editor]);
+    apply(structuredClone(slots[editor]));describe(editor);showTab(editor);controls();
+    say(`已還原 ${editor.toUpperCase()} 本次載入的音量、延時與效果設定；另一組保留。按試聽即可重新比較。`);
+  }
   function range(){const start=$('start').value===''?NaN:Number($('start').value),end=$('end').value===''?NaN:Number($('end').value);
     if(!Number.isFinite(start)||!Number.isFinite(end)||start<0||end<=start||end>3600||end-start>30)throw Error('試聽需設定有效起訖，每段最多 30 秒。');return {start,end};}
   function matchGain(){const names=Object.keys(cache),levels=comparisonLevels(names.map(n=>cache[n]),$('match').checked);return levels[names.indexOf(active)]??1;}
@@ -89,6 +97,7 @@ export function createRecordingAudition({read,apply,render,run,beforePlay,onEdit
   }
   $('from-playhead').addEventListener('click',()=>{const limit=row.sourceSeconds??row.seconds,start=Math.max(0,Math.min(getPosition(),limit-.1));invalidate();$('start').value=start.toFixed(2);$('end').value=Math.min(limit,start+10).toFixed(2);say(`已選 ${$('start').value}～${$('end').value} 秒，可按 A／B 試聽。`);});
   $('stop').addEventListener('click',()=>{stop();say('比較已停止，A／B 設定仍保留。');});
+  $('reset').addEventListener('click',restoreEditor);
   for(const id of ['start','end','mode'])$(id).addEventListener('change',invalidate);
   $('match').addEventListener('change',()=>{if(gain)gain.gain.setTargetAtTime(matchGain(),context.currentTime,.02);});
   // Delegation includes added/removed regions and preset/reset buttons. Reading drafts
