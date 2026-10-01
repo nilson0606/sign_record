@@ -1,5 +1,33 @@
 // Temporary A/B renders share a source-time interval. They never write to the archive.
 const $=id=>document.getElementById('post-audition-'+id);
+// Compare displayed settings, including inactive effect parameters, without touching audio.
+export function settingDifferences(a,b,{includeBacking=true}={}){
+  const rows=[],add=(label,left,right,format=String)=>{if(left!==right)rows.push({label,a:left==null?'未設定':format(left),b:right==null?'未設定':format(right)});};
+  const unit=suffix=>value=>`${value}${suffix}`,signed=suffix=>value=>`${value>0?'+':''}${value}${suffix}`;
+  const strength=value=>({off:'關閉',light:'輕度',medium:'中度',strong:'強烈'})[value]??value;
+  add('歌唱者音量',a.volume?.voice??100,b.volume?.voice??100,unit('%'));
+  if(includeBacking)add('配樂／和音音量',a.volume?.backing??100,b.volume?.backing??100,unit('%'));
+  add('歌聲延時校正',a.delayMs??0,b.delayMs??0,signed(' ms'));
+  add('歌聲柔化',a.softening??'off',b.softening??'off',strength);
+  const x=a.effects??{},y=b.effects??{};
+  for(const [key,label] of [['low','低頻'],['mid','中頻'],['high','高頻']])add(`EQ ${label}`,x.eq?.[key]??0,y.eq?.[key]??0,signed(' dB'));
+  add('動態壓縮',x.compression??'off',y.compression??'off',strength);
+  add('殘響音量',x.reverb??0,y.reverb??0,unit('%'));
+  add('殘響空間',x.reverbOptions?.space??'classic',y.reverbOptions?.space??'classic',value=>({classic:'原版',room:'房間',hall:'大廳',plate:'板式'})[value]??value);
+  for(const [key,label,fallback,suffix] of [['decay','尾音長度',.8,' 秒'],['preDelayMs','預延遲',15,' ms']])add(label,x.reverbOptions?.[key]??fallback,y.reverbOptions?.[key]??fallback,unit(suffix));
+  add('殘響明亮度',x.reverbTone?.brightness??0,y.reverbTone?.brightness??0,signed(''));
+  add('殘響立體寬度',x.reverbTone?.width??100,y.reverbTone?.width??100,unit('%'));
+  for(const [key,label,fallback,suffix] of [['amount','回聲音量',0,'%'],['timeMs','回聲重複間隔',300,' ms'],['repeats','回聲重複次數',3,' 次'],['feedback','回聲每次保留音量',40,'%']])add(label,x.echo?.[key]??fallback,y.echo?.[key]??fallback,unit(suffix));
+  add('回聲位置',x.echo?.pingPong??false,y.echo?.pingPong??false,value=>value?'左右交替':'中央');
+  for(const [key,label,fields] of [
+    ['regions','局部音量',[['start','開始',' 秒'],['end','結束',' 秒'],['volume','音量','%']]],
+    ['effectRegions','局部效果',[['start','開始',' 秒'],['end','結束',' 秒'],['reverb','殘響','%'],['decay','尾音',' 秒'],['echo','回聲','%']]]
+  ]){
+    const left=[...(x[key]??[])].sort((p,q)=>p.start-q.start),right=[...(y[key]??[])].sort((p,q)=>p.start-q.start);
+    for(let i=0;i<Math.max(left.length,right.length);i++)for(const [field,title,suffix] of fields)add(`${label} 第 ${i+1} 段 · ${title}`,left[i]?.[field],right[i]?.[field],unit(suffix));
+  }
+  return rows;
+}
 export function comparisonLevels(buffers,matched=true){
   const rms=buffers.map(b=>{let sum=0;for(let c=0;c<b.numberOfChannels;c++)for(const x of b.getChannelData(c))sum+=x*x;return Math.sqrt(sum/(b.length*b.numberOfChannels));});
   const audible=rms.filter(x=>x>1e-6),target=audible.length?Math.min(...audible):0;
@@ -8,7 +36,17 @@ export function comparisonLevels(buffers,matched=true){
 export function createRecordingAudition({read,apply,render,run,beforePlay,onEditor=()=>{},getPosition=()=>0}){
   let row=null,slots={},cache={},editor='b',busy=false,context=null,active=null,origin=0,source=null,gain=null,timer=null,generation=0,loading=null;
   const say=text=>$('status').textContent=text;
-  function showTab(name){editor=name;for(const key of ['a','b']){const current=key===name;$(key+'-tab').setAttribute('aria-selected',String(current));$(key+'-tab').tabIndex=current?0:-1;$(key+'-pane').hidden=!current;$(key+'-edit').setAttribute('aria-pressed',String(current));}onEditor(name);$('current').textContent=`試聽目前 ${name.toUpperCase()} 設定`;}
+  function showTab(name){editor=name;for(const key of ['a','b']){const current=key===name;$(key+'-tab').setAttribute('aria-selected',String(current));$(key+'-tab').tabIndex=current?0:-1;$(key+'-pane').hidden=!current;$(key+'-edit').setAttribute('aria-pressed',String(current));}onEditor(name);$('current').textContent=`試聽目前 ${name.toUpperCase()} 設定`;refreshDifferences();}
+  function refreshDifferences(){
+    $('differences-body').replaceChildren();$('differences-table').hidden=true;
+    if(!slots.a||!slots.b){$('differences-count').textContent='選取錄音後顯示差異。';return;}
+    try{
+      const drafts={...slots,[editor]:read()},rows=settingDifferences(drafts.a,drafts.b,{includeBacking:row.mode!=='voice'});
+      $('differences-count').textContent=rows.length?`${rows.length} 項不同`:'目前 A／B 設定相同';
+      for(const difference of rows){const tr=document.createElement('tr');for(const key of ['label','a','b']){const cell=document.createElement(key==='label'?'th':'td');if(key==='label')cell.scope='row';else cell.className='audition-slot-'+key;cell.textContent=difference[key];tr.append(cell);}$('differences-body').append(tr);}
+      $('differences-table').hidden=!rows.length;
+    }catch(error){$('differences-count').textContent=`${editor.toUpperCase()} 組欄位尚未完成：${error.message} 補齊後會繼續顯示差異。`;}
+  }
   // Read before switching so even dynamically added regions belong to their own draft.
   // Invalid fields must stay visible instead of being silently lost on a tab change.
   function remember(){if(!slots[editor])return;const next=structuredClone(read());if(JSON.stringify(next)!==JSON.stringify(slots[editor])){if(active)stop();delete cache[editor];slots[editor]=next;describe(editor);}}
@@ -54,6 +92,10 @@ export function createRecordingAudition({read,apply,render,run,beforePlay,onEdit
   $('stop').addEventListener('click',()=>{stop();say('比較已停止，A／B 設定仍保留。');});
   for(const id of ['start','end','mode'])$(id).addEventListener('change',invalidate);
   $('match').addEventListener('change',()=>{if(gain)gain.gain.setTargetAtTime(matchGain(),context.currentTime,.02);});
+  // Delegation includes added/removed regions and preset/reset buttons. Reading drafts
+  // here must not invalidate a playing buffer or overwrite the other group's settings.
+  for(const event of ['input','change','click'])document.getElementById('post-ab-editor').addEventListener(event,refreshDifferences);
+  document.getElementById('post-delay').addEventListener('input',refreshDifferences);
   window.addEventListener('pagehide',stop);
   return {reset,stop,controls,playing:()=>!!active,position:()=>active?Number($('start').value)+(context.currentTime-origin)%cache[active].duration:null};
 }

@@ -149,6 +149,11 @@
     <details id="post-audition-panel" class="post-effects"><summary><span class="post-effects-heading"><strong>片段試聽／A、B 比較</strong><span>同一句循環播放 · 先聽效果再另存</span></span></summary>
       <div class="audition-transport" role="group" aria-label="切換比較版本"><button id="post-audition-a-play" type="button" aria-pressed="false" disabled>▶ 試聽 A</button><button id="post-audition-b-play" type="button" aria-pressed="false" disabled>▶ 試聽 B</button><button id="post-audition-stop" type="button" class="secondary" disabled>停止比較</button></div>
       <output id="post-audition-position"></output><p id="post-audition-status" class="status" role="status">選取錄音後即可比較。</p>
+      <section id="post-audition-differences" class="audition-differences" aria-labelledby="post-audition-differences-heading">
+        <div class="difference-heading"><h3 id="post-audition-differences-heading">A／B 設定差異</h3><span id="post-audition-differences-count" role="status">選取錄音後顯示差異。</span></div>
+        <table id="post-audition-differences-table" hidden aria-labelledby="post-audition-differences-heading"><thead><tr><th scope="col">不同的參數</th><th scope="col" class="audition-slot-a">A 設定</th><th scope="col" class="audition-slot-b">B 設定</th></tr></thead><tbody id="post-audition-differences-body"></tbody></table>
+        <p class="help">隨調整即時更新，只列不同項目，包含尚未開啟的效果參數。修改後再按試聽，即可聽到新設定；剪輯與淡入淡出由 A／B 共用。</p>
+      </section>
       <fieldset id="post-audition-fields" disabled><legend>選同一句 → 調整效果 → 試聽 B → 切換 A／B</legend>
         <div class="post-eq-grid">
           <div><label for="post-audition-start">試聽開始（秒）</label><input id="post-audition-start" type="number" min="0" max="3600" step="0.01" value="0"></div>
