@@ -186,7 +186,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     $('post-reverb-decay').value=decay;$('post-reverb-predelay').value=pre;effectLabels();
   });
   $('post-effects-reset').addEventListener('click',()=>setEffects());
-  $('post-audition-quick').addEventListener('click',()=>{$('post-audition-panel').open=true;$('post-audition-current').click();$('post-audition-panel').scrollIntoView({block:'start'});});
+  $('post-audition-quick').addEventListener('click',()=>{$('post-audition-panel').open=true;void audition?.playCurrent();$('post-audition-panel').scrollIntoView({block:'start'});});
   $('post-edit-reset').addEventListener('click',()=>setEdit());
   for(const key of ['start','end'])$('post-edit-'+key+'-now').addEventListener('click',()=>{$('post-edit-'+key).value=originalPlayhead();});
   $('post-region-add').addEventListener('click',()=>{

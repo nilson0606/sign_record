@@ -36,7 +36,7 @@ export function comparisonLevels(buffers,matched=true){
 export function createRecordingAudition({read,apply,render,run,beforePlay,onEditor=()=>{},getPosition=()=>0}){
   let row=null,slots={},cache={},editor='b',busy=false,context=null,active=null,origin=0,source=null,gain=null,timer=null,generation=0,loading=null;
   const say=text=>$('status').textContent=text;
-  function showTab(name){editor=name;for(const key of ['a','b']){const current=key===name;$(key+'-tab').setAttribute('aria-selected',String(current));$(key+'-tab').tabIndex=current?0:-1;$(key+'-pane').hidden=!current;$(key+'-edit').setAttribute('aria-pressed',String(current));}onEditor(name);$('current').textContent=`試聽目前 ${name.toUpperCase()} 設定`;refreshDifferences();}
+  function showTab(name){editor=name;for(const key of ['a','b']){const current=key===name;$(key+'-tab').setAttribute('aria-selected',String(current));$(key+'-tab').tabIndex=current?0:-1;$(key+'-pane').hidden=!current;$(key+'-edit').setAttribute('aria-pressed',String(current));}onEditor(name);refreshDifferences();}
   function refreshDifferences(){
     $('differences-body').replaceChildren();$('differences-table').hidden=true;
     if(!slots.a||!slots.b){$('differences-count').textContent='選取錄音後顯示差異。';return;}
@@ -87,7 +87,6 @@ export function createRecordingAudition({read,apply,render,run,beforePlay,onEdit
     $(name+'-play').addEventListener('click',()=>play(name));
     $(name+'-apply').addEventListener('click',()=>{if(switchEditor(name))document.getElementById('post-ab-editor').scrollIntoView({block:'start'});});
   }
-  $('current').addEventListener('click',()=>{void play(editor);});
   $('from-playhead').addEventListener('click',()=>{const limit=row.sourceSeconds??row.seconds,start=Math.max(0,Math.min(getPosition(),limit-.1));invalidate();$('start').value=start.toFixed(2);$('end').value=Math.min(limit,start+10).toFixed(2);say(`已選 ${$('start').value}～${$('end').value} 秒，可按 A／B 試聽。`);});
   $('stop').addEventListener('click',()=>{stop();say('比較已停止，A／B 設定仍保留。');});
   for(const id of ['start','end','mode'])$(id).addEventListener('change',invalidate);
@@ -97,5 +96,5 @@ export function createRecordingAudition({read,apply,render,run,beforePlay,onEdit
   for(const event of ['input','change','click'])document.getElementById('post-ab-editor').addEventListener(event,refreshDifferences);
   document.getElementById('post-delay').addEventListener('input',refreshDifferences);
   window.addEventListener('pagehide',stop);
-  return {reset,stop,controls,playing:()=>!!active,position:()=>active?Number($('start').value)+(context.currentTime-origin)%cache[active].duration:null};
+  return {reset,stop,controls,playCurrent:()=>play(editor),playing:()=>!!active,position:()=>active?Number($('start').value)+(context.currentTime-origin)%cache[active].duration:null};
 }
