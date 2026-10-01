@@ -173,9 +173,9 @@
         </div>
         <div class="post-eq-grid">
           <div><label for="post-reverb-space">空間類型</label><select id="post-reverb-space"><option value="classic">原版（沿用舊殘響）</option><option value="room">房間 · 緊密、較短</option><option value="hall">大廳 · 寬廣、較長</option><option value="plate">板式 · 明亮、密集</option></select></div>
-          <div><label for="post-reverb-decay">尾音長度 <output id="post-reverb-decay-value">0.8 秒</output></label><input id="post-reverb-decay" type="range" min="0.2" max="10" step="0.1" value="0.8"></div>
-          <div><label for="post-reverb-predelay">預延遲 <output id="post-reverb-predelay-value">15 ms</output></label><input id="post-reverb-predelay" type="range" min="0" max="500" step="1" value="15"></div>
-        </div><p class="help">更換空間會帶入建議長度與預延遲，之後可各自微調。預延遲是原聲到殘響開始的間隔，不會移動你的乾聲或配樂，也不是歌聲延時校正。「原版」0.8 秒／15 ms 保持舊效果；延長尾音會讓成品更長，除非另設剪輯結束點。</p><button id="post-effects-reset" type="button" class="secondary">重設這四項效果</button>
+          <div><label for="post-reverb-decay">尾音長度 <output id="post-reverb-decay-value">0.8 秒</output></label><input id="post-reverb-decay" type="range" min="0.2" max="10" step="0.1" value="0.8" aria-describedby="post-reverb-decay-help"><p id="post-reverb-decay-help" class="help">0.2～10 秒，控制殘響尾巴延續的長度。數字越大，唱完後的餘韻越長；越小則收得越快。可用 0.8、2、5 秒比較。想保留完整尾音，剪輯的「保留結束」請留白。</p></div>
+          <div><label for="post-reverb-predelay">預延遲 <output id="post-reverb-predelay-value">15 ms</output></label><input id="post-reverb-predelay" type="range" min="0" max="500" step="1" value="15" aria-describedby="post-reverb-predelay-help"><p id="post-reverb-predelay-help" class="help">0～500 ms，控制人聲發出後，隔多久開始出現殘響。0 ms 立即開始；數字越大，原聲與殘響的間隔越明顯。可用 15、80、200 ms 比較；500 ms 就是半秒。不會移動原本人聲或配樂，也不是歌聲延時校正。</p></div>
+        </div><p class="help">殘響音量大於 0% 時才會聽到尾音與預延遲的效果。更換空間會帶入建議值，之後可各自微調；「原版」預設為 0.8 秒／15 ms。每次先改一項，再按「重新合成」另存後試聽。</p><button id="post-effects-reset" type="button" class="secondary">重設這四項效果</button>
       </fieldset>
     </details>
     <details id="post-edit-panel" class="post-effects"><summary><span class="post-effects-heading"><strong>剪輯與淡入淡出</strong><span>保留想要的段落 · 人聲與配樂一起平順收尾</span></span><span class="post-effects-toggle"><span class="when-closed">點此展開</span><span class="when-open">收合設定</span></span></summary>
