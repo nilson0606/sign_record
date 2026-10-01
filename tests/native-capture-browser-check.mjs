@@ -13,7 +13,11 @@ const server=http.createServer(async(req,res)=>{
   const started=performance.now();let frames=0;
   const timer=setInterval(()=>{
    if(stalled)return;
-   const due=Math.floor((performance.now()-started)/20)*960;
+   const elapsed=performance.now()-started;
+   // Delayed delivery, not lost samples: resume with all queued PCM. This
+   // exceeds the old recording buffer and must not produce pops or a stop.
+   if(elapsed>1000&&elapsed%5000<70)return;
+   const due=Math.floor(elapsed/20)*960;
    while(frames+960<=due){const pcm=Float32Array.from({length:960},(_,i)=>.2+.1*Math.sin(2*Math.PI*220*(frames+i)/48000));frames+=960;res.write(Buffer.from(pcm.buffer));}
   },4);
   clients.add(res);res.once('close',()=>{clearInterval(timer);clients.delete(res);});return;
@@ -64,11 +68,12 @@ try{
   if(!errors.length)throw Error('Underrun did not stop recording');await ended;
   const partial=(await store.list()).find(r=>r.id!==first.id);
   const raw=await context.decodeAudioData(await(await store.blob(partial,'voice')).arrayBuffer()),mixed=await context.decodeAudioData(await(await store.blob(partial)).arrayBuffer());
-  const result={first:{complete:first.complete,input:first.captureClock.input,delay:first.appliedDelayMs,seconds:first.seconds},partial:{complete:partial.complete,error:partial.captureError,frames:partial.captureClock.frames,voiceFrames:raw.length,mixFrames:mixed.length},errors,rescue:!!document.querySelector('#recording-rescue a')};
+  const result={first:{complete:first.complete,input:first.captureClock.input,delay:first.appliedDelayMs,seconds:first.seconds},partial:{complete:partial.complete,error:partial.captureError,frames:partial.captureClock.frames,voiceFrames:raw.length,mixFrames:mixed.length},errors,rescue:!!document.querySelector('#recording-rescue a'),status:document.querySelector('#recording-status').textContent,rescueText:document.querySelector('#recording-rescue a')?.textContent};
   await context.close();return result;
  });
  console.log(JSON.stringify(saves));
  assert.equal(saves.first.complete,true);assert.equal(saves.first.input,'native-worklet-v2');assert.equal(saves.first.delay,200);assert.ok(saves.first.seconds>1);
  assert.equal(saves.partial.complete,false);assert.match(saves.partial.error,/收音資料中斷/);assert.equal(saves.errors.length,1);assert.ok(saves.rescue);
+ assert.match(saves.status,/已保留錄音片段/);assert.match(saves.rescueText,/下載錄音片段/);
  assert.ok(saves.partial.frames>48000);assert.equal(saves.partial.frames,saves.partial.voiceFrames);assert.equal(saves.partial.frames,saves.partial.mixFrames);assert.deepEqual(pageErrors,[]);
 }finally{await browser?.close();for(const client of clients)client.destroy();server.closeAllConnections();await new Promise(r=>server.close(r));}

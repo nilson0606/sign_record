@@ -122,14 +122,14 @@ export function createSingerRecorder(options) {
       if (!event.data.size) return;
       meta.rawBytes += event.data.size;
       const index=a.rawCount++, snapshot=structuredClone(meta),header=recorder.voiceHeader();
-      a.queue=a.queue.then(async()=>{await store.save(snapshot,event.data,index,'voice');if(index>0)await store.save(snapshot,header,0,'voice');}).catch(error=>{a.error=error;status('乾淨歌聲保存失敗：'+error.message);});
+      a.queue=a.queue.then(async()=>{await store.save(snapshot,event.data,index,'voice');if(index>0)await store.save(snapshot,header,0,'voice');}).catch(error=>{a.storageFailed=true;a.error=error;status('乾淨歌聲保存失敗：'+error.message);});
     };
     rawRecorder.onerror = event => { a.error ||= event.error || new Error('乾淨歌聲錄音中斷'); stop(); };
     recorder.ondataavailable = event => {
       if (!event.data.size) return;
       a.chunks.push(event.data);meta.bytes+=event.data.size;meta.seconds=recorder.frames/context.sampleRate;
       const index=a.count++,snapshot=structuredClone(meta),header=recorder.header();a.chunks[0]=header;
-      a.queue=a.queue.then(async()=>{await store.save(snapshot,event.data,index);if(index>0)await store.save(snapshot,header,0);}).catch(error=>{a.error=error;status('自動保存失敗，停止後請下載備份：'+error.message);});
+      a.queue=a.queue.then(async()=>{await store.save(snapshot,event.data,index);if(index>0)await store.save(snapshot,header,0);}).catch(error=>{a.storageFailed=true;a.error=error;status('自動保存失敗，停止後請下載備份：'+error.message);});
     };
     recorder.onerror = event => { a.error ||= event.error || new Error('錄音中斷'); stop(); };
     status(`錄音已就緒${mode === 'mix' ? (stems.includes('backing') ? ' · 已載入伴奏＋和音' : ' · 已載入伴奏（此版本無獨立和音）') : ''}，影片開始播放時同步錄製。`);
@@ -178,10 +178,11 @@ export function createSingerRecorder(options) {
       a.meta.seconds=a.recorder.frames/a.context.sampleRate;
       a.meta.captureClock.frames=a.recorder.frames;
       a.chunks[0]=a.recorder.header();
-      let savedId=null;
+      let savedId=null,partialSaved=false;
       try {
         await store.save(a.meta,a.recorder.header(),0);
         await store.save(a.meta,a.recorder.voiceHeader(),0,'voice');
+        partialSaved=true;
         if (a.error) throw a.error;
         let correctionError='';
         if(a.meta.recordingDelayMs!==0){
@@ -199,8 +200,9 @@ export function createSingerRecorder(options) {
       } catch (error) {
         const panel = $('recording-rescue'); panel.hidden = false;
         const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob(a.chunks,{type:a.recorder.mimeType})); link.download = '演唱錄音.wav';
-        link.textContent = `下載未保存錄音：${a.meta.title}（${new Date(a.meta.created).toLocaleTimeString()}）`; panel.append(link);
-        status('錄音未完整保存，請先按「下載未保存錄音」備份：'+error.message);
+        const retained=partialSaved&&!a.storageFailed&&captureError instanceof Error&&a.error===captureError;
+        link.textContent = `${retained?'下載錄音片段':'下載未保存錄音'}：${a.meta.title}（${new Date(a.meta.created).toLocaleTimeString()}）`; panel.append(link);
+        status(retained?'收音中斷，已保留錄音片段，可下載備份：'+error.message:'錄音未完整保存，請先按「下載未保存錄音」備份：'+error.message);
       }
       await render(savedId).catch(error=>status('無法讀取錄音清單：'+error.message));
     })();

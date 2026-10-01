@@ -47,7 +47,7 @@ export async function openNativeMicrophone(context,{deviceId='',signal,onError})
    if(stopped||outputContext.state==='closed')throw Error('本機收音已停止。');
    // Legacy browser monitoring also needs two packets of jitter headroom.
    // Modern helpers use createSpeakerMonitor and bypass this browser buffer.
-   const monitorNode=new AudioWorkletNode(outputContext,'local-microphone',{numberOfInputs:0,numberOfOutputs:1,outputChannelCount:[1]});
+   const monitorNode=new AudioWorkletNode(outputContext,'local-microphone',{numberOfInputs:0,numberOfOutputs:1,outputChannelCount:[1],processorOptions:{prebufferFrames:1920}});
    const id=crypto.randomUUID(),channel=new MessageChannel();monitorNode.port.postMessage({streamPort:channel.port2},[channel.port2]);
    worker.postMessage({type:'attach',id,port:channel.port1},[channel.port1]);
    const monitor={node:monitorNode,disconnect(){monitors.delete(monitor);worker.postMessage({type:'detach',id});monitorNode.port.onmessage=null;monitorNode.disconnect();monitorNode.port.close();}};

@@ -1,7 +1,9 @@
 class LocalMicProcessor extends AudioWorkletProcessor {
  constructor(options){
   super();const requested=options?.processorOptions?.prebufferFrames;
-  this.prebufferFrames=requested===960?960:1920;
+  // Recording needs reserve for delayed/batched 20 ms packets, not just
+  // clock drift. Keep legacy monitoring's explicitly requested short buffer.
+  this.prebufferFrames=[960,1920].includes(requested)?requested:5760;
   this.buffer=new Float32Array(48000);this.read=0;this.write=0;this.count=0;
   this.started=false;this.failed=false;this.phase=0;this.previous=0;this.rate=1;
   this.target=this.prebufferFrames-480;this.average=this.target;this.rendered=0;
