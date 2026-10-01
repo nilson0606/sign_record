@@ -8,6 +8,7 @@ export function comparisonLevels(buffers,matched=true){
 export function createRecordingAudition({read,apply,render,run,beforePlay,getPosition=()=>0}){
   let row=null,slots={},cache={},busy=false,context=null,active=null,origin=0,source=null,gain=null,timer=null,generation=0,loading=null;
   const say=text=>$('status').textContent=text;
+  function selectTab(name){for(const key of ['a','b']){const current=key===name;$(key+'-tab').setAttribute('aria-selected',String(current));$(key+'-tab').tabIndex=current?0:-1;$(key+'-pane').hidden=!current;}}
   function stop(){generation++;if(source){try{source.stop();}catch{}source.disconnect();source=null;}gain?.disconnect();gain=null;active=null;clearInterval(timer);timer=null;$('position').textContent='';if(context){void context.close();context=null;}controls(busy);}
   function invalidate(){stop();cache={};}
   function controls(value=busy){busy=value;const enabled=!!(row?.complete&&row.rawBytes&&row.post?.segments?.length);$('fields').disabled=busy||!enabled;
@@ -16,13 +17,14 @@ export function createRecordingAudition({read,apply,render,run,beforePlay,getPos
     $('stop').disabled=!active&&!busy;$('mode').disabled=busy||!enabled||row?.mode==='voice';
   }
   function describe(name){const s=slots[name];$(name+'-info').textContent=s?`殘響 ${s.effects.reverb}% · 明亮 ${s.effects.reverbTone?.brightness??0} · 寬度 ${s.effects.reverbTone?.width??100}% · 回聲 ${s.effects.echo?.amount??0}% · ${s.effects.effectRegions?.length??0} 段局部效果 · 校正 ${s.delayMs} ms`:'尚未記住設定';}
-  function capture(name){slots[name]=structuredClone(read());invalidate();describe(name);controls();say(`目前設定已記住為 ${name.toUpperCase()}，尚未另存錄音。`);}
-  function reset(value,settings){invalidate();row=value;slots=value?{a:structuredClone(settings)}:{};for(const name of ['a','b'])describe(name);$('start').value=0;$('end').value=Math.min(10,value?.sourceSeconds??value?.seconds??10).toFixed(2);$('mode').value=value?.mode==='voice'?'voice':'mix';say(value?'A 已帶入這筆錄音保存的設定；調整後可試聽目前設定，或記住為 B。':'選取錄音後即可比較。');controls();}
+  function capture(name){slots[name]=structuredClone(read());invalidate();describe(name);selectTab(name);controls();say(`目前設定已記住為 ${name.toUpperCase()}，尚未另存錄音。`);}
+  function reset(value,settings){invalidate();row=value;slots=value?{a:structuredClone(settings)}:{};for(const name of ['a','b'])describe(name);selectTab('a');$('start').value=0;$('end').value=Math.min(10,value?.sourceSeconds??value?.seconds??10).toFixed(2);$('mode').value=value?.mode==='voice'?'voice':'mix';say(value?'A 已帶入這筆錄音保存的設定；調整後可試聽目前設定，或記住為 B。':'選取錄音後即可比較。');controls();}
   function range(){const start=$('start').value===''?NaN:Number($('start').value),end=$('end').value===''?NaN:Number($('end').value);
     if(!Number.isFinite(start)||!Number.isFinite(end)||start<0||end<=start||end>3600||end-start>30)throw Error('試聽需設定有效起訖，每段最多 30 秒。');return {start,end};}
   function matchGain(){const names=Object.keys(cache),levels=comparisonLevels(names.map(n=>cache[n]),$('match').checked);return levels[names.indexOf(active)]??1;}
   function play(name){return run(async selected=>{
     if(!slots[name])throw Error('請先記住這組設定。');
+    selectTab(name);
     const interval=range(),token=generation;
     if(!cache[name]){say(`正在準備 ${name.toUpperCase()} 片段…`);loading=name;controls();try{const audio=await render(selected,slots[name],interval,$('mode').value==='voice');if(token!==generation)return;cache[name]=audio;}finally{loading=null;controls();}}
     beforePlay();
@@ -36,6 +38,8 @@ export function createRecordingAudition({read,apply,render,run,beforePlay,getPos
     say(`正在比較 ${name.toUpperCase()}：${interval.start}～${interval.end} 秒${$('match').checked?' · 近似音量匹配':''}。試聽不另存錄音。`);controls();
   },'post-audition-status');}
   for(const name of ['a','b']){
+    $(name+'-tab').addEventListener('click',()=>selectTab(name));
+    $(name+'-tab').addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const next=event.key==='Home'?'a':event.key==='End'?'b':name==='a'?'b':'a';selectTab(next);$(next+'-tab').focus();});
     $(name+'-capture').addEventListener('click',()=>{try{capture(name);}catch(e){say(e.message);}});
     $(name+'-play').addEventListener('click',()=>play(name));
     $(name+'-apply').addEventListener('click',()=>{apply(structuredClone(slots[name]));say(`已套用 ${name.toUpperCase()} 設定，可繼續調整，或按「重新合成」另存。`);});

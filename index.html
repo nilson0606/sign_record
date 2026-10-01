@@ -158,9 +158,13 @@
         <div class="button-row"><button id="post-audition-from-playhead" type="button" class="secondary">從目前播放位置取 10 秒</button><button id="post-audition-current" type="button">試聽目前設定（更新 B）</button></div>
         <label class="check-option"><input id="post-audition-match" type="checkbox" checked>近似音量匹配（只影響比較）</label>
         <p class="help">A 起初是已保存的版本；調整效果後按「試聽目前設定」產生 B。兩組準備好後，用上方大按鈕切換，播放位置會接續。</p>
-        <div class="post-edit-grid">
-          <div><h3>A 組</h3><p id="post-audition-a-info" class="help">尚未選取錄音</p><div class="button-row"><button id="post-audition-a-capture" type="button" class="secondary">更新 A 設定</button><button id="post-audition-a-apply" type="button" class="secondary">套用 A 到後製</button></div></div>
-          <div><h3>B 組</h3><p id="post-audition-b-info" class="help">尚未記住設定</p><div class="button-row"><button id="post-audition-b-capture" type="button" class="secondary">更新 B 設定</button><button id="post-audition-b-apply" type="button" class="secondary">套用 B 到後製</button></div></div>
+        <div class="audition-settings">
+          <div class="audition-tabs" role="tablist" aria-label="A／B 設定">
+            <button id="post-audition-a-tab" class="audition-slot-a" type="button" role="tab" aria-selected="true" aria-controls="post-audition-a-pane">A 設定</button>
+            <button id="post-audition-b-tab" class="audition-slot-b" type="button" role="tab" aria-selected="false" aria-controls="post-audition-b-pane" tabindex="-1">B 設定</button>
+          </div>
+          <div id="post-audition-a-pane" class="audition-setting-pane audition-slot-a" role="tabpanel" aria-labelledby="post-audition-a-tab"><h3>A 組設定</h3><p id="post-audition-a-info" class="help">尚未選取錄音</p><div class="button-row"><button id="post-audition-a-capture" type="button" class="secondary">更新 A 設定</button><button id="post-audition-a-apply" type="button" class="secondary">套用 A 到後製</button></div></div>
+          <div id="post-audition-b-pane" class="audition-setting-pane audition-slot-b" role="tabpanel" aria-labelledby="post-audition-b-tab" hidden><h3>B 組設定</h3><p id="post-audition-b-info" class="help">尚未記住設定</p><div class="button-row"><button id="post-audition-b-capture" type="button" class="secondary">更新 B 設定</button><button id="post-audition-b-apply" type="button" class="secondary">套用 B 到後製</button></div></div>
         </div>
         <details class="help"><summary>試聽與另存說明</summary><p>試聽以剪輯前完整錄音時間為準，每段最多 30 秒，暫不套用剪輯與淡入淡出。近似音量匹配會降低較大聲的一組，只影響比較。喜歡 A 或 B 時按「套用到後製」，再用下方「重新合成」另存。切換錄音或重整會清除暫存；首次準備需合成，之後可直接切換。</p></details>
       </fieldset>
