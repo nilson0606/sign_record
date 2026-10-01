@@ -1,4 +1,5 @@
 // Temporary A/B renders share a source-time interval. They never write to the archive.
+import {reverbSpaces} from './recording-soften.mjs';
 const $=id=>document.getElementById('post-audition-'+id);
 // Compare displayed settings, including inactive effect parameters, without touching audio.
 export function settingDifferences(a,b,{includeBacking=true}={}){
@@ -13,7 +14,7 @@ export function settingDifferences(a,b,{includeBacking=true}={}){
   for(const [key,label] of [['low','低頻'],['mid','中頻'],['high','高頻']])add(`EQ ${label}`,x.eq?.[key]??0,y.eq?.[key]??0,signed(' dB'));
   add('動態壓縮',x.compression??'off',y.compression??'off',strength);
   add('殘響音量',x.reverb??0,y.reverb??0,unit('%'));
-  add('殘響空間',x.reverbOptions?.space??'classic',y.reverbOptions?.space??'classic',value=>({classic:'原版',room:'房間',hall:'大廳',plate:'板式'})[value]??value);
+  add('殘響空間',x.reverbOptions?.space??'classic',y.reverbOptions?.space??'classic',value=>reverbSpaces[value]??value);
   for(const [key,label,fallback,suffix] of [['decay','尾音長度',.8,' 秒'],['preDelayMs','預延遲',15,' ms']])add(label,x.reverbOptions?.[key]??fallback,y.reverbOptions?.[key]??fallback,unit(suffix));
   add('殘響明亮度',x.reverbTone?.brightness??0,y.reverbTone?.brightness??0,signed(''));
   add('殘響立體寬度',x.reverbTone?.width??100,y.reverbTone?.width??100,unit('%'));

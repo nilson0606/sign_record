@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {vocalEffects,reverbProfile,reverbDuration,reverbImpulse,recordingEffectsSuffix,effectsDuration} from '../recording-soften.mjs';
+import {vocalEffects,reverbProfile,reverbDuration,reverbImpulse,recordingEffectsSuffix,effectsDuration,reverbSpacePresets} from '../recording-soften.mjs';
 import {comparisonLevels} from '../recording-audition.mjs';
 import {recordingEdit} from '../recording-process.mjs';
 import {createHash} from 'node:crypto';
@@ -60,4 +60,28 @@ test('invalid or overlapping local edits and unknown effect versions cannot be s
   for(const regions of [[{start:1,end:1}],[{start:2,end:1}],[{start:-1,end:1}],[{start:0,end:6}],[{start:0,end:2},{start:1,end:3}],[{start:0,end:1,volume:201}],[{start:NaN,end:1}]])assert.throws(()=>vocalEffects({regions},5));
   for(const value of [{eq:{low:13}},{eq:{mid:Infinity}},{compression:'extreme'},{reverb:101},{version:2},{regions:'bad'}])assert.throws(()=>vocalEffects(value));
   assert.doesNotThrow(()=>vocalEffects({regions:[{start:0,end:1,volume:0},{start:1,end:2,volume:200}]},2));
+});
+
+test('the four published space impulses stay identical after adding new scenes',()=>{
+ const expected={classic:['8c24a823fffed2acf5d0bb28472a8272249232b042041f7917435ec255978c1b','bed9a6f1a806001a379c97f029bd936c8df6529638ce034cbb22395a6bb9455f'],room:['ebede7ed9cfa2fdf15dec368faac62a39a799587c044b95c5f992b5ce9a01d00','2fe1eeaa7fb9ee1d58a5fbab0539c7974beed149d0728a21537d5865bff8ccbf'],hall:['30264cd20b312ff3dc2b237272615498d01b3bb2345a2a7cb2d20470292922a5','9e12b0480c0844e1e450de8ba944714fb7cb221393bc5ce5d519eb336a0d3560'],plate:['c18e356f338f4701c02f865b4709d88a81d9619174ee2b4b0bc789d9f43f495e','6a2c1b3e53c69cf09290edcafd75dd95643cc4ebd242b59019e440d2aa9b3b46']};
+ for(const [space,hashes] of Object.entries(expected))for(const [index,rate] of [44100,48000].entries()){
+  const context={sampleRate:rate,createBuffer:(n,len)=>{const channels=Array.from({length:n},()=>new Float32Array(len));return {getChannelData:c=>channels[c]};}};
+  const b=reverbImpulse(context,vocalEffects({reverb:30,reverbOptions:{space,decay:1.8,preDelayMs:25}})),hash=createHash('sha256');for(let c=0;c<2;c++)hash.update(Buffer.from(b.getChannelData(c).buffer));assert.equal(hash.digest('hex'),hashes[index],space+' '+rate);
+ }
+});
+
+test('eight new spaces have distinct repeatable reflections at equal timing and bounded energy',()=>{
+ assert.equal(Object.keys(reverbSpacePresets).length,12);
+ for(const rate of [44100,48000]){
+  const signatures=new Set(),context={sampleRate:rate,createBuffer:(n,len)=>{const channels=Array.from({length:n},()=>new Float32Array(len));return {getChannelData:c=>channels[c]};}};
+  for(const [space,preset] of Object.entries(reverbSpacePresets).slice(4)){
+   const saved=vocalEffects({reverb:40,reverbOptions:{space,decay:preset.decay,preDelayMs:preset.preDelayMs}});assert.match(recordingEffectsSuffix({vocalEffects:saved}),new RegExp(preset.label));assert.deepEqual(vocalEffects(JSON.parse(JSON.stringify(saved))),saved);
+   for(const decay of [.2,2,10]){
+    const recipe=vocalEffects({reverb:40,reverbOptions:{space,decay,preDelayMs:40}}),b=reverbImpulse(context,recipe);
+    for(let c=0;c<2;c++){const a=b.getChannelData(c);assert.ok(a.every(Number.isFinite));assert.ok(a.slice(0,Math.floor(rate*.04)).every(x=>x===0));assert.ok(a.at(-1)===0);assert.ok(Math.abs(a.reduce((sum,x)=>sum+x*x,0)-.65**2)<1e-6);}
+    if(decay===2){const a=b.getChannelData(0);assert.deepEqual(a,reverbImpulse(context,recipe).getChannelData(0));signatures.add(createHash('sha256').update(Buffer.from(a.buffer)).digest('hex'));}
+   }
+  }
+  assert.equal(signatures.size,8);
+ }
 });

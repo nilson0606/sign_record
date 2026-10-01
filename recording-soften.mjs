@@ -67,7 +67,21 @@ export function vocalEffects(value={},duration=3600) {
 }
 
 export const vocalReverbTail=.8;
-export const reverbSpaces={classic:'原版',room:'房間',hall:'大廳',plate:'板式'};
+export const reverbSpacePresets={
+  classic:{label:'原版',decay:.8,preDelayMs:15,damping:5000,help:'沿用舊版殘響，適合與既有成品比較。'},
+  room:{label:'房間',decay:.6,preDelayMs:10,damping:6000,help:'緊密、短尾，帶少量近牆反射，增加自然空間感。'},
+  hall:{label:'大廳',decay:1.8,preDelayMs:25,damping:4000,help:'寬廣、柔和，尾音逐漸鋪開，適合抒情歌。'},
+  plate:{label:'板式',decay:1.2,preDelayMs:15,damping:7000,help:'明亮、密集，尾音較快出現，讓人聲多一層光澤。'},
+  studio:{label:'錄音室',decay:.4,preDelayMs:4,damping:3500,attack:.002,reflections:[[.006,5],[.012,-3],[.019,2]],spread:.0007,help:'貼近、柔暗的短尾，空間感收斂，保留清楚咬字。'},
+  chamber:{label:'小室',decay:1.1,preDelayMs:12,damping:5200,attack:.012,reflections:[[.017,3],[.031,-2.4],[.053,1.8],[.071,-1]],spread:.002,help:'溫暖、緊湊，密集反射讓歌聲較厚實。'},
+  church:{label:'教堂',decay:4.2,preDelayMs:45,damping:3200,attack:.09,reflections:[[.065,1.5],[.113,-1.2],[.19,.8]],spread:.007,help:'柔暗、緩慢鋪開的長尾，適合拉長音與莊嚴感。'},
+  arena:{label:'體育館',decay:3.2,preDelayMs:65,damping:4300,attack:.045,reflections:[[.06,4],[.12,-3],[.21,2.5],[.32,-1.8]],spread:.011,help:'開闊、遠距，較晚的反射群帶出大型場地感。'},
+  tunnel:{label:'隧道',decay:2.6,preDelayMs:35,damping:4600,attack:.005,pulse:.11,reflections:[[.11,3],[.22,-2],[.33,1.4]],spread:.004,help:'規律的一波波反射，能聽到沿著長通道延伸的尾音。'},
+  cave:{label:'洞穴',decay:3,preDelayMs:55,damping:2100,attack:.03,reflections:[[.035,3],[.098,-2.5],[.176,2],[.29,-1.6],[.42,1]],spread:.009,help:'低沉、幽暗，不規則反射帶出深處回應的感覺。'},
+  bathroom:{label:'浴室',decay:.7,preDelayMs:5,damping:8500,attack:.001,reflections:[[.004,6],[.009,-5],[.016,4],[.022,-3],[.033,2]],spread:.0005,help:'明亮、貼近硬牆，短促反射密集，適合聽鮮明的空間效果。'},
+  dream:{label:'夢幻空間',decay:3.6,preDelayMs:80,damping:6000,attack:.22,bloom:true,reflections:[],spread:0,help:'尾音慢慢浮起、綿長散開，營造漂浮感；不會改變音高。'}
+};
+export const reverbSpaces=Object.fromEntries(Object.entries(reverbSpacePresets).map(([key,value])=>[key,value.label]));
 export function reverbProfile(value={}){
   const {space='classic',decay=.8,preDelayMs=15}=value;
   if(!Object.hasOwn(reverbSpaces,space))throw Error('無效的殘響空間類型。');
@@ -83,6 +97,7 @@ export function effectsDuration(recipe){
 }
 export function reverbImpulse(context,recipe){
   const r=reverbProfile(recipe.reverbOptions),legacy=!recipe.reverbOptions;
+  const character=reverbSpacePresets[r.space],extended=character.attack!==undefined;
   const impulse=context.createBuffer(2,Math.ceil(context.sampleRate*reverbDuration(recipe)),context.sampleRate);
   const first=Math.floor(context.sampleRate*r.preDelayMs/1000);let seed=19237;
   for(let c=0;c<2;c++){
@@ -90,10 +105,18 @@ export function reverbImpulse(context,recipe){
     for(let i=first;i<data.length;i++){
       seed=(Math.imul(seed,1664525)+1013904223)>>>0;
       const t=(i-first)/context.sampleRate;
-      const attack=r.space==='hall'?1-Math.exp(-t/.025):r.space==='plate'?1-Math.exp(-t/.004):1;
-      data[i]=(seed/2147483648-1)*Math.exp(legacy?-7*i/data.length:-7*t/r.decay)*attack;
+      const attack=r.space==='hall'?1-Math.exp(-t/.025):r.space==='plate'?1-Math.exp(-t/.004):extended?1-Math.exp(-t/character.attack):1;
+      data[i]=(seed/2147483648-1)*Math.exp(character.bloom?-7*(t/r.decay)**1.5:legacy?-7*i/data.length:-7*t/r.decay)*attack;
+      if(character.pulse){const phase=t%(character.pulse+c*.006);data[i]*=.12+.88*Math.exp(-(((phase-.015)/.01)**2));}
     }
     if(r.space==='room')for(const [time,level] of [[.011,.65],[.027,-.4],[.043,.3]]){const at=first+Math.round((time+c*.002)*context.sampleRate);if(at<data.length)data[at]+=level*Math.sqrt(context.sampleRate/48000);}
+    // New spaces use their own early reflection pattern and a smooth ending.
+    // The existing four impulse paths above remain unchanged for saved recordings.
+    if(extended){
+      for(const [time,level] of character.reflections){const offset=time+c*character.spread;if(offset>=r.decay)continue;const at=first+Math.round(offset*context.sampleRate);if(at<data.length)data[at]+=level*Math.exp(-3*offset/r.decay)*Math.sqrt(context.sampleRate/48000);}
+      const fade=Math.max(1,Math.round(Math.min(.02,r.decay/10)*context.sampleRate));
+      for(let i=Math.max(first,data.length-fade);i<data.length;i++)data[i]*=Math.sin((data.length-1-i)/fade*Math.PI/2)**2;
+    }
     for(const sample of data)energy+=sample*sample;
     const scale=.65/Math.sqrt(energy||1);for(let i=0;i<data.length;i++)data[i]*=scale;
   }
@@ -140,7 +163,7 @@ export function processedVoice(context,source,recipe) {
         const convolver=context.createConvolver(),wet=context.createGain(),damping=context.createBiquadFilter();
         convolver.normalize=false;convolver.buffer=reverbImpulse(context,settings);wet.gain.value=settings.reverb/100;
         const space=reverbProfile(settings.reverbOptions).space;
-        damping.type='lowpass';damping.frequency.value=Math.min(({classic:5000,room:6000,hall:4000,plate:7000})[space]*2**((settings.reverbTone?.brightness??0)/50),context.sampleRate*.45);
+        damping.type='lowpass';damping.frequency.value=Math.min(reverbSpacePresets[space].damping*2**((settings.reverbTone?.brightness??0)/50),context.sampleRate*.45);
         input.connect(convolver);convolver.connect(damping);damping.connect(wet);wet.connect(sum);nodes.push(convolver,damping,wet);
       }
       const echo=settings.echo;

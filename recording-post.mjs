@@ -1,7 +1,7 @@
 import { recordingTuningSuffix } from './recording-tune.mjs';
 import { createRecordingAudition } from './recording-audition.mjs';
 import { PITCH_DETECTOR_VERSION } from './audio.mjs';
-import { softeningProfile, recordingSofteningSuffix, recordingEffectsSuffix, vocalEffects, reverbProfile } from './recording-soften.mjs';
+import { softeningProfile, recordingSofteningSuffix, recordingEffectsSuffix, vocalEffects, reverbProfile, reverbSpacePresets } from './recording-soften.mjs';
 import { scoringProfile } from './scoring.mjs';
 import { recordingVolume } from './recording-mix.mjs';
 import { rescoreRecording, remixRecording, wavBlob, delaySeconds, referenceForRescore, recordingDelaySuffix, recordingEdit } from './recording-process.mjs';
@@ -39,6 +39,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
   const status=text=>{$(statusTarget).textContent=text;};
   function clearAudio(){audition?.stop();const a=$('post-audio');a.pause();a.removeAttribute('src');a.load();a.hidden=true;if(url)URL.revokeObjectURL(url);url=null;}
   function effectLabels(){
+    $('post-reverb-space-help').textContent=reverbSpacePresets[$('post-reverb-space').value].help;
     for(const band of ['low','mid','high'])$('post-eq-'+band+'-value').textContent=$('post-eq-'+band).value+' dB';
     $('post-reverb-value').textContent=$('post-reverb').value+'%';
     $('post-reverb-decay-value').textContent=$('post-reverb-decay').value+' 秒';
@@ -182,8 +183,8 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
   for(const id of ['post-voice-level','post-backing-level'])$(id).addEventListener('input',volumeLabels);
   for(const id of ['post-eq-low','post-eq-mid','post-eq-high','post-reverb','post-reverb-decay','post-reverb-predelay','post-reverb-brightness','post-reverb-width','post-echo-amount','post-echo-time','post-echo-repeats','post-echo-feedback'])$(id).addEventListener('input',effectLabels);
   $('post-reverb-space').addEventListener('change',()=>{
-    const presets={classic:[.8,15],room:[.6,10],hall:[1.8,25],plate:[1.2,15]},[decay,pre]=presets[$('post-reverb-space').value];
-    $('post-reverb-decay').value=decay;$('post-reverb-predelay').value=pre;effectLabels();
+    const preset=reverbSpacePresets[$('post-reverb-space').value];
+    $('post-reverb-decay').value=preset.decay;$('post-reverb-predelay').value=preset.preDelayMs;effectLabels();
   });
   $('post-effects-reset').addEventListener('click',()=>setEffects());
   $('post-audition-quick').addEventListener('click',()=>{$('post-audition-panel').open=true;void audition?.playCurrent();$('post-audition-panel').scrollIntoView({block:'start'});});
