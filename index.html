@@ -147,21 +147,23 @@
     <p id="post-preview-help" class="help">「試聽」播放完整成品；「只聽人聲」播放歌唱者音軌，不加入配樂／和音，沿用這筆錄音已保存的音量、延時與柔化設定。更改後製設定後需先重新合成，才能試聽新效果。</p>
     <audio id="post-audio" controls hidden></audio>
     <details id="post-audition-panel" class="post-effects"><summary><span class="post-effects-heading"><strong>片段試聽／A、B 比較</strong><span>同一句循環播放 · 先聽效果再另存</span></span></summary>
-      <fieldset id="post-audition-fields" disabled><legend>本次比較暫存</legend>
+      <div class="audition-transport" role="group" aria-label="切換比較版本"><button id="post-audition-a-play" type="button" aria-pressed="false" disabled>▶ 試聽 A</button><button id="post-audition-b-play" type="button" aria-pressed="false" disabled>▶ 試聽 B</button><button id="post-audition-stop" type="button" class="secondary" disabled>停止比較</button></div>
+      <output id="post-audition-position"></output><p id="post-audition-status" class="status" role="status">選取錄音後即可比較。</p>
+      <fieldset id="post-audition-fields" disabled><legend>選同一句 → 調整效果 → 試聽 B → 切換 A／B</legend>
         <div class="post-eq-grid">
           <div><label for="post-audition-start">試聽開始（秒）</label><input id="post-audition-start" type="number" min="0" max="3600" step="0.01" value="0"></div>
           <div><label for="post-audition-end">試聽結束（秒）</label><input id="post-audition-end" type="number" min="0" max="3600" step="0.01" value="10"></div>
           <div><label for="post-audition-mode">試聽內容</label><select id="post-audition-mode"><option value="mix">人聲＋配樂</option><option value="voice">只聽人聲</option></select></div>
         </div>
+        <div class="button-row"><button id="post-audition-from-playhead" type="button" class="secondary">從目前播放位置取 10 秒</button><button id="post-audition-current" type="button">試聽目前設定（更新 B）</button></div>
         <label class="check-option"><input id="post-audition-match" type="checkbox" checked>近似音量匹配（只影響比較）</label>
-        <p class="help">以剪輯前完整錄音的秒數選同一句，每段最多 30 秒；循環試聽暫不套用剪輯與淡入淡出。A 起初是這筆錄音保存的音色設定，B 可記住你調整後的設定。兩組準備好後，切換會沿用播放位置。音量匹配以片段平均能量降低較大聲的一組，避免只因大聲而覺得較好。</p>
+        <p class="help">A 起初是已保存的版本；調整效果後按「試聽目前設定」產生 B。兩組準備好後，用上方大按鈕切換，播放位置會接續。</p>
         <div class="post-edit-grid">
-          <div><h3>A 組</h3><p id="post-audition-a-info" class="help">尚未選取錄音</p><div class="button-row"><button id="post-audition-a-capture" type="button" class="secondary">記住目前為 A</button><button id="post-audition-a-play" type="button">試聽 A</button><button id="post-audition-a-apply" type="button" class="secondary">套用 A 設定</button></div></div>
-          <div><h3>B 組</h3><p id="post-audition-b-info" class="help">尚未記住設定</p><div class="button-row"><button id="post-audition-b-capture" type="button" class="secondary">記住目前為 B</button><button id="post-audition-b-play" type="button">試聽 B</button><button id="post-audition-b-apply" type="button" class="secondary">套用 B 設定</button></div></div>
+          <div><h3>A 組</h3><p id="post-audition-a-info" class="help">尚未選取錄音</p><div class="button-row"><button id="post-audition-a-capture" type="button" class="secondary">更新 A 設定</button><button id="post-audition-a-apply" type="button" class="secondary">套用 A 到後製</button></div></div>
+          <div><h3>B 組</h3><p id="post-audition-b-info" class="help">尚未記住設定</p><div class="button-row"><button id="post-audition-b-capture" type="button" class="secondary">更新 B 設定</button><button id="post-audition-b-apply" type="button" class="secondary">套用 B 到後製</button></div></div>
         </div>
-        <div class="button-row"><button id="post-audition-current" type="button">試聽目前設定（更新 B）</button></div>
-        <p class="help">試聽不新增錄音。喜歡 A 或 B 時按「套用設定」，再用下方「重新合成」另存；切換錄音或重新整理會清除比較暫存。首次準備片段需要合成，之後可直接切換。</p>
-      </fieldset><button id="post-audition-stop" type="button" class="secondary" disabled>停止比較</button><p id="post-audition-status" class="status" role="status">選取錄音後即可比較。</p><output id="post-audition-position"></output>
+        <details class="help"><summary>試聽與另存說明</summary><p>試聽以剪輯前完整錄音時間為準，每段最多 30 秒，暫不套用剪輯與淡入淡出。近似音量匹配會降低較大聲的一組，只影響比較。喜歡 A 或 B 時按「套用到後製」，再用下方「重新合成」另存。切換錄音或重整會清除暫存；首次準備需合成，之後可直接切換。</p></details>
+      </fieldset>
     </details>
     <p id="post-status" class="status" role="status">請選擇一筆錄音。</p>
     <p id="post-info" class="help"></p><p id="recording-storage-status" class="help" role="status">連接本機錄音目錄中…</p>
@@ -222,7 +224,7 @@
         <button id="post-edit-reset" type="button" class="secondary">重設剪輯與淡入淡出</button>
       </fieldset>
     </details>
-    <div class="button-row"><button id="post-remix" type="button" disabled>重新合成（音量／延時／音色／剪輯）</button><button id="post-mp3" type="button" class="secondary" disabled>轉 MP3 並下載</button></div>
+    <div class="button-row"><button id="post-audition-quick" type="button" class="secondary" disabled>片段試聽目前設定</button><button id="post-remix" type="button" disabled>重新合成（音量／延時／音色／剪輯）</button><button id="post-mp3" type="button" class="secondary" disabled>轉 MP3 並下載</button></div>
     <p class="help">重新合成會另存一筆，並保存獨立的原始歌聲與後製資料，可再次編輯或轉 MP3；原錄音保留。配樂／和音需歌曲庫中的同版本音軌。舊成品或單獨匯出的 WAV／MP3 若沒有原始歌聲及時間資料，無法直接分軌後製。選「不保存錄音」時不保留後處理資料。</p>
     <details id="recordings-panel"><summary>所有演唱錄音</summary><p class="help">停止錄音後自動保存於歌曲庫下的「錄音」目錄；Chrome 與 Edge 連到同一本機工具即可共用。既有瀏覽器錄音會自動搬存，成功確認後才清除舊副本；未搬存成功仍保留在瀏覽器。直接按 YouTube 播放只評分；要錄音請按「從頭開始唱」。</p><div class="button-row"><button id="recording-refresh" class="secondary" type="button">重新整理／搬存錄音</button><button id="recording-delete-all" class="secondary" type="button">全部刪除錄音</button></div><audio id="recording-audio" controls hidden></audio><ul id="recording-list" class="library-list"></ul></details>
   </section>

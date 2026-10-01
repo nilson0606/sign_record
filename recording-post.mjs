@@ -109,6 +109,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     if(editable&&$('post-reference-source').value==='current')try{referenceForRescore(selected.post,current);}catch(error){referenceError=error.message;}
     $('post-reference-info').textContent=editable?`錄音原始基準：${referenceName(selected.post.reference)}。目前已載入：${referenceName(current)}。${referenceError||($('post-reference-source').value==='current'?'這次使用目前已載入基準，保留錄音當時的遮罩、八度與評分範圍，難度使用「評分設定」中的重新評分難度。':'這次使用錄音當時的基準；換歌曲庫版本不會自動套用。')}`:'';
     $('post-rescore').disabled=busy||!editable||!!referenceError;$('post-remix').disabled=busy||!editable;$('post-mp3').disabled=busy||!selected;
+    $('post-audition-quick').disabled=busy||!editable;
   }
   function choose(){
     clearAudio();previewSources=null;selected=rows.find(x=>x.id===$('post-recording').value)||null;
@@ -185,6 +186,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     $('post-reverb-decay').value=decay;$('post-reverb-predelay').value=pre;effectLabels();
   });
   $('post-effects-reset').addEventListener('click',()=>setEffects());
+  $('post-audition-quick').addEventListener('click',()=>{$('post-audition-panel').open=true;$('post-audition-current').click();$('post-audition-panel').scrollIntoView({block:'start'});});
   $('post-edit-reset').addEventListener('click',()=>setEdit());
   for(const key of ['start','end'])$('post-edit-'+key+'-now').addEventListener('click',()=>{$('post-edit-'+key).value=originalPlayhead();});
   $('post-region-add').addEventListener('click',()=>{
@@ -258,7 +260,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     let savedPath='',saveError='';try{savedPath=(await store.saveMp3(row,mp3)).path;}catch(error){saveError=error.message;}
     const href=URL.createObjectURL(mp3),a=document.createElement('a');a.href=href;a.download=row.title.replace(/[\\/:*?"<>|]/g,'_').slice(0,100)+recordingEffectsSuffix(row)+recordingSofteningSuffix(row)+recordingTuningSuffix(row)+recordingDelaySuffix(row)+'.mp3';a.click();setTimeout(()=>URL.revokeObjectURL(href),60000);status(savedPath?'MP3 已轉換並開始下載，同時保存至 '+savedPath+'。':'MP3 已轉換並開始下載，但尚未存入錄音目錄：'+saveError);
   }));
-  audition=createRecordingAudition({run,beforePlay:()=>{$('post-audio').pause();pause();},
+  audition=createRecordingAudition({run,getPosition:originalPlayhead,beforePlay:()=>{$('post-audio').pause();pause();},
     read:()=>{const delayMs=Number($('remix-delay').value);delaySeconds(delayMs);return {delayMs,softening:$('post-softening').value,volume:recordingVolume({voice:Number($('post-voice-level').value),backing:Number($('post-backing-level').value)}),effects:readEffects()};},
     apply:s=>{setEffects(s.effects);$('post-softening').value=s.softening;$('remix-delay').value=s.delayMs;$('post-delay').value=s.delayMs;$('post-voice-level').value=s.volume.voice;$('post-backing-level').value=s.volume.backing;volumeLabels();},
     render:async(row,settings,interval,solo)=>{

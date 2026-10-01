@@ -5,13 +5,14 @@ export function comparisonLevels(buffers,matched=true){
   const audible=rms.filter(x=>x>1e-6),target=audible.length?Math.min(...audible):0;
   return rms.map(x=>matched&&x>1e-6&&target?Math.min(1,target/x):1);
 }
-export function createRecordingAudition({read,apply,render,run,beforePlay}){
-  let row=null,slots={},cache={},busy=false,context=null,active=null,origin=0,source=null,gain=null,timer=null,generation=0;
+export function createRecordingAudition({read,apply,render,run,beforePlay,getPosition=()=>0}){
+  let row=null,slots={},cache={},busy=false,context=null,active=null,origin=0,source=null,gain=null,timer=null,generation=0,loading=null;
   const say=text=>$('status').textContent=text;
   function stop(){generation++;if(source){try{source.stop();}catch{}source.disconnect();source=null;}gain?.disconnect();gain=null;active=null;clearInterval(timer);timer=null;$('position').textContent='';if(context){void context.close();context=null;}controls(busy);}
   function invalidate(){stop();cache={};}
   function controls(value=busy){busy=value;const enabled=!!(row?.complete&&row.rawBytes&&row.post?.segments?.length);$('fields').disabled=busy||!enabled;
     for(const name of ['a','b'])for(const action of ['play','apply'])$(name+'-'+action).disabled=busy||!enabled||!slots[name];
+    for(const name of ['a','b']){const button=$(name+'-play');button.setAttribute('aria-pressed',String(active===name));button.textContent=loading===name?`準備 ${name.toUpperCase()}…`:active===name?`● 正在聽 ${name.toUpperCase()}`:`▶ 試聽 ${name.toUpperCase()}`;}
     $('stop').disabled=!active&&!busy;$('mode').disabled=busy||!enabled||row?.mode==='voice';
   }
   function describe(name){const s=slots[name];$(name+'-info').textContent=s?`殘響 ${s.effects.reverb}% · 明亮 ${s.effects.reverbTone?.brightness??0} · 寬度 ${s.effects.reverbTone?.width??100}% · 回聲 ${s.effects.echo?.amount??0}% · ${s.effects.effectRegions?.length??0} 段局部效果 · 校正 ${s.delayMs} ms`:'尚未記住設定';}
@@ -23,7 +24,7 @@ export function createRecordingAudition({read,apply,render,run,beforePlay}){
   function play(name){return run(async selected=>{
     if(!slots[name])throw Error('請先記住這組設定。');
     const interval=range(),token=generation;
-    if(!cache[name]){say(`正在準備 ${name.toUpperCase()} 片段…`);const audio=await render(selected,slots[name],interval,$('mode').value==='voice');if(token!==generation)return;cache[name]=audio;}
+    if(!cache[name]){say(`正在準備 ${name.toUpperCase()} 片段…`);loading=name;controls();try{const audio=await render(selected,slots[name],interval,$('mode').value==='voice');if(token!==generation)return;cache[name]=audio;}finally{loading=null;controls();}}
     beforePlay();
     if(!context)context=new AudioContext();await context.resume();if(token!==generation)return;
     const now=context.currentTime,offset=active?(now-origin)%cache[name].duration:0;
@@ -40,6 +41,7 @@ export function createRecordingAudition({read,apply,render,run,beforePlay}){
     $(name+'-apply').addEventListener('click',()=>{apply(structuredClone(slots[name]));say(`已套用 ${name.toUpperCase()} 設定，可繼續調整，或按「重新合成」另存。`);});
   }
   $('current').addEventListener('click',()=>{try{capture('b');void play('b');}catch(e){say(e.message);}});
+  $('from-playhead').addEventListener('click',()=>{const limit=row.sourceSeconds??row.seconds,start=Math.max(0,Math.min(getPosition(),limit-.1));invalidate();$('start').value=start.toFixed(2);$('end').value=Math.min(limit,start+10).toFixed(2);say(`已選 ${$('start').value}～${$('end').value} 秒，可按 A／B 試聽。`);});
   $('stop').addEventListener('click',()=>{stop();say('比較已停止，A／B 設定仍保留。');});
   for(const id of ['start','end','mode'])$(id).addEventListener('change',invalidate);
   $('match').addEventListener('change',()=>{if(gain)gain.gain.setTargetAtTime(matchGain(),context.currentTime,.02);});
