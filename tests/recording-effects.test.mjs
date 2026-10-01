@@ -15,14 +15,14 @@ test('old recordings default to neutral effects; recipes sort independent region
 test('reverb options validate, preserve legacy defaults and keep their own tail duration',()=>{
  assert.deepEqual(vocalEffects({reverb:20,reverbOptions:{space:'classic',decay:.8,preDelayMs:15}}),vocalEffects({reverb:20}));
  assert.equal(reverbDuration(vocalEffects({reverb:20})),.8);
- const recipe=vocalEffects({reverb:20,reverbOptions:{space:'hall',decay:2,preDelayMs:100}});
- assert.equal(reverbDuration(recipe),2.1);assert.equal(reverbDuration({...recipe,reverb:0}),0);
- for(const r of [{space:'unknown'},{decay:0},{decay:Infinity},{preDelayMs:-1},{preDelayMs:151}])assert.throws(()=>reverbProfile(r));
+ const recipe=vocalEffects({reverb:20,reverbOptions:{space:'hall',decay:10,preDelayMs:500}});
+ assert.equal(reverbDuration(recipe),10.5);assert.equal(reverbDuration({...recipe,reverb:0}),0);
+ for(const r of [{space:'unknown'},{decay:0},{decay:Infinity},{decay:10.1},{preDelayMs:-1},{preDelayMs:501}])assert.throws(()=>reverbProfile(r));
  const context={sampleRate:48000,createBuffer:(channels,length)=>{const data=Array.from({length:channels},()=>new Float32Array(length));return {length,getChannelData:c=>data[c]};}};
  const a=reverbImpulse(context,recipe),b=reverbImpulse(context,recipe);
  assert.deepEqual(a.getChannelData(0),b.getChannelData(0));
- assert.ok(a.getChannelData(0).slice(0,4800).every(x=>x===0));
- assert.ok(a.getChannelData(0).slice(4801).some(x=>x!==0));
+ assert.ok(a.getChannelData(0).slice(0,24000).every(x=>x===0));
+ assert.ok(a.getChannelData(0).slice(24001).some(x=>x!==0));
  assert.notDeepEqual(a.getChannelData(0),a.getChannelData(1));
 });
 

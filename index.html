@@ -173,8 +173,8 @@
         </div>
         <div class="post-eq-grid">
           <div><label for="post-reverb-space">空間類型</label><select id="post-reverb-space"><option value="classic">原版（沿用舊殘響）</option><option value="room">房間 · 緊密、較短</option><option value="hall">大廳 · 寬廣、較長</option><option value="plate">板式 · 明亮、密集</option></select></div>
-          <div><label for="post-reverb-decay">尾音長度 <output id="post-reverb-decay-value">0.8 秒</output></label><input id="post-reverb-decay" type="range" min="0.2" max="3" step="0.1" value="0.8"></div>
-          <div><label for="post-reverb-predelay">預延遲 <output id="post-reverb-predelay-value">15 ms</output></label><input id="post-reverb-predelay" type="range" min="0" max="150" step="1" value="15"></div>
+          <div><label for="post-reverb-decay">尾音長度 <output id="post-reverb-decay-value">0.8 秒</output></label><input id="post-reverb-decay" type="range" min="0.2" max="10" step="0.1" value="0.8"></div>
+          <div><label for="post-reverb-predelay">預延遲 <output id="post-reverb-predelay-value">15 ms</output></label><input id="post-reverb-predelay" type="range" min="0" max="500" step="1" value="15"></div>
         </div><p class="help">更換空間會帶入建議長度與預延遲，之後可各自微調。預延遲是原聲到殘響開始的間隔，不會移動你的乾聲或配樂，也不是歌聲延時校正。「原版」0.8 秒／15 ms 保持舊效果；延長尾音會讓成品更長，除非另設剪輯結束點。</p><button id="post-effects-reset" type="button" class="secondary">重設這四項效果</button>
       </fieldset>
     </details>

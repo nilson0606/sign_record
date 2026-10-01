@@ -61,8 +61,8 @@ export const reverbSpaces={classic:'原版',room:'房間',hall:'大廳',plate:'�
 export function reverbProfile(value={}){
   const {space='classic',decay=.8,preDelayMs=15}=value;
   if(!Object.hasOwn(reverbSpaces,space))throw Error('無效的殘響空間類型。');
-  if(!Number.isFinite(decay)||decay<.2||decay>3)throw Error('殘響尾音長度需介於 0.2 與 3 秒。');
-  if(!Number.isFinite(preDelayMs)||preDelayMs<0||preDelayMs>150)throw Error('殘響預延遲需介於 0 與 150 ms。');
+  if(!Number.isFinite(decay)||decay<.2||decay>10)throw Error('殘響尾音長度需介於 0.2 與 10 秒。');
+  if(!Number.isFinite(preDelayMs)||preDelayMs<0||preDelayMs>500)throw Error('殘響預延遲需介於 0 與 500 ms。');
   return {space,decay,preDelayMs};
 }
 export function reverbDuration(recipe){const r=reverbProfile(recipe.reverbOptions);return recipe.reverb?(recipe.reverbOptions?r.decay+r.preDelayMs/1000:vocalReverbTail):0;}
