@@ -118,7 +118,10 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     $('rescore-status').textContent=selected?'已選取錄音，可調整設定後重新評分。':'請先保存一段演唱錄音。';
     $('post-reference-source').value='original';
     $('post-softening').value=selected?.vocalSoftening?.strength||'off';
-    setEffects(selected?.vocalEffects);
+    // Both editing drafts start with the same gentle reverb preset.
+    // Saved recipes, including explicit 0%, retain their settings.
+    const defaultSpace=reverbSpacePresets.hall;
+    setEffects(selected?.vocalEffects??{reverb:20,reverbOptions:{space:'hall',decay:defaultSpace.decay,preDelayMs:defaultSpace.preDelayMs}});
     setEdit(selected?.postEdit);
     $('post-edit-info').textContent=selected?`原始錄音約 ${(selected.sourceSeconds??selected.seconds).toFixed(2)} 秒；目前成品 ${selected.seconds.toFixed(2)} 秒。剪輯秒數以套用延時後、尚未裁切的完整錄音為準。${selected.postEdit?.start?`目前播放器 0 秒對應原始錄音 ${selected.postEdit.start} 秒。`:''}`:'';
     const volume=recordingVolume(selected?.postVolume);
@@ -128,7 +131,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     $('post-delay').value=selected?.postResult?.delayMs??selected?.post?.offsetMs??0;
     $('remix-delay').value=$('post-delay').value;
     $('post-info').textContent=selected?(selected.post&&selected.rawBytes?'已保存乾淨歌聲、播放位置與當次基準，可重評／重合成。':'此錄音未保存後處理來源，可轉 MP3 下載。'): '請先保存一段演唱錄音。';
-    audition?.reset(selected,selected?{delayMs:selected.appliedDelayMs??(selected.parentId?selected.delayMs:0)??0,softening:selected.vocalSoftening?.strength||'off',volume:recordingVolume(selected.postVolume),effects:vocalEffects(selected.vocalEffects)}:null);
+    audition?.reset(selected);
     showScore();controls();
   }
   function showScore(){const r=selected?.postResult;$('post-score').textContent=r?`${r.source==='decoded-voice-v1'?'音檔重評':'舊版即時資料重評'} · ${r.referenceSource==='current'?'改用已載入基準':'錄音當時基準'} ${(r.reference?.pitchMethod||selected.post?.reference?.pitchMethod||'yin').toUpperCase()} · ${scoringProfile(r.scoring?.difficulty??selected.post?.scoring?.difficulty).label} · 校正 ${r.delayMs} ms · 總分 ${r.score??'—'} · 音準 ${r.pitch} · 進拍 ${r.rhythm} · 完整度 ${r.coverage} · 可計分旋律 ${r.referenceSeconds} 秒${r.baseline ? ` · 同音檔 0 ms 進拍 ${r.baseline.rhythm}` : ''}`:'';}

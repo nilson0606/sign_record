@@ -162,7 +162,7 @@
         </div>
         <div class="button-row"><button id="post-audition-from-playhead" type="button" class="secondary">從目前播放位置取 10 秒</button></div>
         <label class="check-option"><input id="post-audition-match" type="checkbox" checked>近似音量匹配（只影響比較）</label>
-        <p class="help">A（藍色）保留已保存的版本，預設從 B（紫色）開始調整。點標籤會帶出該組所有數值，切換時自動暫存各自的調整。用上方大按鈕試聽 A／B，播放位置會接續。</p>
+        <p class="help">A（藍色）、B（紫色）從相同設定開始，之後各自調整比較；預設編輯 B。點標籤會帶出該組所有數值，切換時自動暫存各自的調整。用上方大按鈕試聽 A／B，播放位置會接續。</p>
         <div class="audition-settings">
           <div class="audition-tabs" role="tablist" aria-label="A／B 設定">
             <button id="post-audition-a-tab" class="audition-slot-a" type="button" role="tab" aria-selected="true" aria-controls="post-audition-a-pane">A 設定</button>
@@ -189,7 +189,7 @@
     <p class="help">音色效果：輕度稍微柔和，中度明顯降低尖亮感，強烈做出厚柔、較暗的音色；不是修復原音或消除呼吸聲。只處理歌唱者，配樂與和音不套用。選好後按「重新合成」另存，原錄音及評分不變；強烈會犧牲一些明亮感與咬字清晰度。比較強度時保持相同音量與延時；選取成品可再調整，柔化不會重複疊加。</p>
     <details id="post-effects-panel" class="post-effects"><summary><span class="post-effects-heading"><strong>人聲進階後製</strong><span>局部音量 · EQ · 動態壓縮 · 殘響</span></span><span class="post-effects-toggle"><span class="when-closed">點此展開</span><span class="when-open">收合設定</span></span></summary>
       <fieldset id="post-effects-fields" disabled><legend>只處理歌唱者</legend>
-        <p class="help">效果預設關閉或中性。可先用片段試聽比較，滿意後按「重新合成」另存；每次從原始歌聲重算，效果不會疊加。配樂／和音不套用這些效果。</p>
+        <p class="help">未後製錄音的 A／B 兩組皆預設大廳殘響 20%，其他效果關閉或中性。可先用片段試聽比較，滿意後按「重新合成」另存；每次從原始歌聲重算，效果不會疊加。配樂／和音不套用這些效果。</p>
         <h3>局部音量</h3><p id="post-regions-help" class="help">以套用延時後、尚未剪輯的完整錄音秒數設定，不是 YouTube 時間。「從目前播放位置」會自動換算已剪輯成品的位置。100% 不變、0% 靜音，區段不可重疊。變更延時後請重新核對位置；殘響會自然延伸到區段外。</p>
         <div id="post-regions"></div><button id="post-region-add" type="button" class="secondary">新增區段（從目前播放位置）</button>
         <h3>EQ 音色</h3><div class="post-eq-grid">
@@ -199,12 +199,12 @@
         </div><p class="help">0 dB 不變；往左減少、往右增加。先從 ±2～3 dB 比較。</p>
         <div class="post-eq-grid">
           <div><label for="post-compression">動態壓縮 · 穩定大小聲</label><select id="post-compression"><option value="off">關閉</option><option value="light">輕度 · 保留較多起伏</option><option value="medium">中度 · 更穩定</option></select></div>
-          <div><label for="post-reverb">殘響音量 <output id="post-reverb-value">0%</output></label><input id="post-reverb" type="range" min="0" max="100" step="1" value="0"><p class="help">0% 關閉，最高 100%；可用 20%、40%、60% 比較效果。數字越高，加入的殘響越明顯；原本人聲仍保留。按「重新合成」另存後試聽。</p></div>
+          <div><label for="post-reverb">殘響音量 <output id="post-reverb-value">20%</output></label><input id="post-reverb" type="range" min="0" max="100" step="1" value="20"><p class="help">新後製預設大廳 20%，已有設定則沿用；0% 關閉，最高 100%。可用 20%、40%、60% 比較效果。數字越高，加入的殘響越明顯；原本人聲仍保留。按「重新合成」另存後試聽。</p></div>
         </div>
         <div class="post-eq-grid">
-          <div><label for="post-reverb-space">空間類型</label><select id="post-reverb-space" aria-describedby="post-reverb-space-help"><option value="classic">原版（沿用舊殘響）</option><option value="room">房間 · 緊密、較短</option><option value="hall">大廳 · 寬廣、較長</option><option value="plate">板式 · 明亮、密集</option><option value="studio">錄音室 · 貼近、短尾</option><option value="chamber">小室 · 溫暖、厚實</option><option value="church">教堂 · 柔暗、莊嚴長尾</option><option value="arena">體育館 · 開闊、遠距</option><option value="tunnel">隧道 · 規律、連續反射</option><option value="cave">洞穴 · 低沉、不規則反射</option><option value="bathroom">浴室 · 明亮、近牆反射</option><option value="dream">夢幻空間 · 漸起、漂浮長尾</option></select><p id="post-reverb-space-help" class="help">沿用舊版殘響，適合與既有成品比較。</p></div>
-          <div><label for="post-reverb-decay">尾音長度 <output id="post-reverb-decay-value">0.8 秒</output></label><input id="post-reverb-decay" type="range" min="0.2" max="10" step="0.1" value="0.8" aria-describedby="post-reverb-decay-help"><p id="post-reverb-decay-help" class="help">0.2～10 秒，控制殘響尾巴延續的長度。數字越大，唱完後的餘韻越長；越小則收得越快。可用 0.8、2、5 秒比較。想保留完整尾音，剪輯的「保留結束」請留白。</p></div>
-          <div><label for="post-reverb-predelay">預延遲 <output id="post-reverb-predelay-value">15 ms</output></label><input id="post-reverb-predelay" type="range" min="0" max="500" step="1" value="15" aria-describedby="post-reverb-predelay-help"><p id="post-reverb-predelay-help" class="help">0～500 ms，控制人聲發出後，隔多久開始出現殘響。0 ms 立即開始；數字越大，原聲與殘響的間隔越明顯。可用 15、80、200 ms 比較；500 ms 就是半秒。不會移動原本人聲或配樂，也不是歌聲延時校正。</p></div>
+          <div><label for="post-reverb-space">空間類型</label><select id="post-reverb-space" aria-describedby="post-reverb-space-help"><option value="classic">原版（沿用舊殘響）</option><option value="room">房間 · 緊密、較短</option><option value="hall" selected>大廳 · 寬廣、較長</option><option value="plate">板式 · 明亮、密集</option><option value="studio">錄音室 · 貼近、短尾</option><option value="chamber">小室 · 溫暖、厚實</option><option value="church">教堂 · 柔暗、莊嚴長尾</option><option value="arena">體育館 · 開闊、遠距</option><option value="tunnel">隧道 · 規律、連續反射</option><option value="cave">洞穴 · 低沉、不規則反射</option><option value="bathroom">浴室 · 明亮、近牆反射</option><option value="dream">夢幻空間 · 漸起、漂浮長尾</option></select><p id="post-reverb-space-help" class="help">寬廣、柔和，尾音逐漸鋪開，適合抒情歌。</p></div>
+          <div><label for="post-reverb-decay">尾音長度 <output id="post-reverb-decay-value">1.8 秒</output></label><input id="post-reverb-decay" type="range" min="0.2" max="10" step="0.1" value="1.8" aria-describedby="post-reverb-decay-help"><p id="post-reverb-decay-help" class="help">0.2～10 秒，控制殘響尾巴延續的長度。數字越大，唱完後的餘韻越長；越小則收得越快。可用 0.8、2、5 秒比較。想保留完整尾音，剪輯的「保留結束」請留白。</p></div>
+          <div><label for="post-reverb-predelay">預延遲 <output id="post-reverb-predelay-value">25 ms</output></label><input id="post-reverb-predelay" type="range" min="0" max="500" step="1" value="25" aria-describedby="post-reverb-predelay-help"><p id="post-reverb-predelay-help" class="help">0～500 ms，控制人聲發出後，隔多久開始出現殘響。0 ms 立即開始；數字越大，原聲與殘響的間隔越明顯。可用 15、80、200 ms 比較；500 ms 就是半秒。不會移動原本人聲或配樂，也不是歌聲延時校正。</p></div>
         </div>
         <div class="post-edit-grid">
           <div><label for="post-reverb-brightness">殘響明亮度 <output id="post-reverb-brightness-value">0</output></label><input id="post-reverb-brightness" type="range" min="-100" max="100" step="5" value="0"><p class="help">負值讓尾音柔暗、正值讓尾音明亮；0 沿用目前空間音色。只改殘響，不改原本人聲。</p></div>

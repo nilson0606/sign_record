@@ -63,7 +63,7 @@ export function createRecordingAudition({read,apply,render,run,beforePlay,onEdit
     $('stop').disabled=!active&&!busy;$('mode').disabled=busy||!enabled||row?.mode==='voice';
   }
   function describe(name){const s=slots[name];$(name+'-info').textContent=s?`殘響 ${s.effects.reverb}% · 明亮 ${s.effects.reverbTone?.brightness??0} · 寬度 ${s.effects.reverbTone?.width??100}% · 回聲 ${s.effects.echo?.amount??0}% · ${s.effects.effectRegions?.length??0} 段局部效果 · 校正 ${s.delayMs} ms`:'尚未記住設定';}
-  function reset(value,settings){invalidate();row=value;slots=value?{a:structuredClone(settings),b:structuredClone(read())}:{};initial=structuredClone(slots);for(const name of ['a','b'])describe(name);showTab('b');$('start').value=0;$('end').value=Math.min(10,value?.sourceSeconds??value?.seconds??10).toFixed(2);$('mode').value=value?.mode==='voice'?'voice':'mix';say(value?'A 保留已保存的版本，B 帶入目前後製設定。預設調整 B；點標籤即可切換整組數值。':'選取錄音後即可比較。');controls();}
+  function reset(value){invalidate();row=value;const settings=value?read():null;slots=value?{a:structuredClone(settings),b:structuredClone(settings)}:{};initial=structuredClone(slots);for(const name of ['a','b'])describe(name);showTab('b');$('start').value=0;$('end').value=Math.min(10,value?.sourceSeconds??value?.seconds??10).toFixed(2);$('mode').value=value?.mode==='voice'?'voice':'mix';say(value?'A、B 已帶入相同的初始設定，可各自調整後比較。預設調整 B；點標籤即可切換整組數值。':'選取錄音後即可比較。');controls();}
   function restoreEditor(){
     if(busy||!initial[editor])return;
     // Skip reading the draft: restoring must also recover incomplete/invalid fields.
