@@ -34,13 +34,13 @@ try{
  const $=id=>page.locator('#'+id),selected=()=>$('post-recording').inputValue();
  async function remix(){const before=await selected();await $('post-remix').click();await page.waitForFunction(id=>document.querySelector('#post-recording').value!==id,before);return selected();}
  await $('post-effects-panel').locator('summary').click();await $('post-edit-panel').locator('summary').click();
- await $('post-reverb').fill('20');await $('post-reverb-space').selectOption('hall');
+ await $('post-reverb').fill('100');await $('post-reverb-space').selectOption('hall');
  assert.equal(await $('post-reverb-decay').inputValue(),'1.8');assert.equal(await $('post-reverb-predelay').inputValue(),'25');
  await $('post-reverb-decay').fill('1.4');await $('post-reverb-predelay').fill('70');
  await $('post-edit-start').fill('0.5');await $('post-edit-end').fill('3.5');await $('post-edit-fadeIn').fill('0.3');await $('post-edit-fadeOut').fill('0.4');
  const child=await remix();
  const check=await page.evaluate(async id=>{const r=fixtureRows.get(id);return {meta:r.meta,rawHash:await hash(r.voice),mixHash:await hash(r.mix),originalHash:await hash(fixtureRows.get('original').mix),oldRaw:rawHash};},child);
- assert.equal(check.meta.seconds,3);assert.equal(check.meta.sourceSeconds,4);assert.equal(check.rawHash,check.oldRaw);assert.equal(check.originalHash,await page.evaluate(()=>originalHash));
+ assert.equal(check.meta.vocalEffects.reverb,100);assert.equal(await $('post-reverb').inputValue(),'100');assert.equal(check.meta.seconds,3);assert.equal(check.meta.sourceSeconds,4);assert.equal(check.rawHash,check.oldRaw);assert.equal(check.originalHash,await page.evaluate(()=>originalHash));
  assert.deepEqual(check.meta.postEdit,{version:1,start:.5,end:3.5,fadeIn:.3,fadeOut:.4});
  assert.deepEqual(check.meta.vocalEffects.reverbOptions,{space:'hall',decay:1.4,preDelayMs:70});
  assert.match(await $('post-recording').locator('option:checked').textContent(),/大廳1.4s.*剪輯0.5-3.5秒.*淡入0.3秒.*淡出0.4秒/);

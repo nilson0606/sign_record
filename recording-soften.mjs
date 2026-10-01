@@ -44,7 +44,7 @@ export function vocalEffects(value={},duration=3600) {
   const eq=Object.fromEntries(['low','mid','high'].map(band=>[band,number(value.eq?.[band],0,-12,12,'EQ（dB）')]));
   const compression=value.compression??'off';
   if(!['off','light','medium'].includes(compression))throw new Error('無效的動態壓縮強度。');
-  const reverb=number(value.reverb,0,0,20,'殘響（%）');
+  const reverb=number(value.reverb,0,0,100,'殘響（%）');
   if(!Array.isArray(value.regions??[])||(value.regions?.length??0)>100)throw new Error('局部音量最多 100 個區段。');
   const regions=(value.regions??[]).map(r=>({start:number(r.start,NaN,0,duration,'區段開始秒數'),end:number(r.end,NaN,0,duration,'區段結束秒數'),volume:number(r.volume,100,0,200,'區段音量（%）')})).sort((a,b)=>a.start-b.start);
   for(let i=0;i<regions.length;i++){

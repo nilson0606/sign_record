@@ -157,7 +157,7 @@
     <p class="help">正值：歌聲晚到，將歌聲提前；負值：歌聲太早，將歌聲延後。填入總校正量，不是累加；配樂與和音不移動。初始值沿用本輪錄音校正值；舊錄音沿用當時保存的時間補償。</p>
     <label for="post-softening">歌聲柔化</label><select id="post-softening" disabled><option value="off">關閉（預設，保留原音色）</option><option value="light">輕度（柔和一點）</option><option value="medium">中度（明顯溫潤）</option><option value="strong">強烈（厚柔、較暗）</option></select>
     <p class="help">音色效果：輕度稍微柔和，中度明顯降低尖亮感，強烈做出厚柔、較暗的音色；不是修復原音或消除呼吸聲。只處理歌唱者，配樂與和音不套用。選好後按「重新合成」另存，原錄音及評分不變；強烈會犧牲一些明亮感與咬字清晰度。比較強度時保持相同音量與延時；選取成品可再調整，柔化不會重複疊加。</p>
-    <details id="post-effects-panel" class="post-effects"><summary><span class="post-effects-heading"><strong>人聲進階後製</strong><span>局部音量 · EQ · 動態壓縮 · 少量殘響</span></span><span class="post-effects-toggle"><span class="when-closed">點此展開</span><span class="when-open">收合設定</span></span></summary>
+    <details id="post-effects-panel" class="post-effects"><summary><span class="post-effects-heading"><strong>人聲進階後製</strong><span>局部音量 · EQ · 動態壓縮 · 殘響</span></span><span class="post-effects-toggle"><span class="when-closed">點此展開</span><span class="when-open">收合設定</span></span></summary>
       <fieldset id="post-effects-fields" disabled><legend>只處理歌唱者</legend>
         <p class="help">四項預設關閉或中性。按「重新合成」另存後試聽；每次從原始歌聲重算，效果不會疊加。配樂／和音不套用這些效果。</p>
         <h3>局部音量</h3><p id="post-regions-help" class="help">以套用延時後、尚未剪輯的完整錄音秒數設定，不是 YouTube 時間。「從目前播放位置」會自動換算已剪輯成品的位置。100% 不變、0% 靜音，區段不可重疊。變更延時後請重新核對位置；殘響會自然延伸到區段外。</p>
@@ -169,7 +169,7 @@
         </div><p class="help">0 dB 不變；往左減少、往右增加。先從 ±2～3 dB 比較。</p>
         <div class="post-eq-grid">
           <div><label for="post-compression">動態壓縮 · 穩定大小聲</label><select id="post-compression"><option value="off">關閉</option><option value="light">輕度 · 保留較多起伏</option><option value="medium">中度 · 更穩定</option></select></div>
-          <div><label for="post-reverb">殘響音量 <output id="post-reverb-value">0%</output></label><input id="post-reverb" type="range" min="0" max="20" step="1" value="0"><p class="help">0% 關閉；可先試 5～10%。</p></div>
+          <div><label for="post-reverb">殘響音量 <output id="post-reverb-value">0%</output></label><input id="post-reverb" type="range" min="0" max="100" step="1" value="0"><p class="help">0% 關閉，最高 100%；可用 20%、40%、60% 比較效果。數字越高，加入的殘響越明顯；原本人聲仍保留。按「重新合成」另存後試聽。</p></div>
         </div>
         <div class="post-eq-grid">
           <div><label for="post-reverb-space">空間類型</label><select id="post-reverb-space"><option value="classic">原版（沿用舊殘響）</option><option value="room">房間 · 緊密、較短</option><option value="hall">大廳 · 寬廣、較長</option><option value="plate">板式 · 明亮、密集</option></select></div>

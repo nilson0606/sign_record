@@ -44,6 +44,6 @@ test('legacy reverb impulse stays byte-identical to the published 5d378ee releas
 });
 test('invalid or overlapping local edits and unknown effect versions cannot be silently rendered',()=>{
   for(const regions of [[{start:1,end:1}],[{start:2,end:1}],[{start:-1,end:1}],[{start:0,end:6}],[{start:0,end:2},{start:1,end:3}],[{start:0,end:1,volume:201}],[{start:NaN,end:1}]])assert.throws(()=>vocalEffects({regions},5));
-  for(const value of [{eq:{low:13}},{eq:{mid:Infinity}},{compression:'extreme'},{reverb:21},{version:2},{regions:'bad'}])assert.throws(()=>vocalEffects(value));
+  for(const value of [{eq:{low:13}},{eq:{mid:Infinity}},{compression:'extreme'},{reverb:101},{version:2},{regions:'bad'}])assert.throws(()=>vocalEffects(value));
   assert.doesNotThrow(()=>vocalEffects({regions:[{start:0,end:1,volume:0},{start:1,end:2,volume:200}]},2));
 });
