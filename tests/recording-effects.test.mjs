@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {vocalEffects,reverbProfile,reverbDuration,reverbImpulse,recordingEffectsSuffix} from '../recording-soften.mjs';
+import {vocalEffects,reverbProfile,reverbDuration,reverbImpulse,recordingEffectsSuffix,effectsDuration} from '../recording-soften.mjs';
+import {comparisonLevels} from '../recording-audition.mjs';
 import {recordingEdit} from '../recording-process.mjs';
 import {createHash} from 'node:crypto';
 
@@ -32,6 +33,19 @@ test('trim and fades are a non-destructive recipe on the original timeline',()=>
  for(const value of [{start:-1},{start:10},{start:NaN},{end:0},{end:11},{start:2,end:1},{fadeIn:Infinity},{fadeOut:-1},{fadeIn:6,fadeOut:5},{version:2}])assert.throws(()=>recordingEdit(value,10));
  assert.throws(()=>recordingEdit({start:2,end:3,fadeIn:.8,fadeOut:.8},10));
  assert.match(recordingEffectsSuffix({postEdit:{start:2,end:7,fadeIn:1,fadeOut:2}}),/剪輯2-7秒.*淡入1秒.*淡出2秒/);
+});
+
+test('echo, reverb color and phrase recipes validate and preserve independent tails',()=>{
+ const value={reverbTone:{brightness:-50,width:0},echo:{amount:25,timeMs:1000,repeats:8,feedback:80,pingPong:true},effectRegions:[{start:2,end:3,reverb:60,echo:15,decay:10}]};
+ const saved=structuredClone(value),r=vocalEffects(value,4);assert.deepEqual(value,saved);assert.equal(effectsDuration(r),10.015);
+ assert.match(recordingEffectsSuffix({vocalEffects:r}),/殘響明亮-50.*殘響寬度0%.*回聲25%.*局部效果1段/);
+ for(const value of [{reverbTone:{width:101}},{reverbTone:{brightness:NaN}},{echo:{repeats:2.5}},{echo:{feedback:81}},{echo:{timeMs:0}},{echo:{pingPong:'yes'}},{effectRegions:[{start:1,end:2},{start:1.5,end:3}]},{effectRegions:[{start:2,end:1}]},{effectRegions:[{start:0,end:1,decay:11}]}])assert.throws(()=>vocalEffects(value,4));
+});
+
+test('comparison gain matching attenuates louder buffers without boosting silence',()=>{
+ const buffer=value=>({numberOfChannels:1,length:4,getChannelData:()=>new Float32Array(4).fill(value)});
+ assert.deepEqual(comparisonLevels([buffer(.25),buffer(.5),buffer(0)]),[1,.5,1]);
+ assert.deepEqual(comparisonLevels([buffer(.25),buffer(.5)],false),[1,1]);
 });
 
 test('legacy reverb impulse stays byte-identical to the published 5d378ee release',()=>{

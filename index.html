@@ -146,6 +146,23 @@
     </div>
     <p id="post-preview-help" class="help">「試聽」播放完整成品；「只聽人聲」播放歌唱者音軌，不加入配樂／和音，沿用這筆錄音已保存的音量、延時與柔化設定。更改後製設定後需先重新合成，才能試聽新效果。</p>
     <audio id="post-audio" controls hidden></audio>
+    <details id="post-audition-panel" class="post-effects"><summary><span class="post-effects-heading"><strong>片段試聽／A、B 比較</strong><span>同一句循環播放 · 先聽效果再另存</span></span></summary>
+      <fieldset id="post-audition-fields" disabled><legend>本次比較暫存</legend>
+        <div class="post-eq-grid">
+          <div><label for="post-audition-start">試聽開始（秒）</label><input id="post-audition-start" type="number" min="0" max="3600" step="0.01" value="0"></div>
+          <div><label for="post-audition-end">試聽結束（秒）</label><input id="post-audition-end" type="number" min="0" max="3600" step="0.01" value="10"></div>
+          <div><label for="post-audition-mode">試聽內容</label><select id="post-audition-mode"><option value="mix">人聲＋配樂</option><option value="voice">只聽人聲</option></select></div>
+        </div>
+        <label class="check-option"><input id="post-audition-match" type="checkbox" checked>近似音量匹配（只影響比較）</label>
+        <p class="help">以剪輯前完整錄音的秒數選同一句，每段最多 30 秒；循環試聽暫不套用剪輯與淡入淡出。A 起初是這筆錄音保存的音色設定，B 可記住你調整後的設定。兩組準備好後，切換會沿用播放位置。音量匹配以片段平均能量降低較大聲的一組，避免只因大聲而覺得較好。</p>
+        <div class="post-edit-grid">
+          <div><h3>A 組</h3><p id="post-audition-a-info" class="help">尚未選取錄音</p><div class="button-row"><button id="post-audition-a-capture" type="button" class="secondary">記住目前為 A</button><button id="post-audition-a-play" type="button">試聽 A</button><button id="post-audition-a-apply" type="button" class="secondary">套用 A 設定</button></div></div>
+          <div><h3>B 組</h3><p id="post-audition-b-info" class="help">尚未記住設定</p><div class="button-row"><button id="post-audition-b-capture" type="button" class="secondary">記住目前為 B</button><button id="post-audition-b-play" type="button">試聽 B</button><button id="post-audition-b-apply" type="button" class="secondary">套用 B 設定</button></div></div>
+        </div>
+        <div class="button-row"><button id="post-audition-current" type="button">試聽目前設定（更新 B）</button></div>
+        <p class="help">試聽不新增錄音。喜歡 A 或 B 時按「套用設定」，再用下方「重新合成」另存；切換錄音或重新整理會清除比較暫存。首次準備片段需要合成，之後可直接切換。</p>
+      </fieldset><button id="post-audition-stop" type="button" class="secondary" disabled>停止比較</button><p id="post-audition-status" class="status" role="status">選取錄音後即可比較。</p><output id="post-audition-position"></output>
+    </details>
     <p id="post-status" class="status" role="status">請選擇一筆錄音。</p>
     <p id="post-info" class="help"></p><p id="recording-storage-status" class="help" role="status">連接本機錄音目錄中…</p>
     <div class="recording-levels">
@@ -159,7 +176,7 @@
     <p class="help">音色效果：輕度稍微柔和，中度明顯降低尖亮感，強烈做出厚柔、較暗的音色；不是修復原音或消除呼吸聲。只處理歌唱者，配樂與和音不套用。選好後按「重新合成」另存，原錄音及評分不變；強烈會犧牲一些明亮感與咬字清晰度。比較強度時保持相同音量與延時；選取成品可再調整，柔化不會重複疊加。</p>
     <details id="post-effects-panel" class="post-effects"><summary><span class="post-effects-heading"><strong>人聲進階後製</strong><span>局部音量 · EQ · 動態壓縮 · 殘響</span></span><span class="post-effects-toggle"><span class="when-closed">點此展開</span><span class="when-open">收合設定</span></span></summary>
       <fieldset id="post-effects-fields" disabled><legend>只處理歌唱者</legend>
-        <p class="help">四項預設關閉或中性。按「重新合成」另存後試聽；每次從原始歌聲重算，效果不會疊加。配樂／和音不套用這些效果。</p>
+        <p class="help">效果預設關閉或中性。可先用片段試聽比較，滿意後按「重新合成」另存；每次從原始歌聲重算，效果不會疊加。配樂／和音不套用這些效果。</p>
         <h3>局部音量</h3><p id="post-regions-help" class="help">以套用延時後、尚未剪輯的完整錄音秒數設定，不是 YouTube 時間。「從目前播放位置」會自動換算已剪輯成品的位置。100% 不變、0% 靜音，區段不可重疊。變更延時後請重新核對位置；殘響會自然延伸到區段外。</p>
         <div id="post-regions"></div><button id="post-region-add" type="button" class="secondary">新增區段（從目前播放位置）</button>
         <h3>EQ 音色</h3><div class="post-eq-grid">
@@ -175,7 +192,21 @@
           <div><label for="post-reverb-space">空間類型</label><select id="post-reverb-space"><option value="classic">原版（沿用舊殘響）</option><option value="room">房間 · 緊密、較短</option><option value="hall">大廳 · 寬廣、較長</option><option value="plate">板式 · 明亮、密集</option></select></div>
           <div><label for="post-reverb-decay">尾音長度 <output id="post-reverb-decay-value">0.8 秒</output></label><input id="post-reverb-decay" type="range" min="0.2" max="10" step="0.1" value="0.8" aria-describedby="post-reverb-decay-help"><p id="post-reverb-decay-help" class="help">0.2～10 秒，控制殘響尾巴延續的長度。數字越大，唱完後的餘韻越長；越小則收得越快。可用 0.8、2、5 秒比較。想保留完整尾音，剪輯的「保留結束」請留白。</p></div>
           <div><label for="post-reverb-predelay">預延遲 <output id="post-reverb-predelay-value">15 ms</output></label><input id="post-reverb-predelay" type="range" min="0" max="500" step="1" value="15" aria-describedby="post-reverb-predelay-help"><p id="post-reverb-predelay-help" class="help">0～500 ms，控制人聲發出後，隔多久開始出現殘響。0 ms 立即開始；數字越大，原聲與殘響的間隔越明顯。可用 15、80、200 ms 比較；500 ms 就是半秒。不會移動原本人聲或配樂，也不是歌聲延時校正。</p></div>
-        </div><p class="help">殘響音量大於 0% 時才會聽到尾音與預延遲的效果。更換空間會帶入建議值，之後可各自微調；「原版」預設為 0.8 秒／15 ms。每次先改一項，再按「重新合成」另存後試聽。</p><button id="post-effects-reset" type="button" class="secondary">重設這四項效果</button>
+        </div>
+        <div class="post-edit-grid">
+          <div><label for="post-reverb-brightness">殘響明亮度 <output id="post-reverb-brightness-value">0</output></label><input id="post-reverb-brightness" type="range" min="-100" max="100" step="5" value="0"><p class="help">負值讓尾音柔暗、正值讓尾音明亮；0 沿用目前空間音色。只改殘響，不改原本人聲。</p></div>
+          <div><label for="post-reverb-width">殘響立體寬度 <output id="post-reverb-width-value">100%</output></label><input id="post-reverb-width" type="range" min="0" max="100" step="5" value="100"><p class="help">0% 集中在中央，100% 保留完整左右空間感。戴耳機比較較明顯；原本人聲位置不變。</p></div>
+        </div><p class="help">殘響音量大於 0% 時才會聽到這些效果。更換空間會帶入建議值，之後可各自微調；「原版」預設為 0.8 秒／15 ms。每次先改一項，再用片段試聽比較。</p>
+        <h3>回聲 Delay</h3><div class="post-eq-grid">
+          <div><label for="post-echo-amount">回聲音量 <output id="post-echo-amount-value">0%</output></label><input id="post-echo-amount" type="range" min="0" max="100" step="1" value="0"><p class="help">0% 關閉；提高後，能聽到句子或字音重複出現。可從 15% 開始。</p></div>
+          <div><label for="post-echo-time">重複間隔 <output id="post-echo-time-value">300 ms</output></label><input id="post-echo-time" type="range" min="80" max="1000" step="10" value="300"><p class="help">80～1000 ms。小值像緊貼人聲的重影，大值像一句接一句的回應。</p></div>
+          <div><label for="post-echo-repeats">重複次數 <output id="post-echo-repeats-value">3 次</output></label><input id="post-echo-repeats" type="range" min="1" max="8" step="1" value="3"><p class="help">最多 8 次；間隔和次數一起決定回聲延伸多長。</p></div>
+          <div><label for="post-echo-feedback">每次保留音量 <output id="post-echo-feedback-value">40%</output></label><input id="post-echo-feedback" type="range" min="0" max="80" step="5" value="40"><p class="help">後一次是前一次的幾成。40% 會很快變小；80% 衰減較慢；0% 只留下第一次回聲。</p></div>
+          <div><label for="post-echo-pingpong">回聲位置</label><select id="post-echo-pingpong"><option value="off">中央</option><option value="on">左右交替</option></select><p class="help">左右交替讓每次回聲輪流出現在左右兩邊，原本人聲保持原位。</p></div>
+        </div>
+        <h3>局部效果</h3><p class="help">區段內用指定的殘響音量、尾音長度與回聲音量，區段外沿用上方設定。可做主歌淡、副歌濃、最後一句長尾音。秒數以剪輯前完整錄音為準，區段不可重疊；已產生的尾音會自然延伸到區段外，其餘音色與回聲間隔沿用上方設定。</p>
+        <div id="post-effect-regions"></div><button id="post-effect-region-add" type="button" class="secondary">新增效果區段（目前位置）</button>
+        <button id="post-effects-reset" type="button" class="secondary">重設全部人聲效果</button>
       </fieldset>
     </details>
     <details id="post-edit-panel" class="post-effects"><summary><span class="post-effects-heading"><strong>剪輯與淡入淡出</strong><span>保留想要的段落 · 人聲與配樂一起平順收尾</span></span><span class="post-effects-toggle"><span class="when-closed">點此展開</span><span class="when-open">收合設定</span></span></summary>

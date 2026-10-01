@@ -1,4 +1,5 @@
 import { recordingTuningSuffix } from './recording-tune.mjs';
+import { createRecordingAudition } from './recording-audition.mjs';
 import { PITCH_DETECTOR_VERSION } from './audio.mjs';
 import { softeningProfile, recordingSofteningSuffix, recordingEffectsSuffix, vocalEffects, reverbProfile } from './recording-soften.mjs';
 import { scoringProfile } from './scoring.mjs';
@@ -34,14 +35,15 @@ async function recordedAnalysis(blob, progress) {
   });
 }
 export function createRecordingPost({store,stop,pause,download,onDelete,reference=()=>null}) {
-  let rows=[],selected=null,busy=false,url=null,statusTarget='post-status';
+  let rows=[],selected=null,busy=false,url=null,statusTarget='post-status',audition=null,previewSources=null;
   const status=text=>{$(statusTarget).textContent=text;};
-  function clearAudio(){const a=$('post-audio');a.pause();a.removeAttribute('src');a.load();a.hidden=true;if(url)URL.revokeObjectURL(url);url=null;}
+  function clearAudio(){audition?.stop();const a=$('post-audio');a.pause();a.removeAttribute('src');a.load();a.hidden=true;if(url)URL.revokeObjectURL(url);url=null;}
   function effectLabels(){
     for(const band of ['low','mid','high'])$('post-eq-'+band+'-value').textContent=$('post-eq-'+band).value+' dB';
     $('post-reverb-value').textContent=$('post-reverb').value+'%';
     $('post-reverb-decay-value').textContent=$('post-reverb-decay').value+' 秒';
     $('post-reverb-predelay-value').textContent=$('post-reverb-predelay').value+' ms';
+    for(const [id,unit] of [['reverb-brightness',''],['reverb-width','%'],['echo-amount','%'],['echo-time',' ms'],['echo-repeats',' 次'],['echo-feedback','%']])$('post-'+id+'-value').textContent=$('post-'+id).value+unit;
   }
   function addRegion(value){
     const row=document.createElement('div');row.className='post-region-row';
@@ -56,23 +58,37 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     $('post-compression').value=recipe.compression;$('post-reverb').value=recipe.reverb;
     const reverb=reverbProfile(recipe.reverbOptions);
     $('post-reverb-space').value=reverb.space;$('post-reverb-decay').value=reverb.decay;$('post-reverb-predelay').value=reverb.preDelayMs;
+    $('post-reverb-brightness').value=recipe.reverbTone?.brightness??0;$('post-reverb-width').value=recipe.reverbTone?.width??100;
+    for(const [id,key,fallback] of [['amount','amount',0],['time','timeMs',300],['repeats','repeats',3],['feedback','feedback',40]])$('post-echo-'+id).value=recipe.echo?.[key]??fallback;
+    $('post-echo-pingpong').value=recipe.echo?.pingPong?'on':'off';
+    $('post-effect-regions').replaceChildren();(recipe.effectRegions??[]).forEach(addEffectRegion);
     $('post-regions').replaceChildren();recipe.regions.forEach(addRegion);effectLabels();
+  }
+  function addEffectRegion(value){
+    const row=document.createElement('div');row.className='post-effect-region-row';
+    for(const [key,label,min,max,step] of [['start','開始（秒）',0,3600,.01],['end','結束（秒）',0,3600,.01],['reverb','殘響（%）',0,100,1],['decay','尾音（秒）',.2,10,.1],['echo','回聲（%）',0,100,1]]){
+      const field=document.createElement('label'),input=document.createElement('input');field.textContent=label;input.type='number';input.dataset.field=key;input.min=min;input.max=max;input.step=step;input.value=value[key];field.append(input);row.append(field);
+    }const remove=document.createElement('button');remove.type='button';remove.className='secondary';remove.textContent='移除區段';remove.addEventListener('click',()=>row.remove());row.append(remove);$('post-effect-regions').append(row);
   }
   function readEffects(){
     const regions=Array.from($('post-regions').children,row=>Object.fromEntries(Array.from(row.querySelectorAll('input'),input=>[input.dataset.field,input.value===''?NaN:Number(input.value)])));
-    return vocalEffects({eq:Object.fromEntries(['low','mid','high'].map(band=>[band,Number($('post-eq-'+band).value)])),compression:$('post-compression').value,reverb:Number($('post-reverb').value),reverbOptions:{space:$('post-reverb-space').value,decay:Number($('post-reverb-decay').value),preDelayMs:Number($('post-reverb-predelay').value)},regions});
+    const effectRegions=Array.from($('post-effect-regions').children,row=>Object.fromEntries(Array.from(row.querySelectorAll('input'),input=>[input.dataset.field,input.value===''?NaN:Number(input.value)])));
+    const echo={amount:Number($('post-echo-amount').value),timeMs:Number($('post-echo-time').value),repeats:Number($('post-echo-repeats').value),feedback:Number($('post-echo-feedback').value),pingPong:$('post-echo-pingpong').value==='on'};
+    const customEcho=echo.amount||echo.timeMs!==300||echo.repeats!==3||echo.feedback!==40||echo.pingPong;
+    return vocalEffects({eq:Object.fromEntries(['low','mid','high'].map(band=>[band,Number($('post-eq-'+band).value)])),compression:$('post-compression').value,reverb:Number($('post-reverb').value),reverbOptions:{space:$('post-reverb-space').value,decay:Number($('post-reverb-decay').value),preDelayMs:Number($('post-reverb-predelay').value)},reverbTone:{brightness:Number($('post-reverb-brightness').value),width:Number($('post-reverb-width').value)},...(customEcho?{echo}:{}),effectRegions,regions});
   }
   function setEdit(value){
     const edit=recordingEdit(value);
     for(const key of ['start','end','fadeIn','fadeOut'])$('post-edit-'+key).value=edit[key]??'';
   }
   function readEdit(){return recordingEdit(Object.fromEntries(['start','end','fadeIn','fadeOut'].map(key=>{const value=$('post-edit-'+key).value;return [key,value===''?(key==='end'?null:NaN):Number(value)];})));}
-  function originalPlayhead(){return Math.round((($('post-audio').currentTime||0)+(selected?.postEdit?.start||0))*100)/100;}
+  function originalPlayhead(){return Math.round((audition?.position()??(($('post-audio').currentTime||0)+(selected?.postEdit?.start||0)))*100)/100;}
   function referenceName(ref) {
     if(!ref)return '尚未載入';
     return `${(ref.pitchMethod||'yin').toUpperCase()} · ${({demucs:'Demucs','bs-roformer':'BS-RoFormer','mel-roformer':'Mel-Band RoFormer'})[ref.separationModel]||'Demucs'} · ${ref.separationMethod==='residual'?'二次分離＋相減':'單次分離'} · ${ref.vocalMode==='lead'?'主唱':'人聲'} · ${Math.round(ref.duration??ref.frames.length*ref.step)} 秒`;
   }
   function controls(){
+    audition?.controls(busy);
     const editable=!!(selected?.complete&&selected.rawBytes&&selected.post?.segments?.length);
     $('post-diagnostic').disabled=busy||!editable;
     for(const action of ['preview','download','delete'])$('selected-recording-'+action).disabled=busy||!selected;
@@ -86,7 +102,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     $('post-softening').disabled=busy||!editable;
     $('post-effects-fields').disabled=busy||!editable;
     $('post-edit-fields').disabled=busy||!editable;
-    for(const key of ['start','end'])$('post-edit-'+key+'-now').disabled=busy||!editable||!$('post-audio').getAttribute('src');
+    for(const key of ['start','end'])$('post-edit-'+key+'-now').disabled=busy||!editable||(!$('post-audio').getAttribute('src')&&!audition?.playing());
     $('post-voice-level').disabled=busy||!editable;
     $('post-backing-level').disabled=busy||!editable||selected?.mode!=='mix';
     const current=reference();let referenceError='';
@@ -95,7 +111,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     $('post-rescore').disabled=busy||!editable||!!referenceError;$('post-remix').disabled=busy||!editable;$('post-mp3').disabled=busy||!selected;
   }
   function choose(){
-    clearAudio();selected=rows.find(x=>x.id===$('post-recording').value)||null;
+    clearAudio();previewSources=null;selected=rows.find(x=>x.id===$('post-recording').value)||null;
     $('score-recording').value=$('post-recording').value;
     $('rescore-status').textContent=selected?'已選取錄音，可調整設定後重新評分。':'請先保存一段演唱錄音。';
     $('post-reference-source').value='original';
@@ -110,6 +126,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     $('post-delay').value=selected?.postResult?.delayMs??selected?.post?.offsetMs??0;
     $('remix-delay').value=$('post-delay').value;
     $('post-info').textContent=selected?(selected.post&&selected.rawBytes?'已保存乾淨歌聲、播放位置與當次基準，可重評／重合成。':'此錄音未保存後處理來源，可轉 MP3 下載。'): '請先保存一段演唱錄音。';
+    audition?.reset(selected,selected?{delayMs:selected.appliedDelayMs??(selected.parentId?selected.delayMs:0)??0,softening:selected.vocalSoftening?.strength||'off',volume:recordingVolume(selected.postVolume),effects:vocalEffects(selected.vocalEffects)}:null);
     showScore();controls();
   }
   function showScore(){const r=selected?.postResult;$('post-score').textContent=r?`${r.source==='decoded-voice-v1'?'音檔重評':'舊版即時資料重評'} · ${r.referenceSource==='current'?'改用已載入基準':'錄音當時基準'} ${(r.reference?.pitchMethod||selected.post?.reference?.pitchMethod||'yin').toUpperCase()} · ${scoringProfile(r.scoring?.difficulty??selected.post?.scoring?.difficulty).label} · 校正 ${r.delayMs} ms · 總分 ${r.score??'—'} · 音準 ${r.pitch} · 進拍 ${r.rhythm} · 完整度 ${r.coverage} · 可計分旋律 ${r.referenceSeconds} 秒${r.baseline ? ` · 同音檔 0 ms 進拍 ${r.baseline.rhythm}` : ''}`:'';}
@@ -151,7 +168,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     if(!confirm('刪除這筆錄音、原始歌聲及其後處理資料？此操作無法復原。\n'+selected.title+' · '+new Date(selected.created).toLocaleString()))return;
     run(async row=>{clearAudio();await store.delete(row.id);await onDelete();choose();status('已刪除選取的錄音。');});
   });
-  $('post-audio').addEventListener('play',pause);
+  $('post-audio').addEventListener('play',()=>{audition?.stop();pause();});
   $('post-recording').addEventListener('change',choose);
   $('score-recording').addEventListener('change',()=>{$('post-recording').value=$('score-recording').value;choose();});
   $('post-delay').addEventListener('input',()=>{$('remix-delay').value=$('post-delay').value;});
@@ -162,7 +179,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     $('post-backing-value').textContent=$('post-backing-level').value+'%';
   }
   for(const id of ['post-voice-level','post-backing-level'])$(id).addEventListener('input',volumeLabels);
-  for(const id of ['post-eq-low','post-eq-mid','post-eq-high','post-reverb','post-reverb-decay','post-reverb-predelay'])$(id).addEventListener('input',effectLabels);
+  for(const id of ['post-eq-low','post-eq-mid','post-eq-high','post-reverb','post-reverb-decay','post-reverb-predelay','post-reverb-brightness','post-reverb-width','post-echo-amount','post-echo-time','post-echo-repeats','post-echo-feedback'])$(id).addEventListener('input',effectLabels);
   $('post-reverb-space').addEventListener('change',()=>{
     const presets={classic:[.8,15],room:[.6,10],hall:[1.8,25],plate:[1.2,15]},[decay,pre]=presets[$('post-reverb-space').value];
     $('post-reverb-decay').value=decay;$('post-reverb-predelay').value=pre;effectLabels();
@@ -175,6 +192,11 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     const endLimit=selected?.sourceSeconds??selected?.seconds??0;
     const start=Math.min(Math.max(0,endLimit-.1),originalPlayhead());
     addRegion({start,end:Math.min(endLimit,start+5),volume:100});
+  });
+  $('post-effect-region-add').addEventListener('click',()=>{
+    if($('post-effect-regions').children.length>=20){status('局部效果最多 20 個區段。');return;}
+    const limit=selected?.sourceSeconds??selected?.seconds??0,start=Math.min(Math.max(0,limit-.1),originalPlayhead());
+    addEffectRegion({start,end:Math.min(limit,start+5),reverb:Number($('post-reverb').value),decay:Number($('post-reverb-decay').value),echo:Number($('post-echo-amount').value)});
   });
   $('post-rescore').addEventListener('click',()=>run(async row=>{
     const delayMs=Number($('post-delay').value);delaySeconds(delayMs);
@@ -236,6 +258,21 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     let savedPath='',saveError='';try{savedPath=(await store.saveMp3(row,mp3)).path;}catch(error){saveError=error.message;}
     const href=URL.createObjectURL(mp3),a=document.createElement('a');a.href=href;a.download=row.title.replace(/[\\/:*?"<>|]/g,'_').slice(0,100)+recordingEffectsSuffix(row)+recordingSofteningSuffix(row)+recordingTuningSuffix(row)+recordingDelaySuffix(row)+'.mp3';a.click();setTimeout(()=>URL.revokeObjectURL(href),60000);status(savedPath?'MP3 已轉換並開始下載，同時保存至 '+savedPath+'。':'MP3 已轉換並開始下載，但尚未存入錄音目錄：'+saveError);
   }));
+  audition=createRecordingAudition({run,beforePlay:()=>{$('post-audio').pause();pause();},
+    read:()=>{const delayMs=Number($('remix-delay').value);delaySeconds(delayMs);return {delayMs,softening:$('post-softening').value,volume:recordingVolume({voice:Number($('post-voice-level').value),backing:Number($('post-backing-level').value)}),effects:readEffects()};},
+    apply:s=>{setEffects(s.effects);$('post-softening').value=s.softening;$('remix-delay').value=s.delayMs;$('post-delay').value=s.delayMs;$('post-voice-level').value=s.volume.voice;$('post-backing-level').value=s.volume.backing;volumeLabels();},
+    render:async(row,settings,interval,solo)=>{
+      if(!previewSources){const c=new AudioContext({sinkId:{type:'none'}});try{
+        const blob=await store.blob(row,'voice');if(!blob.size||blob.size!==row.rawBytes)throw Error('原始歌聲不完整，無法比較。');
+        previewSources={raw:await c.decodeAudioData(await blob.arrayBuffer()),tracks:null};
+      }finally{await c.close();}}
+      if(!solo&&row.mode==='mix'&&!previewSources.tracks){const c=new AudioContext({sampleRate:previewSources.raw.sampleRate,sinkId:{type:'none'}});try{
+        const tracks=[];for(const stem of row.stems){const response=await localRequest(`/library/${row.post.reference.cacheId}/${stem}`);tracks.push(await c.decodeAudioData(await response.arrayBuffer()));}previewSources.tracks=tracks;
+      }finally{await c.close();}}
+      const fade=Math.min(.003,(interval.end-interval.start)/4);
+      return remixRecording(previewSources.raw,solo?[]:previewSources.tracks??[],row,settings.delayMs,{...settings,edit:{...interval,fadeIn:fade,fadeOut:fade}});
+    }
+  });
   window.addEventListener('pagehide',clearAudio);
   return {refresh,select,controls,clearAudio};
 }

@@ -59,7 +59,24 @@ try{
  await $('post-edit-reset').click();const uncut=await remix();const uncutSeconds=await page.evaluate(id=>fixtureRows.get(id).meta.seconds,uncut);assert.ok(Math.abs(uncutSeconds-14.5)<.001);
  await $('post-effects-reset').click();const restored=await remix();assert.equal(await page.evaluate(async id=>hash(fixtureRows.get(id).mix),restored),check.originalHash,'reset restores full original rendering even after deleting the parent');
  assert.equal(await $('post-edit-end').inputValue(),'');assert.equal(await $('post-edit-fadeIn').inputValue(),'0');assert.equal(await $('post-reverb-space').inputValue(),'classic');
- await mkdir('test-results',{recursive:true});
- for(const width of [1280,390]){await page.setViewportSize({width,height:1000});await $('post-edit-panel').screenshot({path:`test-results/recording-edit-${width}.png`});await $('post-effects-panel').screenshot({path:`test-results/recording-reverb-${width}.png`});assert.ok(await $('post-edit-panel').evaluate(el=>el.scrollWidth<=el.clientWidth+1));}
+ await $('post-audition-panel').locator('summary').click();await $('post-audition-start').fill('0.3');await $('post-audition-end').fill('1.3');await $('post-audition-end').blur();
+ await page.evaluate(()=>{window.loopStarts=[];const start=AudioBufferSourceNode.prototype.start;AudioBufferSourceNode.prototype.start=function(when=0,offset=0,...rest){if(this.loop)loopStarts.push({when,offset,duration:this.buffer.duration});return start.call(this,when,offset,...rest);};});
+ await $('post-reverb').fill('30');await $('post-reverb-brightness').fill('-50');await $('post-reverb-width').fill('30');await $('post-echo-amount').fill('25');await $('post-echo-time').fill('200');await $('post-echo-repeats').fill('2');await $('post-echo-pingpong').selectOption('on');
+ await $('post-effect-region-add').click();const phrase=page.locator('#post-effect-regions');await phrase.locator('[data-field=start]').fill('1');await phrase.locator('[data-field=end]').fill('2');await phrase.locator('[data-field=reverb]').fill('60');await phrase.locator('[data-field=decay]').fill('2');await phrase.locator('[data-field=echo]').fill('40');
+ const beforePreview=await page.evaluate(()=>fixtureRows.size);
+ await $('post-audition-current').click();await page.waitForFunction(()=>document.querySelector('#post-audition-position').textContent.startsWith('B'));
+ await $('post-audition-a-play').click();await page.waitForFunction(()=>document.querySelector('#post-audition-position').textContent.startsWith('A'));
+ await $('post-audition-b-play').click();await page.waitForFunction(()=>document.querySelector('#post-audition-position').textContent.startsWith('B'));
+ const loops=await page.evaluate(()=>loopStarts);assert.equal(loops.length,3);assert.ok(loops.every(x=>Math.abs(x.duration-1)<.001));
+ for(let i=1;i<loops.length;i++){const expected=(loops[i].when-loops[0].when)%1;assert.ok(Math.abs(loops[i].offset-expected)<.01,'A/B preserves phrase position');}
+ assert.equal(await page.evaluate(()=>fixtureRows.size),beforePreview,'preview never creates recordings');
+ await $('post-audition-a-apply').click();assert.equal(await $('post-reverb').inputValue(),'0');assert.equal(await $('post-echo-amount').inputValue(),'0');
+ await $('post-audition-b-apply').click();assert.equal(await $('post-reverb-brightness').inputValue(),'-50');assert.equal(await $('post-reverb-width').inputValue(),'30');assert.equal(await $('post-echo-amount').inputValue(),'25');assert.equal(await phrase.locator('[data-field=decay]').inputValue(),'2');
+ await $('post-audition-stop').click();assert.equal(await $('post-audition-position').textContent(),'');
+ const newEffects=await remix();const newMeta=await page.evaluate(id=>fixtureRows.get(id).meta,newEffects);
+ assert.deepEqual(newMeta.vocalEffects.reverbTone,{brightness:-50,width:30});assert.equal(newMeta.vocalEffects.echo.pingPong,true);assert.equal(newMeta.vocalEffects.effectRegions[0].reverb,60);assert.equal(await $('post-echo-amount').inputValue(),'25');assert.ok(await $('post-audition-b-play').isDisabled(),'selecting a new recording clears temporary B');
+ await $('post-audition-start').fill('2');await $('post-audition-end').fill('1');await $('post-audition-a-play').click();await page.waitForFunction(()=>document.querySelector('#post-audition-status').textContent.includes('有效起訖'));assert.equal(await page.evaluate(()=>fixtureRows.size),beforePreview+1);
+  await mkdir('test-results',{recursive:true});
+ for(const width of [1280,390]){await page.setViewportSize({width,height:1000});await $('post-edit-panel').screenshot({path:`test-results/recording-edit-${width}.png`});await $('post-effects-panel').screenshot({path:`test-results/recording-reverb-${width}.png`});await $('post-audition-panel').screenshot({path:`test-results/recording-audition-${width}.png`});for(const id of ['post-edit-panel','post-effects-panel','post-audition-panel'])assert.ok(await $(id).evaluate(el=>el.scrollWidth<=el.clientWidth+1),id);}
  assert.deepEqual(errors,[]);console.log(JSON.stringify({saved:check.meta.postEdit,reverb:check.meta.vocalEffects.reverbOptions,solo,repeatIdentical:true,sourceRestored:true,mappedPlayhead:true,errors}));
 }finally{await browser?.close();server.kill();}

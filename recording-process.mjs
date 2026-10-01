@@ -1,4 +1,4 @@
-import { softenedVoice, vocalEffects, processedVoice, reverbDuration } from './recording-soften.mjs';
+import { softenedVoice, vocalEffects, processedVoice, effectsDuration } from './recording-soften.mjs';
 import { ScoringTake, validateReference } from './scoring.mjs';
 import { balanceGains, createRecordingMix } from './recording-mix.mjs';
 // Describe the audio that was actually rendered, never a pending score correction.
@@ -80,7 +80,7 @@ export function editRecordingAudio(buffer,value={}){
 export async function remixRecording(raw, tracks, meta, ms, {softening='off',volume,effects,edit=meta.postEdit}={}) {
   const shift=delaySeconds(ms), rate=raw.sampleRate;
   const sourceDuration=Math.max(raw.duration+Math.max(0,-shift),meta.sourceSeconds??meta.seconds);
-  const recipe=vocalEffects(effects,sourceDuration),duration=sourceDuration+reverbDuration(recipe);
+  const recipe=vocalEffects(effects,sourceDuration),duration=sourceDuration+effectsDuration(recipe);
   const cuts=recordingEdit(edit,duration);
   if(duration>3600)throw new Error('後處理一次最多一小時。');
   const context=new OfflineAudioContext(2,Math.ceil(duration*rate),rate), voice=context.createBufferSource();voice.buffer=raw;

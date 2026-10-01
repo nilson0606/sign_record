@@ -25,6 +25,10 @@ export function recordingEffectsSuffix(meta) {
   if(compression)parts.push('壓縮'+compression);
   if(Number.isFinite(effects.reverb)&&effects.reverb>0)parts.push(`殘響${effects.reverb}%`);
   if(effects.reverb>0&&effects.reverbOptions){const r=reverbProfile(effects.reverbOptions);parts.push(`${reverbSpaces[r.space]}${r.decay}s`, `預延遲${r.preDelayMs}ms`);}
+  if(effects.reverbTone?.brightness)parts.push(`殘響明亮${signed(effects.reverbTone.brightness)}`);
+  if(effects.reverbTone&&effects.reverbTone.width!==100)parts.push(`殘響寬度${effects.reverbTone.width}%`);
+  if(effects.echo?.amount)parts.push(`回聲${effects.echo.amount}%_${effects.echo.timeMs}ms_${effects.echo.repeats}次${effects.echo.pingPong?'左右交替':''}`);
+  if(effects.effectRegions?.length)parts.push(`局部效果${effects.effectRegions.length}段`);
   const edit=meta.postEdit;
   if(edit?.start>0||edit?.end!=null)parts.push(`剪輯${edit.start||0}-${edit.end??'末尾'}秒`);
   if(edit?.fadeIn>0)parts.push(`淡入${edit.fadeIn}秒`);
@@ -53,7 +57,13 @@ export function vocalEffects(value={},duration=3600) {
   }
   const profile=reverbProfile(value.reverbOptions);
   const custom=profile.space!=='classic'||profile.decay!==.8||profile.preDelayMs!==15;
-  return {version:1,eq,compression,reverb,regions,...(custom?{reverbOptions:profile}:{})};
+  const tone={brightness:number(value.reverbTone?.brightness,0,-100,100,'殘響明亮度'),width:number(value.reverbTone?.width,100,0,100,'殘響寬度（%）')};
+  const echo={amount:number(value.echo?.amount,0,0,100,'回聲音量（%）'),timeMs:number(value.echo?.timeMs,300,80,1000,'回聲間隔（ms）'),repeats:number(value.echo?.repeats,3,1,8,'回聲次數'),feedback:number(value.echo?.feedback,40,0,80,'回聲保留比例（%）'),pingPong:value.echo?.pingPong??false};
+  if(!Number.isInteger(echo.repeats)||typeof echo.pingPong!=='boolean')throw Error('回聲次數需為整數，左右交替需為開關。');
+  if(!Array.isArray(value.effectRegions??[])||(value.effectRegions?.length??0)>20)throw Error('局部效果最多 20 個區段。');
+  const effectRegions=(value.effectRegions??[]).map(r=>({start:number(r.start,NaN,0,duration,'效果開始秒數'),end:number(r.end,NaN,0,duration,'效果結束秒數'),reverb:number(r.reverb,reverb,0,100,'區段殘響（%）'),echo:number(r.echo,echo.amount,0,100,'區段回聲（%）'),decay:number(r.decay,profile.decay,.2,10,'區段尾音（秒）')})).sort((a,b)=>a.start-b.start);
+  for(let i=0;i<effectRegions.length;i++)if(effectRegions[i].end<=effectRegions[i].start||(i&&effectRegions[i].start<effectRegions[i-1].end))throw Error('局部效果結束需晚於開始，且區段不可重疊。');
+  return {version:1,eq,compression,reverb,regions,...(custom?{reverbOptions:profile}:{}),...(tone.brightness||tone.width!==100?{reverbTone:tone}:{}),...(value.echo||effectRegions.some(r=>r.echo)?{echo}:{}),...(effectRegions.length?{effectRegions}:{})};
 }
 
 export const vocalReverbTail=.8;
@@ -66,6 +76,11 @@ export function reverbProfile(value={}){
   return {space,decay,preDelayMs};
 }
 export function reverbDuration(recipe){const r=reverbProfile(recipe.reverbOptions);return recipe.reverb?(recipe.reverbOptions?r.decay+r.preDelayMs/1000:vocalReverbTail):0;}
+export function effectsDuration(recipe){
+  const echoes=recipe.echo;
+  const echoTail=echoes&&(echoes.amount||recipe.effectRegions?.some(r=>r.echo))?echoes.timeMs/1000*echoes.repeats:0;
+  return Math.max(reverbDuration(recipe),echoTail,...(recipe.effectRegions??[]).map(r=>r.reverb?r.decay+reverbProfile(recipe.reverbOptions).preDelayMs/1000:0));
+}
 export function reverbImpulse(context,recipe){
   const r=reverbProfile(recipe.reverbOptions),legacy=!recipe.reverbOptions;
   const impulse=context.createBuffer(2,Math.ceil(context.sampleRate*reverbDuration(recipe)),context.sampleRate);
@@ -82,6 +97,8 @@ export function reverbImpulse(context,recipe){
     for(const sample of data)energy+=sample*sample;
     const scale=.65/Math.sqrt(energy||1);for(let i=0;i<data.length;i++)data[i]*=scale;
   }
+  const width=(recipe.reverbTone?.width??100)/100;
+  if(width!==1){const left=impulse.getChannelData(0),right=impulse.getChannelData(1);for(let i=0;i<left.length;i++){const mid=(left[i]+right[i])/2,side=(left[i]-right[i])/2*width;left[i]=mid+side;right[i]=mid-side;}}
   return impulse;
 }
 export function processedVoice(context,source,recipe) {
@@ -107,13 +124,35 @@ export function processedVoice(context,source,recipe) {
     }
     append(local);
   }
-  if(recipe.reverb){
-    const dry=output,convolver=context.createConvolver(),wet=context.createGain(),sum=context.createGain(),damping=context.createBiquadFilter();
-    convolver.normalize=false;convolver.buffer=reverbImpulse(context,recipe);wet.gain.value=recipe.reverb/100;
-    const space=reverbProfile(recipe.reverbOptions).space;
-    damping.type='lowpass';damping.frequency.value=Math.min(({classic:5000,room:6000,hall:4000,plate:7000})[space],context.sampleRate*.45);
-    dry.connect(sum);dry.connect(convolver);convolver.connect(damping);damping.connect(wet);wet.connect(sum);
-    nodes.push(convolver,damping,wet,sum);output=sum;
+  const sections=recipe.effectRegions??[];
+  if(recipe.reverb||recipe.echo?.amount||sections.some(r=>r.reverb||r.echo)){
+    const dry=output,sum=context.createGain();dry.connect(sum);nodes.push(sum);
+    // Gate sends, not returns: a phrase's tail continues naturally after its end.
+    function send(region){
+      if(!sections.length)return dry;
+      const gain=context.createGain();gain.gain.value=region?0:1;dry.connect(gain);nodes.push(gain);
+      for(const r of region?[region]:sections){const fade=Math.min(.01,(r.end-r.start)/3),inside=region?1:0,outside=1-inside;
+        gain.gain.setValueAtTime(r.start===0?inside:outside,r.start);gain.gain.linearRampToValueAtTime(inside,r.start+fade);gain.gain.setValueAtTime(inside,r.end-fade);gain.gain.linearRampToValueAtTime(outside,r.end);
+      }return gain;
+    }
+    function addEffects(input,settings){
+      if(settings.reverb){
+        const convolver=context.createConvolver(),wet=context.createGain(),damping=context.createBiquadFilter();
+        convolver.normalize=false;convolver.buffer=reverbImpulse(context,settings);wet.gain.value=settings.reverb/100;
+        const space=reverbProfile(settings.reverbOptions).space;
+        damping.type='lowpass';damping.frequency.value=Math.min(({classic:5000,room:6000,hall:4000,plate:7000})[space]*2**((settings.reverbTone?.brightness??0)/50),context.sampleRate*.45);
+        input.connect(convolver);convolver.connect(damping);damping.connect(wet);wet.connect(sum);nodes.push(convolver,damping,wet);
+      }
+      const echo=settings.echo;
+      if(echo?.amount)for(let k=1;k<=echo.repeats;k++){
+        const delay=context.createDelay(8),gain=context.createGain();delay.delayTime.value=k*echo.timeMs/1000;gain.gain.value=echo.amount/100*(echo.feedback/100)**(k-1);
+        input.connect(delay);delay.connect(gain);nodes.push(delay,gain);
+        if(echo.pingPong){const pan=context.createStereoPanner();pan.pan.value=k%2?-.8:.8;gain.connect(pan);pan.connect(sum);nodes.push(pan);}else gain.connect(sum);
+      }
+    }
+    if(recipe.reverb||recipe.echo?.amount)addEffects(send(),recipe);
+    for(const r of sections)if(r.reverb||r.echo)addEffects(send(r),{...recipe,reverb:r.reverb,reverbOptions:{...reverbProfile(recipe.reverbOptions),decay:r.decay},echo:{...recipe.echo,amount:r.echo}});
+    output=sum;
   }
   return {output,disconnect(){source.disconnect();for(const node of nodes)node.disconnect();}};
 }
