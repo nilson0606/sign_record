@@ -1,3 +1,4 @@
+import {recordingSceneSuffix} from './recording-scenes.mjs';
 // Graded timbre effect on the singer bus: shelf + presence dip + high cut.
 // This softens bright/breathy texture; it does not isolate or remove breath sounds.
 const presets={off:{label:'關閉',maxDb:0},light:{label:'輕度',baseDb:2,maxDb:5,shelf:3500,presence:1,cutoff:12000},medium:{label:'中度',baseDb:5,maxDb:11,shelf:2800,presence:3,cutoff:7500},strong:{label:'強烈',baseDb:10,maxDb:18,shelf:2000,presence:6,cutoff:4500}};
@@ -13,6 +14,7 @@ export function recordingSofteningSuffix(meta) {
 // Derive labels from the saved recipe without changing the original song title.
 export function recordingEffectsSuffix(meta) {
   const parts=[],effects=meta.vocalEffects||{},volume=meta.postVolume||{};
+  const scene=recordingSceneSuffix(meta);if(scene)parts.push(scene);
   const changed=x=>Number.isFinite(x)&&x!==0;
   const signed=x=>(x>0?'+':'')+x;
   if(Number.isFinite(volume.voice)&&volume.voice!==100)parts.push(`人聲${volume.voice}%`);

@@ -1,5 +1,11 @@
 // Editing starting points, never effects applied during capture or archive migration.
 export const recordingSceneDefaultsVersion='hall-echo-v1';
+const sceneFilenameLabels={intimate:'貼近耳邊',acoustic:'木吉他',hall:'大廳一般流行',pop:'明亮流行',ballad:'大廳慢板抒情',sacred:'教堂',concert:'演唱會',dream:'夢幻',custom:'自訂'};
+export function recordingSceneSuffix(meta){
+  // Only explicitly saved new metadata opts in; old names are never inferred retroactively.
+  const saved=meta.postScene;
+  return saved?.version===1&&Object.hasOwn(sceneFilenameLabels,saved.id)?`情境_${sceneFilenameLabels[saved.id]}`:'';
+}
 const echo=(amount=0,timeMs=300,repeats=3,feedback=40,pingPong=false)=>({amount,timeMs,repeats,feedback,pingPong});
 const scene=(label,space,reverb,decay,preDelayMs,brightness,width,delay=echo())=>({label,effects:{reverb,reverbOptions:{space,decay,preDelayMs},reverbTone:{brightness,width},echo:delay}});
 export const recordingScenes={

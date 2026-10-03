@@ -129,6 +129,8 @@ try{
  await $('post-scene').selectOption('acoustic');assert.equal(await $('post-audition-position').textContent(),'');assert.equal(await $('post-echo-amount').inputValue(),'0');assert.equal(await $('post-echo-pingpong').inputValue(),'off');
  await $('post-scene').selectOption('hall');await page.locator('.post-scene-card').screenshot({path:'test-results/recording-scene-b.png'});
  const presetSaved=await remix();assert.equal(await page.evaluate(id=>fixtureRows.get(id).meta.vocalEffects.echo.amount,presetSaved),10);assert.equal(await $('post-scene').inputValue(),'hall');
+ assert.deepEqual(await page.evaluate(id=>fixtureRows.get(id).meta.postScene,presetSaved),{version:1,id:'hall'});assert.match(await $('post-recording').locator('option:checked').textContent(),/人聲後製_情境_大廳一般流行/);
+ assert.deepEqual(await page.evaluate(id=>fixtureRows.get(id).meta.postScene,sceneRecording),{version:1,id:'custom'});
  // Only new capture metadata enables the new starting point. Loading it must not write effects to the recording.
  await page.evaluate(id=>{const saved=fixtureRows.get(id),meta={...saved.meta,id:'new-capture',postDefaults:'hall-echo-v1'};delete meta.vocalEffects;fixtureRows.set(meta.id,{...saved,meta});fixturePost.refresh([...fixtureRows.values()].map(x=>x.meta));fixturePost.select(meta.id,{scroll:false});},presetSaved);
  assert.equal(await $('post-scene').inputValue(),'hall');assert.equal(await $('post-echo-amount').inputValue(),'10');await $('post-audition-a-edit').click();assert.equal(await $('post-scene').inputValue(),'hall');assert.equal(await $('post-echo-amount').inputValue(),'10');assert.equal(await page.evaluate(()=>fixtureRows.get('new-capture').meta.vocalEffects),undefined);

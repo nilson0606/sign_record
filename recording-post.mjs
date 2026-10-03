@@ -253,6 +253,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
       const result={id:crypto.randomUUID(),title:row.title,videoId:row.videoId,mode:row.mode,stems:row.stems,mime:'audio/wav',created:Date.now(),seconds:audio.duration,bytes:blob.size,complete:true,parentId:row.id,delayMs,appliedDelayMs:delayMs,vocalSoftening:{version:2,strength:softening.id}};
       result.postVolume=volume;
       result.vocalEffects=effects;
+      result.postScene={version:1,id:matchingRecordingScene(effects)||'custom'};
       result.postEdit=edit;
       result.rawBytes=rawBlob.size;result.rawMime=row.rawMime||rawBlob.type||row.mime;
       result.post=structuredClone(row.post);result.post.offsetMs=delayMs;
