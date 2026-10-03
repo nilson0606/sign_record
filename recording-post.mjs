@@ -1,5 +1,6 @@
 import { recordingTuningSuffix } from './recording-tune.mjs';
 import { createRecordingAudition } from './recording-audition.mjs';
+import { recordingScenes, initialRecordingEffects, matchingRecordingScene } from './recording-scenes.mjs';
 import { PITCH_DETECTOR_VERSION } from './audio.mjs';
 import { softeningProfile, recordingSofteningSuffix, recordingEffectsSuffix, vocalEffects, reverbProfile, reverbSpacePresets } from './recording-soften.mjs';
 import { scoringProfile } from './scoring.mjs';
@@ -45,6 +46,24 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     $('post-reverb-decay-value').textContent=$('post-reverb-decay').value+' 秒';
     $('post-reverb-predelay-value').textContent=$('post-reverb-predelay').value+' ms';
     for(const [id,unit] of [['reverb-brightness',''],['reverb-width','%'],['echo-amount','%'],['echo-time',' ms'],['echo-repeats',' 次'],['echo-feedback','%']])$('post-'+id+'-value').textContent=$('post-'+id).value+unit;
+    const spatial=readSpatialEffects(),key=matchingRecordingScene(spatial),r=spatial.reverbOptions,t=spatial.reverbTone,e=spatial.echo;
+    $('post-scene').value=key;
+    $('post-scene-status').textContent=`${key?recordingScenes[key].label:'自訂空間效果'} · 殘響 ${spatial.reverb}% · ${reverbSpacePresets[r.space].label} · 尾音 ${r.decay} 秒 · 預延遲 ${r.preDelayMs} ms · 明亮 ${t.brightness} · 寬度 ${t.width}% · 回聲 ${e.amount}%${e.amount?`／${e.timeMs} ms／${e.repeats} 次／每次保留 ${e.feedback}%／${e.pingPong?'左右交替':'中央'}`:''}。`;
+  }
+  function readSpatialEffects(){
+    return {reverb:Number($('post-reverb').value),reverbOptions:{space:$('post-reverb-space').value,decay:Number($('post-reverb-decay').value),preDelayMs:Number($('post-reverb-predelay').value)},reverbTone:{brightness:Number($('post-reverb-brightness').value),width:Number($('post-reverb-width').value)},echo:{amount:Number($('post-echo-amount').value),timeMs:Number($('post-echo-time').value),repeats:Number($('post-echo-repeats').value),feedback:Number($('post-echo-feedback').value),pingPong:$('post-echo-pingpong').value==='on'}};
+  }
+  function setSpatialEffects(recipe){
+    $('post-reverb').value=recipe.reverb;
+    const reverb=reverbProfile(recipe.reverbOptions);
+    $('post-reverb-space').value=reverb.space;$('post-reverb-decay').value=reverb.decay;$('post-reverb-predelay').value=reverb.preDelayMs;
+    $('post-reverb-brightness').value=recipe.reverbTone?.brightness??0;$('post-reverb-width').value=recipe.reverbTone?.width??100;
+    for(const [id,key,fallback] of [['amount','amount',0],['time','timeMs',300],['repeats','repeats',3],['feedback','feedback',40]])$('post-echo-'+id).value=recipe.echo?.[key]??fallback;
+    $('post-echo-pingpong').value=recipe.echo?.pingPong?'on':'off';
+    effectLabels();
+  }
+  for(const [key,scene] of Object.entries(recordingScenes)){
+    const option=document.createElement('option');option.value=key;option.textContent=scene.label;$('post-scene').append(option);
   }
   function addRegion(value){
     const row=document.createElement('div');row.className='post-region-row';
@@ -56,12 +75,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
   function setEffects(value){
     const recipe=vocalEffects(value);
     for(const band of ['low','mid','high'])$('post-eq-'+band).value=recipe.eq[band];
-    $('post-compression').value=recipe.compression;$('post-reverb').value=recipe.reverb;
-    const reverb=reverbProfile(recipe.reverbOptions);
-    $('post-reverb-space').value=reverb.space;$('post-reverb-decay').value=reverb.decay;$('post-reverb-predelay').value=reverb.preDelayMs;
-    $('post-reverb-brightness').value=recipe.reverbTone?.brightness??0;$('post-reverb-width').value=recipe.reverbTone?.width??100;
-    for(const [id,key,fallback] of [['amount','amount',0],['time','timeMs',300],['repeats','repeats',3],['feedback','feedback',40]])$('post-echo-'+id).value=recipe.echo?.[key]??fallback;
-    $('post-echo-pingpong').value=recipe.echo?.pingPong?'on':'off';
+    $('post-compression').value=recipe.compression;setSpatialEffects(recipe);
     $('post-effect-regions').replaceChildren();(recipe.effectRegions??[]).forEach(addEffectRegion);
     $('post-regions').replaceChildren();recipe.regions.forEach(addRegion);effectLabels();
   }
@@ -118,10 +132,8 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     $('rescore-status').textContent=selected?'已選取錄音，可調整設定後重新評分。':'請先保存一段演唱錄音。';
     $('post-reference-source').value='original';
     $('post-softening').value=selected?.vocalSoftening?.strength||'off';
-    // Both editing drafts start with the same gentle reverb preset.
-    // Saved recipes, including explicit 0%, retain their settings.
-    const defaultSpace=reverbSpacePresets.hall;
-    setEffects(selected?.vocalEffects??{reverb:20,reverbOptions:{space:'hall',decay:defaultSpace.decay,preDelayMs:defaultSpace.preDelayMs}});
+    // Both drafts agree; only newly captured recordings opt into the new default.
+    setEffects(initialRecordingEffects(selected));
     setEdit(selected?.postEdit);
     $('post-edit-info').textContent=selected?`原始錄音約 ${(selected.sourceSeconds??selected.seconds).toFixed(2)} 秒；目前成品 ${selected.seconds.toFixed(2)} 秒。剪輯秒數以套用延時後、尚未裁切的完整錄音為準。${selected.postEdit?.start?`目前播放器 0 秒對應原始錄音 ${selected.postEdit.start} 秒。`:''}`:'';
     const volume=recordingVolume(selected?.postVolume);
@@ -188,6 +200,12 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
   $('post-reverb-space').addEventListener('change',()=>{
     const preset=reverbSpacePresets[$('post-reverb-space').value];
     $('post-reverb-decay').value=preset.decay;$('post-reverb-predelay').value=preset.preDelayMs;effectLabels();
+  });
+  $('post-echo-pingpong').addEventListener('change',effectLabels);
+  $('post-scene').addEventListener('change',()=>{
+    const scene=recordingScenes[$('post-scene').value];if(!scene)return;
+    audition?.stop();setSpatialEffects(scene.effects);
+    $('post-audition-status').textContent=`已套用${$('post-ab-editor').dataset.slot.toUpperCase()} 組「${scene.label}」，按試聽聽取新效果；滿意後重新合成另存。`;
   });
   $('post-effects-reset').addEventListener('click',()=>setEffects());
   $('post-audition-quick').addEventListener('click',()=>{$('post-audition-panel').open=true;void audition?.playCurrent();$('post-audition-panel').scrollIntoView({block:'start'});});

@@ -5,6 +5,7 @@ import { createRecordingPost } from './recording-post.mjs';
 import { createRecordingMix, mixSettings } from './recording-mix.mjs';
 import { RecordingStore } from './recording-store.mjs';
 import { createPCMRecorders } from './recording-pcm.mjs';
+import { recordingSceneDefaultsVersion } from './recording-scenes.mjs';
 const $ = id => document.getElementById(id);
 export function createSingerRecorder(options) {
   const store = new RecordingStore({status:text=>{$('recording-storage-status').textContent=text;}});
@@ -115,6 +116,8 @@ export function createSingerRecorder(options) {
     catch (error) { mix.disconnect(); destination.disconnect(); throw error; }
     if(request!==operation||options.context()!==context){recorder.dispose();mix.disconnect();destination.disconnect();throw new Error('錄音準備已取消。');}
     const meta = { id: crypto.randomUUID(), title: reference.title, videoId: reference.videoId, mode, mime: recorder.mimeType, rawMime:rawRecorder.mimeType, appliedDelayMs:0, recordingDelayMs, created: Date.now(), seconds: 0, bytes: 0, complete: false, balance: mix.settings, stems, rawBytes:0, post:{version:1, reference:structuredClone(reference), scoring, offsetMs:recordingDelayMs, liveOffsetMs:Number($('offset').value), segments:[], samples:[]} };
+    // Only new recordings opt into the new editing defaults; saved audio stays dry.
+    meta.postDefaults=recordingSceneDefaultsVersion;
     meta.captureClock={version:1,source:'audio-worklet-pcm',sampleRate:context.sampleRate,input:direct?'native-worklet-v2':'browser-media-stream'};
     const a = { recorder, rawRecorder, rawCount:0, segment:null, context, mic, mix, destination, buffers, meta, chunks: [], queue: Promise.resolve(), count: 0, backing: [], error: null };
     active = a; controls();

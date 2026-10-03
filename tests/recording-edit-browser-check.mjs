@@ -112,5 +112,27 @@ try{
  await $('post-reverb-space').selectOption('church');await $('post-reverb-decay').fill('5');await $('post-reverb-predelay').fill('90');const sceneRecording=await remix();const sceneMeta=await page.evaluate(id=>fixtureRows.get(id).meta,sceneRecording);assert.deepEqual(sceneMeta.vocalEffects.reverbOptions,{space:'church',decay:5,preDelayMs:90});assert.match(await $('post-recording').locator('option:checked').textContent(),/教堂5s/);
  await $('post-reverb-space').selectOption('dream');assert.match(await $('post-audition-differences-body').textContent(),/教堂.*夢幻空間/);await $('post-audition-a-edit').click();assert.equal(await $('post-reverb-space').inputValue(),'church');assert.equal(await $('post-reverb-decay').inputValue(),'5');assert.equal(await $('post-reverb-space-help').textContent(),spacePresets.church.help);await $('post-audition-b-edit').click();assert.equal(await $('post-reverb-space').inputValue(),'dream');await $('post-audition-reset').click();assert.equal(await $('post-reverb-space').inputValue(),'church');
  await $('post-reverb-space').locator('..').screenshot({path:'test-results/recording-space-description.png'});
+ // Scene presets affect only this group's spatial controls, including when local edits are unfinished.
+ assert.equal(await $('post-scene').inputValue(),'');
+ await $('post-softening').selectOption('light');await $('post-eq-low').fill('3');await $('post-compression').selectOption('light');await $('post-voice-level').fill('85');await $('remix-delay').fill('200');
+ await $('post-edit-start').fill('0.2');await $('post-region-add').click();await page.locator('#post-regions [data-field=end]').fill('');
+ const localBefore=await phrase.locator('input').evaluateAll(xs=>xs.map(x=>x.value));
+ await $('post-scene').selectOption('hall');
+ assert.equal(await $('post-reverb').inputValue(),'20');assert.equal(await $('post-echo-amount').inputValue(),'10');assert.equal(await $('post-echo-time').inputValue(),'300');assert.equal(await $('post-echo-repeats').inputValue(),'3');assert.equal(await $('post-echo-feedback').inputValue(),'40');
+ assert.equal(await $('post-eq-low').inputValue(),'3');assert.equal(await $('post-compression').inputValue(),'light');assert.equal(await $('post-softening').inputValue(),'light');assert.equal(await $('post-voice-level').inputValue(),'85');assert.equal(await $('remix-delay').inputValue(),'200');assert.equal(await $('post-edit-start').inputValue(),'0.2');assert.equal(await page.locator('#post-regions [data-field=end]').inputValue(),'');assert.deepEqual(await phrase.locator('input').evaluateAll(xs=>xs.map(x=>x.value)),localBefore);
+ await page.locator('#post-regions').getByRole('button',{name:'移除區段'}).click();
+ await $('post-audition-a-edit').click();assert.equal(await $('post-reverb-space').inputValue(),'church');assert.equal(await $('post-echo-amount').inputValue(),'25');
+ await $('post-audition-b-edit').click();assert.equal(await $('post-scene').inputValue(),'hall');assert.equal(await $('post-echo-amount').inputValue(),'10');
+ await $('post-reverb-brightness').fill('5');assert.equal(await $('post-scene').inputValue(),'');assert.match(await $('post-scene-status').textContent(),/自訂/);
+ await $('post-scene').selectOption('dream');assert.equal(await $('post-echo-amount').inputValue(),'12');assert.equal(await $('post-echo-time').inputValue(),'600');assert.equal(await $('post-echo-pingpong').inputValue(),'on');
+ await $('post-audition-quick').click();await page.waitForFunction(()=>document.querySelector('#post-audition-position').textContent.startsWith('B'));
+ await $('post-scene').selectOption('acoustic');assert.equal(await $('post-audition-position').textContent(),'');assert.equal(await $('post-echo-amount').inputValue(),'0');assert.equal(await $('post-echo-pingpong').inputValue(),'off');
+ await $('post-scene').selectOption('hall');await page.locator('.post-scene-card').screenshot({path:'test-results/recording-scene-b.png'});
+ const presetSaved=await remix();assert.equal(await page.evaluate(id=>fixtureRows.get(id).meta.vocalEffects.echo.amount,presetSaved),10);assert.equal(await $('post-scene').inputValue(),'hall');
+ // Only new capture metadata enables the new starting point. Loading it must not write effects to the recording.
+ await page.evaluate(id=>{const saved=fixtureRows.get(id),meta={...saved.meta,id:'new-capture',postDefaults:'hall-echo-v1'};delete meta.vocalEffects;fixtureRows.set(meta.id,{...saved,meta});fixturePost.refresh([...fixtureRows.values()].map(x=>x.meta));fixturePost.select(meta.id,{scroll:false});},presetSaved);
+ assert.equal(await $('post-scene').inputValue(),'hall');assert.equal(await $('post-echo-amount').inputValue(),'10');await $('post-audition-a-edit').click();assert.equal(await $('post-scene').inputValue(),'hall');assert.equal(await $('post-echo-amount').inputValue(),'10');assert.equal(await page.evaluate(()=>fixtureRows.get('new-capture').meta.vocalEffects),undefined);
+ await $('post-scene').selectOption('sacred');await $('post-audition-reset').click();assert.equal(await $('post-scene').inputValue(),'hall');assert.equal(await $('post-echo-amount').inputValue(),'10');
+ await page.locator('.post-scene-card').screenshot({path:'test-results/recording-scene-a.png'});
  assert.deepEqual(errors,[]);console.log(JSON.stringify({saved:check.meta.postEdit,reverb:check.meta.vocalEffects.reverbOptions,solo,repeatIdentical:true,sourceRestored:true,mappedPlayhead:true,abRestore:true,spaceCount:12,sceneSaved:true,errors}));
 }finally{await browser?.close();server.kill();}
