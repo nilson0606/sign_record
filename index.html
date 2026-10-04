@@ -146,6 +146,47 @@
     </div>
     <p id="post-preview-help" class="help">「試聽」播放完整成品；「只聽人聲」播放歌唱者音軌，不加入配樂／和音，沿用這筆錄音已保存的音量、延時與柔化設定。更改後製設定後需先重新合成，才能試聽新效果。</p>
     <audio id="post-audio" controls hidden></audio>
+    <details id="soulx-panel" class="post-effects soulx-panel">
+      <summary><span class="post-effects-heading"><strong>SoulX 獨立實驗室</strong><span>歌聲／音色轉換 · 預設關閉 · 與 A／B 分開</span></span><span class="post-effects-toggle"><span class="when-closed">點此展開</span><span class="when-open">收合設定</span></span></summary>
+      <label class="soulx-enable"><input id="soulx-enable" type="checkbox"> 啟用 SoulX 實驗選項</label>
+      <p class="help">沿用原錄音旋律與時間位置，用參考歌聲探索不同音色。尚未保證逐字對齊；這裡只產生試聽副本，不覆蓋錄音或套用 A／B 情緒、殘響。速度固定，自動移調關閉。</p>
+      <p id="soulx-status" class="status" role="status">SoulX 已關閉；展開不會載入模型。</p>
+      <div id="soulx-content" hidden>
+        <p id="soulx-source-info" class="help">請在上方選擇保留原始人聲的錄音。</p>
+        <fieldset id="soulx-fields" disabled>
+          <legend>獨立轉換設定</legend>
+          <div class="soulx-grid">
+            <div><label for="soulx-start">轉換開始（秒）</label><input id="soulx-start" type="number" min="0" step="0.01" value="0"></div>
+            <div><label for="soulx-end">轉換結束（秒）</label><input id="soulx-end" type="number" min="1" step="0.01" value="20"></div>
+            <div class="soulx-actions"><button id="soulx-now" type="button" class="secondary">從目前位置取 20 秒</button><button id="soulx-full" type="button" class="secondary">整首（最多 10 分鐘）</button></div>
+          </div>
+          <p class="help">以原錄音套用已保存校正後、尚未剪輯的時間為準；先試 10～20 秒較容易比較。變更設定後需重新產生。</p>
+          <div class="soulx-grid">
+            <div><label for="soulx-reference">參考歌聲</label><select id="soulx-reference"><option value="self">自己的歌聲（預設）</option><option value="zh">官方中文示範</option><option value="en">官方英文示範</option><option value="custom">自選參考歌聲檔</option></select><p class="help">主要決定參考音色與唱法特徵；選別人的聲音可能更像對方，不是單純調情緒。</p><label id="soulx-upload-label" hidden>參考音檔<input id="soulx-upload" type="file" accept="audio/*"></label></div>
+            <div><label for="soulx-reference-start">參考起點（秒）</label><input id="soulx-reference-start" type="number" min="0" max="1800" step="0.1" placeholder="留白：自動選有聲片段"><p class="help">自己的／自選歌聲留白時，自動挑選較有聲的片段；官方示範留白由 0 秒開始。</p></div>
+            <div><label for="soulx-reference-seconds">參考長度 <output id="soulx-reference-seconds-value">8 秒</output></label><input id="soulx-reference-seconds" type="range" min="3" max="15" step="1" value="8"><p class="help">3～15 秒；參考宜為清楚乾人聲，避免混入配樂。長度不能超出參考檔。</p></div>
+          </div>
+          <div class="soulx-grid">
+            <div><label for="soulx-steps">生成步數 <output id="soulx-steps-value">32 步</output></label><input id="soulx-steps" type="range" min="8" max="64" step="1" value="32"><p class="help">8～64 步，預設 32。更多步通常更慢，不保證一定更好聽；可試 16／32／64。</p></div>
+            <div><label for="soulx-guidance">引導強度 CFG <output id="soulx-guidance-value">3</output></label><input id="soulx-guidance" type="range" min="0" max="5" step="0.1" value="3"><p class="help">預設 3。改變條件引導程度，並非情緒濃度或相似度百分比；過高可能不自然。可試 1／3／5。</p></div>
+            <div><label for="soulx-seed">隨機種子</label><input id="soulx-seed" type="number" min="0" max="2147483647" step="1" value="20261004"><button id="soulx-random" type="button" class="secondary">換一個種子</button><p class="help">相同種子方便比較其他參數；換數字探索生成差異，不是效果強度。</p></div>
+          </div>
+          <div class="button-row"><button id="soulx-generate" type="button">產生 SoulX 試聽</button><button id="soulx-reset" type="button" class="secondary">設定回預設</button></div>
+        </fieldset>
+        <button id="soulx-cancel" type="button" class="secondary" disabled>取消生成</button>
+        <section id="soulx-result" hidden aria-label="SoulX 獨立試聽結果">
+          <p id="soulx-result-info" class="help"></p>
+          <div class="soulx-grid">
+            <div><label for="soulx-blend">AI 混合比例 <output id="soulx-blend-value">100%</output></label><input id="soulx-blend" type="range" min="0" max="100" step="5" value="100"><p class="help">0% 原聲，100% AI；中間值混合兩者，可能有疊音感。這是試聽混音，不需重新生成。</p></div>
+            <div><label><input id="soulx-backing" type="checkbox" checked> 加入同一份配樂</label><label><input id="soulx-match" type="checkbox" checked> 人聲音量匹配</label><label><input id="soulx-loop" type="checkbox" checked> 循環試聽</label><p class="help">配樂使用錄音原版本與原時間位置，不加入 A／B 後製。</p></div>
+            <div class="soulx-actions"><button id="soulx-listen-original" type="button" class="secondary" aria-pressed="false">▶ 原聲</button><button id="soulx-listen-ai" type="button" aria-pressed="false">▶ SoulX</button></div>
+          </div>
+          <audio id="soulx-audio" controls></audio>
+          <p id="soulx-listen-status" class="help" role="status"></p>
+          <button id="soulx-download" type="button" class="secondary">下載 SoulX 試聽 WAV</button>
+        </section>
+      </div>
+    </details>
     <details id="post-audition-panel" class="post-effects"><summary><span class="post-effects-heading"><strong>片段試聽／A、B 比較</strong><span>同一句循環播放 · 先聽效果再另存</span></span></summary>
       <div class="audition-transport" role="group" aria-label="切換比較版本"><button id="post-audition-a-play" type="button" aria-pressed="false" disabled>▶ 試聽 A</button><button id="post-audition-b-play" type="button" aria-pressed="false" disabled>▶ 試聽 B</button><button id="post-audition-stop" type="button" class="secondary" disabled>停止比較</button></div>
       <output id="post-audition-position"></output><p id="post-audition-status" class="status" role="status">選取錄音後即可比較。</p>

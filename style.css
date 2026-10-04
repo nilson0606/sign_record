@@ -158,3 +158,21 @@ header{gap:18px;flex-wrap:wrap}
 #post-ab-editor input,#post-ab-editor select,#post-ab-editor button{scroll-margin-top:190px}
 
 .audition-differences{margin:20px 0 26px;padding:18px 20px;border:1px solid var(--line);border-radius:12px;background:var(--input-bg)}.difference-heading{display:flex;align-items:baseline;gap:18px;justify-content:space-between;margin-bottom:12px}.post-effects .difference-heading h3{margin:0;font-size:17px;color:var(--text)}.difference-heading [role=status]{font-size:13px;color:var(--soft)}.audition-differences table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:14px}.audition-differences table[hidden]{display:none}.audition-differences th,.audition-differences td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.audition-differences th:first-child{width:46%;font-weight:500}.audition-differences thead th{font-weight:700}.audition-differences .audition-slot-a,.audition-differences .audition-slot-b{color:var(--slot-color);background:var(--slot-tint);font-weight:650}.audition-differences .help{margin-bottom:0}
+:root { --soulx-accent: #81ded1; }
+.soulx-panel { margin: 1.2rem 0; border-color: var(--soulx-accent) !important; background: #172d2c; }
+.soulx-panel > summary strong, .soulx-panel output { color: var(--soulx-accent); }
+.soulx-panel .soulx-enable { display: flex; align-items: center; gap: .6rem; margin: 1.2rem 0; font-weight: 700; }
+.soulx-panel input[type=checkbox] { width: auto; accent-color: var(--soulx-accent); }
+.soulx-panel input[type=range] { accent-color: var(--soulx-accent); }
+.soulx-panel fieldset { margin: 1rem 0; min-width: 0; }
+.soulx-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 1.2rem; margin: 1rem 0; }
+.soulx-grid label { display: block; margin: .5rem 0; }
+.soulx-actions { display: flex; flex-direction: column; justify-content: center; gap: .6rem; }
+.soulx-panel button:not(.secondary) { background: var(--soulx-accent); color: #102726; }
+.soulx-panel button[aria-pressed=true] { outline: 3px solid var(--soulx-accent); outline-offset: 2px; }
+.soulx-panel [hidden] { display: none !important; }
+.soulx-panel audio { width: 100%; margin: .8rem 0; }
+.soulx-panel { font-size: 14px; }
+.soulx-panel > .soulx-enable, .soulx-panel > .help, .soulx-panel > .status { margin-left: 20px; margin-right: 20px; }
+.soulx-panel #soulx-content { padding: 0 20px 20px; }
+.soulx-panel .help { font-size: 12px; line-height: 1.75; }

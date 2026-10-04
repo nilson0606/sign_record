@@ -1,4 +1,5 @@
 import { recordingTuningSuffix } from './recording-tune.mjs';
+import { createSoulx } from './soulx-client.mjs';
 import { createRecordingAudition } from './recording-audition.mjs';
 import { recordingScenes, initialRecordingEffects, matchingRecordingScene, recordingEmotions, matchingRecordingEmotion } from './recording-scenes.mjs';
 import { PITCH_DETECTOR_VERSION } from './audio.mjs';
@@ -36,7 +37,7 @@ async function recordedAnalysis(blob, progress) {
   });
 }
 export function createRecordingPost({store,stop,pause,download,onDelete,reference=()=>null}) {
-  let rows=[],selected=null,busy=false,url=null,statusTarget='post-status',audition=null,previewSources=null;
+  let rows=[],selected=null,busy=false,url=null,statusTarget='post-status',audition=null,previewSources=null,soulx=null;
   const status=text=>{$(statusTarget).textContent=text;};
   function clearAudio(){audition?.stop();const a=$('post-audio');a.pause();a.removeAttribute('src');a.load();a.hidden=true;if(url)URL.revokeObjectURL(url);url=null;}
   function effectLabels(){
@@ -114,6 +115,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     return `${(ref.pitchMethod||'yin').toUpperCase()} · ${({demucs:'Demucs','bs-roformer':'BS-RoFormer','mel-roformer':'Mel-Band RoFormer'})[ref.separationModel]||'Demucs'} · ${ref.separationMethod==='residual'?'二次分離＋相減':'單次分離'} · ${ref.vocalMode==='lead'?'主唱':'人聲'} · ${Math.round(ref.duration??ref.frames.length*ref.step)} 秒`;
   }
   function controls(){
+    soulx?.sync(selected,busy);
     audition?.controls(busy);
     const editable=!!(selected?.complete&&selected.rawBytes&&selected.post?.segments?.length);
     $('post-diagnostic').disabled=busy||!editable;
@@ -160,7 +162,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
   function showScore(){const r=selected?.postResult;$('post-score').textContent=r?`${r.source==='decoded-voice-v1'?'音檔重評':'舊版即時資料重評'} · ${r.referenceSource==='current'?'改用已載入基準':'錄音當時基準'} ${(r.reference?.pitchMethod||selected.post?.reference?.pitchMethod||'yin').toUpperCase()} · ${scoringProfile(r.scoring?.difficulty??selected.post?.scoring?.difficulty).label} · 校正 ${r.delayMs} ms · 總分 ${r.score??'—'} · 音準 ${r.pitch} · 進拍 ${r.rhythm} · 完整度 ${r.coverage} · 可計分旋律 ${r.referenceSeconds} 秒${r.baseline ? ` · 同音檔 0 ms 進拍 ${r.baseline.rhythm}` : ''}`:'';}
   function refresh(value){rows=value;const old=$('post-recording').value;const options=rows.map(row=>{const o=document.createElement('option');o.value=row.id;o.textContent=`${row.title}${recordingEffectsSuffix(row)}${recordingSofteningSuffix(row)}${recordingTuningSuffix(row)}${recordingDelaySuffix(row)?" "+recordingDelaySuffix(row):""} · ${new Date(row.created).toLocaleString()}`;return o;});$('post-recording').replaceChildren(...options);$('score-recording').replaceChildren(...options.map(o=>o.cloneNode(true)));if(rows.some(r=>r.id===old))$('post-recording').value=old;if(selected?.id===old&&rows.some(r=>r.id===old)){selected=rows.find(r=>r.id===old);$('score-recording').value=old;controls();}else if(!busy)choose();}
   function select(id,{scroll=true}={}){if(!rows.some(row=>row.id===id))return;$('post-recording').value=id;choose();if(scroll)$('recording-post').scrollIntoView({block:'start'});}
-  async function run(action,target='post-status'){if(busy||!selected)return;statusTarget=target;busy=true;controls();try{const row=selected;await stop();pause();if(row)await action(row);}catch(error){status(error.message);}finally{busy=false;controls();statusTarget='post-status';}}
+  async function run(action,target='post-status'){if(busy||!selected)return;soulx?.pause();statusTarget=target;busy=true;controls();try{const row=selected;await stop();pause();if(row)await action(row);}catch(error){status(error.message);}finally{busy=false;controls();statusTarget='post-status';}}
   $('selected-recording-preview').addEventListener('click',()=>run(async row=>{
     clearAudio();url=URL.createObjectURL(await store.blob(row));
     $('post-audio').src=url;$('post-audio').hidden=false;await $('post-audio').play();
@@ -304,7 +306,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     let savedPath='',saveError='';try{savedPath=(await store.saveMp3(row,mp3)).path;}catch(error){saveError=error.message;}
     const href=URL.createObjectURL(mp3),a=document.createElement('a');a.href=href;a.download=row.title.replace(/[\\/:*?"<>|]/g,'_').slice(0,100)+recordingEffectsSuffix(row)+recordingSofteningSuffix(row)+recordingTuningSuffix(row)+recordingDelaySuffix(row)+'.mp3';a.click();setTimeout(()=>URL.revokeObjectURL(href),60000);status(savedPath?'MP3 已轉換並開始下載，同時保存至 '+savedPath+'。':'MP3 已轉換並開始下載，但尚未存入錄音目錄：'+saveError);
   }));
-  audition=createRecordingAudition({run,getPosition:originalPlayhead,beforePlay:()=>{$('post-audio').pause();pause();},
+  audition=createRecordingAudition({run,getPosition:originalPlayhead,beforePlay:()=>{soulx?.pause();$('post-audio').pause();pause();},
     onEditor:name=>{const panel=$('post-ab-editor'),label=name.toUpperCase();panel.dataset.slot=name;panel.className='audition-slot-'+name;$('post-ab-editor-heading').textContent=`正在調整 ${label} 組`;$('post-audition-quick').textContent=`片段試聽目前 ${label} 設定`;$('post-remix').textContent=`重新合成 ${label}（音量／延時／音色／剪輯）`;},
     read:()=>{const delayMs=Number($('remix-delay').value);delaySeconds(delayMs);return {delayMs,softening:$('post-softening').value,volume:recordingVolume({voice:Number($('post-voice-level').value),backing:Number($('post-backing-level').value)}),effects:readEffects()};},
     apply:s=>{$('post-softening').value=s.softening;setEffects(s.effects);$('remix-delay').value=s.delayMs;$('post-delay').value=s.delayMs;$('post-voice-level').value=s.volume.voice;$('post-backing-level').value=s.volume.backing;volumeLabels();},
@@ -320,6 +322,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
       return remixRecording(previewSources.raw,solo?[]:previewSources.tracks??[],row,settings.delayMs,{...settings,edit:{...interval,fadeIn:fade,fadeOut:fade}});
     }
   });
+  soulx=createSoulx({store,getSelected:()=>selected,getPosition:originalPlayhead,beforePlay:()=>{audition?.stop();$('post-audio').pause();pause();}});
   window.addEventListener('pagehide',clearAudio);
   return {refresh,select,controls,clearAudio};
 }
