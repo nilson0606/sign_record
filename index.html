@@ -193,7 +193,7 @@
           <p id="soulx-result-info" class="help"></p>
           <div class="soulx-grid">
             <div><label for="soulx-blend">AI 混合比例 <output id="soulx-blend-value">100%</output></label><input id="soulx-blend" type="range" min="0" max="100" step="5" value="100"><p class="help">0% 原聲，100% AI；中間值混合兩者，可能有疊音感。這是試聽混音，不需重新生成。</p></div>
-            <div><label><input id="soulx-backing" type="checkbox" checked> 加入同一份配樂</label><label><input id="soulx-match" type="checkbox" checked> 人聲音量匹配</label><label><input id="soulx-loop" type="checkbox" checked> 循環試聽</label><p class="help">配樂使用錄音原版本與原時間位置，不加入 A／B 後製。</p></div>
+<div><label><input id="soulx-backing" type="checkbox" checked> 加入配樂</label><label for="soulx-backing-choice">搭配的配樂</label><select id="soulx-backing-choice"><option value="">錄音原配樂</option></select><button id="soulx-backing-refresh" class="secondary" type="button">重新整理已保存配樂</button><label><input id="soulx-match" type="checkbox" checked> 人聲音量匹配</label><label><input id="soulx-loop" type="checkbox" checked> 循環試聽</label><p class="help">可選同一首歌的已保存新配樂，不必重新生成歌聲。片段配樂需涵蓋本次歌聲範圍。</p></div>
             <div class="soulx-actions"><button id="soulx-listen-original" type="button" class="secondary" aria-pressed="false">▶ 原聲</button><button id="soulx-listen-ai" type="button" aria-pressed="false">▶ SoulX</button></div>
           </div>
           <audio id="soulx-audio" controls></audio>
@@ -203,6 +203,38 @@
         </section>
       </div>
     </details>
+    <details id="arrangement-panel" class="post-effects arrangement-panel">
+      <summary><span class="post-effects-heading"><strong>配樂編曲實驗室</strong><span>推薦組合／自選樂器 · 整首生成 · 原唱搭配試聽</span></span></summary>
+      <label><input id="arrangement-enable" type="checkbox"> 啟用本機配樂編曲（預設關閉）</label>
+      <p id="arrangement-status" role="status">先載入歌曲庫中的歌曲，再啟用。</p>
+      <div id="arrangement-content" hidden>
+        <p id="arrangement-source"></p>
+        <p class="help">以原伴奏重新編曲，原唱保持原音與時間位置。AI 不保證每個拍點完全一致，也不保證每種指定樂器都出現；請比較整首前、中、後段再保存。</p>
+        <fieldset id="arrangement-fields" disabled><legend>編曲設定</legend>
+          <div class="soulx-grid"><label>推薦組合<select id="arrangement-preset"></select></label><label>曲風<select id="arrangement-style"></select></label><label>氣氛<select id="arrangement-mood"></select></label></div>
+          <p>自選樂器（1～8 種）</p><div id="arrangement-instruments" class="arrangement-instruments"></div>
+          <div class="soulx-grid">
+            <label>豐富程度<select id="arrangement-density"><option value="light">簡潔，留給歌聲空間</option><option value="balanced">適中</option><option value="rich">豐富多層</option></select></label>
+            <label>原伴奏參考強度 <output id="arrangement-strength-value">80%</output><input id="arrangement-strength" type="range" min="0.3" max="1" step="0.05" value="0.8"><span class="help">越高越依照原伴奏；不是節拍對齊的保證。</span></label>
+            <label>隨機種子<input id="arrangement-seed" type="number" min="0" max="2147483647" value="20261004"><button id="arrangement-random" type="button" class="secondary">換一個種子</button></label>
+            <label>開始（歌曲秒數）<input id="arrangement-start" type="number" min="0" step="0.01" value="0"></label>
+            <label>結束（歌曲秒數）<input id="arrangement-end" type="number" min="1" step="0.01" value="30"></label>
+            <div class="arrangement-stack"><button id="arrangement-full" type="button" class="secondary">整首（最多 10 分鐘）</button><button id="arrangement-clip" type="button" class="secondary">從試聽位置取 30 秒</button></div>
+          </div><button id="arrangement-generate" type="button">產生新配樂</button>
+        </fieldset>
+        <div id="arrangement-progress" hidden><p id="arrangement-progress-label"></p><progress id="arrangement-progress-bar" max="100"></progress><span id="arrangement-elapsed"></span></div>
+        <button id="arrangement-cancel" type="button" class="secondary" disabled>取消生成</button>
+        <section id="arrangement-result" hidden>
+          <p id="arrangement-result-info"></p>
+          <div class="soulx-grid"><label>試聽內容<select id="arrangement-listen-mode"><option value="mix">原唱＋配樂</option><option value="solo">只聽配樂</option></select></label><label><input id="arrangement-match" type="checkbox" checked> 新舊配樂音量匹配</label><label><input id="arrangement-loop" type="checkbox"> 循環試聽</label></div>
+          <div class="arrangement-switch"><button id="arrangement-listen-original" type="button" class="secondary" aria-pressed="false">▶ 原配樂</button><button id="arrangement-listen-new" type="button" class="secondary" aria-pressed="false">▶ 新配樂</button></div>
+          <audio id="arrangement-audio" controls preload="metadata"></audio><p id="arrangement-listen-status" role="status">同位置切換比較。</p>
+          <div class="arrangement-switch"><button id="arrangement-save" type="button">保存配樂到本機配樂庫</button><button id="arrangement-download" type="button" class="secondary">下載新配樂試聽 WAV</button></div>
+        </section>
+        <fieldset><legend>已保存配樂</legend><label>目前歌曲的配樂<select id="arrangement-library"></select></label><div class="arrangement-switch"><button id="arrangement-refresh" type="button" class="secondary">重新整理</button><button id="arrangement-load" type="button" class="secondary">載入並試聽</button></div><p id="arrangement-library-path" class="help">保存後可到 SoulX「搭配的配樂」選用，與歌聲一起另存錄音。</p></fieldset>
+      </div>
+    </details>
+
     <details id="post-audition-panel" class="post-effects"><summary><span class="post-effects-heading"><strong>片段試聽／A、B 比較</strong><span>同一句循環播放 · 先聽效果再另存</span></span></summary>
       <div class="audition-transport" role="group" aria-label="切換比較版本"><button id="post-audition-a-play" type="button" aria-pressed="false" disabled>▶ 試聽 A</button><button id="post-audition-b-play" type="button" aria-pressed="false" disabled>▶ 試聽 B</button><button id="post-audition-stop" type="button" class="secondary" disabled>停止比較</button></div>
       <output id="post-audition-position"></output><p id="post-audition-status" class="status" role="status">選取錄音後即可比較。</p>

@@ -1,3 +1,4 @@
+import {arrangementCovers,recordingBackingRoute} from './arrangement-settings.mjs';
 import {wavBlob} from './recording-process.mjs';
 import {SOULX_DEFAULTS,SOULX_REFERENCES,soulxSettings,soulxInterval,soulxRangeLabel,soulxSavedMetadata,soulxOriginalReference,soulxSongSource,soulxPitchLabel} from './soulx-settings.mjs';
 const BASE='http://127.0.0.1:4274';
@@ -25,6 +26,7 @@ function automaticReference(buffer,seconds){
   return best;
 }
 export function createSoulx({store,getSelected,getPosition,getReference=()=>null,beforePlay,onSaved=async()=>{}}){
+  let savedBackings=[];
   let selectedId=null,externalBusy=false,busy=false,saving=false,revision=0,active=null,result=null,urls=[],mixes=null,rendering=0,side='ai';
   const say=text=>{$('status').textContent=text;};
   let progressTimer=null,progressStarted=0;
@@ -59,7 +61,7 @@ export function createSoulx({store,getSelected,getPosition,getReference=()=>null
     for(const id of ['listen-original','listen-ai','download','save'])$(id).disabled=!result||busy||saving||externalBusy;
     $('save').disabled||=!!result&&result.draft!==draft();
     $('enable').disabled=saving;
-    for(const id of ['blend','match','loop'])$(id).disabled=saving;
+    for(const id of ['blend','match','loop','backing-choice','backing-refresh'])$(id).disabled=saving;
     $('backing').disabled=saving||!result||result.row.mode!=='mix';
   }
   function labels(){for(const [id,unit] of [['steps',' 步'],['guidance',''],['reference-seconds',' 秒'],['blend','%']])$(id+'-value').textContent=$(id).value+unit;$('upload-label').hidden=$('reference').value!=='custom';
@@ -71,7 +73,7 @@ export function createSoulx({store,getSelected,getPosition,getReference=()=>null
   async function cancel(){revision++;player.pause();if(busy)showProgress('cancelled','已取消轉換；原始音檔保留。');else{stopProgress();$('progress').hidden=true;}if(active)try{await request('/soulx/jobs/'+active,{method:'DELETE'});}catch{}say(enabled()?'已取消 SoulX；原始錄音保留。':'SoulX 已關閉。');}
   $('enable').addEventListener('change',async()=>{
     controls();if(!enabled()){void cancel();return;}
-    const rev=revision;say('檢查本機 SoulX 環境…');
+    void refreshBackings();const rev=revision;say('檢查本機 SoulX 環境…');
     try{const state=await(await request('/soulx')).json();if(enabled()&&revision===rev)say(state.installed?'SoulX 已就緒。先選參考與範圍，再按「產生 SoulX 試聽」。':'SoulX 尚未安裝完成。');}catch(e){if(enabled()&&revision===rev)say(e.message);}
   });
   $('panel').addEventListener('toggle',()=>{if(!$('panel').open)player.pause();});
@@ -153,11 +155,14 @@ export function createSoulx({store,getSelected,getPosition,getReference=()=>null
   async function buildMixes(){
     if(!result)throw Error('請先產生 SoulX。');const snapshot=result,rev=revision,pass=++rendering;
     const useBacking=$('backing').checked&&snapshot.row.mode==='mix',match=$('match').checked,blend=Number($('blend').value)/100;
-    const key=JSON.stringify([useBacking,match,blend]);if(mixes?.key===key)return mixes;
+    const chosen=$('backing-choice').value,custom=chosen?savedBackings.find(m=>m.id===chosen):null;
+    if(useBacking&&chosen&&(!custom||!arrangementCovers(custom,snapshot.row,snapshot.interval)))throw Error('所選配樂未涵蓋這段歌聲，請選整首或範圍相符的配樂。');
+    const arrangement=useBacking?(custom??snapshot.row.arrangement??null):null;
+    const key=JSON.stringify([useBacking,match,blend,arrangement?.id]);if(mixes?.key===key)return mixes;
     $('listen-status').textContent='準備試聽音訊…';
-    if(useBacking&&!snapshot.tracks){
+    if(useBacking&&(!snapshot.tracks||snapshot.tracksKey!==(arrangement?.id??'original'))){
       const context=new AudioContext({sampleRate:24000,sinkId:{type:'none'}});
-      try{const tracks=[];for(const stem of snapshot.row.stems??[]){const blob=await(await request(`/library/${snapshot.row.post.reference.cacheId}/${stem}`)).blob();tracks.push(await context.decodeAudioData(await blob.arrayBuffer()));}snapshot.tracks=tracks;}finally{await context.close();}
+      try{const tracks=[],routes=arrangement?[`/arrangements/library/${arrangement.id}/audio`]:(snapshot.row.stems??[]).map(stem=>recordingBackingRoute(snapshot.row,stem));for(const route of routes){const blob=await(await request(route)).blob();tracks.push(await context.decodeAudioData(await blob.arrayBuffer()));}snapshot.tracks=tracks;snapshot.tracksKey=arrangement?.id??'original';}finally{await context.close();}
     }
     const gain=match?Math.min(4,rms(snapshot.original)/Math.max(rms(snapshot.converted),.00001)):1;
     async function render(ai){
@@ -180,7 +185,7 @@ export function createSoulx({store,getSelected,getPosition,getReference=()=>null
     for(let i=0;i<out.length;i++)out[i]=original[i]*(1-blend)+converted[i]*blend*gain;
     // Preserve the blended dry vocal without PCM clipping; fold its scale into the saved bus gain.
     let voicePeak=1;for(const x of out)voicePeak=Math.max(voicePeak,Math.abs(x));if(voicePeak>1)for(let i=0;i<out.length;i++)out[i]/=voicePeak;
-    mixes={key,blobs,urls,voice:wavBlob(voice),voiceScale:voicePeak,useBacking,match,blend:Math.round(blend*100),commonGain};$('listen-status').textContent=`${useBacking?'同一份配樂':'只聽人聲'} · AI ${Math.round(blend*100)}%${match?' · 音量匹配':''}；切換保留目前播放位置。`;return mixes;
+    mixes={key,blobs,urls,voice:wavBlob(voice),voiceScale:voicePeak,useBacking,match,blend:Math.round(blend*100),commonGain,arrangement};$('listen-status').textContent=`${useBacking?(arrangement?'已保存的新配樂':'同一份配樂'):'只聽人聲'} · AI ${Math.round(blend*100)}%${match?' · 音量匹配':''}；切換保留目前播放位置。`;return mixes;
   }
   async function play(next){
     if(!result)return;const position=player.currentTime||0;side=next;beforePlay();
@@ -189,7 +194,7 @@ export function createSoulx({store,getSelected,getPosition,getReference=()=>null
     }catch(e){$('listen-status').textContent=e.message;}
   }
   $('listen-original').addEventListener('click',()=>void play('original'));$('listen-ai').addEventListener('click',()=>void play('ai'));
-  for(const id of ['blend','backing','match'])$(id).addEventListener('input',()=>{labels();mixes=null;rendering++;player.pause();$('listen-status').textContent='試聽混音已改，按「原聲／SoulX」聽新效果；不需重新生成。';});
+  for(const id of ['blend','backing','match','backing-choice'])$(id).addEventListener('input',()=>{labels();mixes=null;rendering++;player.pause();$('listen-status').textContent='試聽混音已改，按「原聲／SoulX」聽新效果；不需重新生成。';});
   $('loop').addEventListener('change',()=>{player.loop=$('loop').checked;});
   $('download').addEventListener('click',async()=>{
     try{const mix=await buildMixes(),s=result.report.settings,a=document.createElement('a'),pitch=s.pitchShift??0;a.href=mix.urls[1];a.download=`${result.row.title}_SoulX_${SOULX_REFERENCES[s.reference]}_${s.steps}步_CFG${s.guidance}_${result.interval.start}-${result.interval.end}秒${pitch?`_移調${pitch>0?'+':''}${pitch}半音`:''}_AI${$('blend').value}%_試聽.wav`.replace(/[\\/:*?"<>|]/g,'_');a.click();}catch(e){$('listen-status').textContent=e.message;}
@@ -210,10 +215,16 @@ export function createSoulx({store,getSelected,getPosition,getReference=()=>null
   window.addEventListener('pagehide',()=>{void cancel();clear();});
   function syncSource(){
     const row=source();
-    if((row?.id??null)!==selectedId){selectedId=row?.id??null;void cancel();clear();$('start').value=0;$('end').value=Math.min(20,row?.sourceSeconds??row?.seconds??20);}
+    if((row?.id??null)!==selectedId){selectedId=row?.id??null;void cancel();clear();$('backing-choice').replaceChildren(new Option('錄音原配樂',''));savedBackings=[];if(enabled())void refreshBackings();$('start').value=0;$('end').value=Math.min(20,row?.sourceSeconds??row?.seconds??20);}
     $('source-info').textContent=row?`待轉換：${row.soulxSource==='original'?'原曲原唱':'我的錄音'} · ${row.title} · ${Number(row.sourceSeconds??row.seconds).toFixed(2)} 秒 · 校正 ${row.appliedDelayMs??row.recordingDelayMs??row.post?.offsetMs??0} ms`:$('source').value==='original'?'請先從歌曲庫載入含分離音軌的歌曲，不需要先錄音。':'請在上方選擇保留原始人聲的錄音。';
     $('now').textContent=row?.soulxSource==='original'?'從 SoulX 試聽位置取 20 秒':'從目前位置取 20 秒';rangeLabel();controls();
   }
+  async function refreshBackings(){
+    const cacheId=source()?.post?.reference?.cacheId;
+    try{const data=await(await request('/arrangements/library')).json();if(cacheId!==source()?.post?.reference?.cacheId)return;const previous=$('backing-choice').value;savedBackings=data.records.filter(m=>m.cacheId===cacheId);$('backing-choice').replaceChildren(new Option('錄音原配樂',''));for(const m of savedBackings)$('backing-choice').add(new Option(m.title,m.id));if(savedBackings.some(m=>m.id===previous))$('backing-choice').value=previous;else if(previous){mixes=null;rendering++;player.pause();}}
+    catch{/* Original accompaniment remains available on older helpers. */}
+  }
+  $('backing-refresh').addEventListener('click',()=>void refreshBackings());window.addEventListener('arrangement-saved',()=>void refreshBackings());
   reset();syncSource();
   return {pause:()=>player.pause(),sync(row,locked){externalBusy=locked;syncSource();}};
 }

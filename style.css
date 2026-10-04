@@ -166,6 +166,15 @@ header{gap:18px;flex-wrap:wrap}
 .soulx-panel input[type=range] { accent-color: var(--soulx-accent); }
 .soulx-panel fieldset { margin: 1rem 0; min-width: 0; }
 .soulx-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 1.2rem; margin: 1rem 0; }
+.arrangement-panel{margin:1.2rem 0;background:#233022;border-color:#b7d991!important;font-size:14px;color:#e4ecd8}
+.arrangement-panel>label,.arrangement-panel>p{margin:20px}.arrangement-panel #arrangement-content{padding:0 20px 20px}
+.arrangement-panel>summary strong,.arrangement-panel output{color:#c5e6a1}.arrangement-panel .help{font-size:12px;line-height:1.8}
+.arrangement-panel input[type=checkbox]{width:auto;accent-color:#b7d991}.arrangement-panel input[type=range]{accent-color:#b7d991}
+.arrangement-panel fieldset{margin:20px 0;min-width:0}.arrangement-panel [hidden]{display:none!important}
+.arrangement-instruments{display:flex;flex-wrap:wrap;gap:12px 24px}.arrangement-instruments label{display:flex;align-items:center;gap:8px}
+.arrangement-switch{display:flex;gap:12px;margin:16px 0}.arrangement-switch button{flex:1}.arrangement-stack{display:grid;gap:10px;align-content:center}
+.arrangement-panel audio,.arrangement-panel progress{width:100%;margin:12px 0}.arrangement-panel button:not(.secondary){background:#b7d991;color:#1c2d14}
+.arrangement-panel button[aria-pressed=true]{background:#b7d991;color:#1c2d14;outline:2px solid #e2ffc2;outline-offset:2px}
 .soulx-grid label { display: block; margin: .5rem 0; }
 .soulx-actions { display: flex; flex-direction: column; justify-content: center; gap: .6rem; }
 .soulx-panel button:not(.secondary) { background: var(--soulx-accent); color: #102726; }
