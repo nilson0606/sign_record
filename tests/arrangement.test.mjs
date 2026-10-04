@@ -5,7 +5,10 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {arrangementSettings,arrangementCaption,arrangementRange,arrangementCovers,recordingBackingRoute,ARRANGEMENT_PRESETS} from '../arrangement-settings.mjs';
-import {ArrangementArchive} from '../arrangement-server.mjs';
+import {ArrangementArchive,handleArrangements} from '../arrangement-server.mjs';
+import http from 'node:http';
+import {RecordingArchive} from '../recording-archive.mjs';
+import {Readable} from 'node:stream';
 import {soulxSavedMetadata,soulxSettings} from '../soulx-settings.mjs';
 test('arrangement captions support six presets and validated custom instruments without accepting unknown parameters',()=>{
   for(const [preset,p] of Object.entries(ARRANGEMENT_PRESETS)){const s=arrangementSettings({...p,preset});assert.match(arrangementCaption(s),/no vocals/);assert.deepEqual(s.instruments,p.instruments);}
@@ -35,5 +38,17 @@ test('accompaniment archive saves a durable aligned track with a descriptive fil
     assert.match(first.title,/測試曲_配樂_鋼琴＋弦樂_0.00-194.00秒/);assert.equal(rows.records.length,1);assert.equal(first.seconds,194);assert.equal(first.rawBytes,0);
     assert.deepEqual(await readFile(path.join(archive.dir(id),'mix.wav')),wav);assert.equal((await archive.save(job)).created,first.created);
     await assert.rejects(archive.get('../wrong'));
+    const recordings=new RecordingArchive(library),recordingId=randomUUID(),recording={id:recordingId,title:'使用此配樂的 SoulX 成品',created:Date.now(),seconds:194,mime:'audio/wav',bytes:wav.length,rawBytes:0,arrangement:{id}};
+    const bytes=Buffer.from(JSON.stringify(recording)),prefix=Buffer.alloc(4);prefix.writeUInt32LE(bytes.length);
+    await recordings.import(recordingId,Readable.from([prefix,bytes,wav]));
+    await assert.rejects(archive.delete(id),error=>error.status===409&&error.message.includes(recording.title));assert.equal((await archive.list()).records.length,1);
+    const server=http.createServer((req,res)=>handleArrangements(req,res,{getLibrary:async()=>library}));await new Promise(r=>server.listen(0,'127.0.0.1',r));
+    try{const url=`http://127.0.0.1:${server.address().port}/arrangements/library/${id}`;
+      assert.equal((await fetch(url,{method:'DELETE'})).status,409);
+      assert.equal((await fetch(url+'?root=another-library',{method:'DELETE'})).status,400);
+      await recordings.delete(recordingId);assert.equal((await fetch(url+'?root='+encodeURIComponent(archive.root),{method:'DELETE'})).status,200);
+    }finally{await new Promise(r=>server.close(r));}
+    assert.equal((await new ArrangementArchive(library).list()).records.length,0);
+    await assert.rejects(archive.get(id));await archive.delete(id);await assert.rejects(archive.save(job),/已刪除/);
   }finally{if(path.dirname(jobDir)===path.resolve('.runtime/acestep/jobs'))await rm(jobDir,{recursive:true,force:true});if(path.dirname(library)===path.resolve(tmpdir())&&path.basename(library).startsWith('arrangement-archive-'))await rm(library,{recursive:true,force:true,maxRetries:4});}
 });

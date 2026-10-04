@@ -7,7 +7,7 @@ import {Readable} from 'node:stream';
 import {pipeline} from 'node:stream/promises';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
-import {RecordingArchive} from './recording-archive.mjs';
+import {RecordingArchive,serializeArchive} from './recording-archive.mjs';
 import {arrangementSettings,arrangementCaption,arrangementLabel,arrangementRange} from './arrangement-settings.mjs';
 const root=fileURLToPath(new URL('./',import.meta.url)),runtime=path.join(root,'.runtime/acestep'),jobsRoot=path.join(runtime,'jobs'),python=path.join(runtime,'venv/Scripts/python.exe'),jobs=new Map();
 const done=j=>['ready','failed','cancelled'].includes(j.stage),json=(res,code,v)=>{res.writeHead(code,{'Content-Type':'application/json'});res.end(JSON.stringify(v));};
@@ -18,7 +18,13 @@ async function kill(j){if(!j.running)return;const closed=new Promise(resolve=>j.
 async function erase(j){j.deleted=true;clearTimeout(j.timer);clearTimeout(j.expiry);await kill(j);await j.saving?.catch(()=>{});const dir=path.resolve(jobsRoot,j.id);if(/^[a-f0-9-]{36}$/.test(j.id)&&path.dirname(dir)===path.resolve(jobsRoot))await rm(dir,{recursive:true,force:true,maxRetries:4});jobs.delete(j.id);}
 export async function stopArrangements(){await Promise.allSettled([...jobs.values()].map(erase));}
 export class ArrangementArchive extends RecordingArchive{
-  constructor(library){super(library);this.root=path.resolve(library,'配樂');}
+  constructor(library){super(library);this.library=library;this.root=path.resolve(library,'配樂');}
+  async delete(id){
+    this.dir(id);
+    const used=(await new RecordingArchive(this.library).list()).records.filter(r=>r.arrangement?.id===id);
+    if(used.length)throw Object.assign(Error(`這份配樂仍被 ${used.length} 筆錄音使用：${used.slice(0,3).map(r=>r.title).join('、')}。請先保留這份配樂，以便成品繼續後製。`),{status:409});
+    await super.delete(id);
+  }
   async save(job){
     const file=path.join(jobsRoot,job.id,'aligned.wav'),info=await stat(file),r=job.result;
     const meta={...r,id:job.id,title:`${r.title.slice(0,220)}_配樂_${arrangementLabel(r.settings)}_${r.start.toFixed(2)}-${r.end.toFixed(2)}秒`,created:Date.now(),kind:'accompaniment',mode:'voice',complete:true,mime:'audio/wav',rawBytes:0,bytes:info.size,seconds:r.sourceSeconds};
@@ -32,8 +38,10 @@ export async function handleArrangements(req,res,{gpuBusy=()=>false,getSource,ge
     if(req.url.startsWith('/arrangements/library')){
       const library=await getLibrary();if(!library)throw Error('請先設定本機歌曲庫。');const archive=new ArrangementArchive(library);
       if(req.url==='/arrangements/library'&&req.method==='GET'){json(res,200,await archive.list());return;}
-      const m=/^\/arrangements\/library\/([a-f0-9-]{36})\/audio$/.exec(req.url);
-      if(!m||req.method!=='GET'){json(res,404,{error:'配樂不存在。'});return;}
+      const url=new URL(req.url,'http://localhost'),m=/^\/arrangements\/library\/([a-f0-9-]{36})(?:\/(audio))?$/.exec(url.pathname);
+      if(url.searchParams.has('root')&&url.searchParams.get('root')!==archive.root)throw Error('歌曲庫位置已變更，請重新整理配樂清單。');
+      if(m&&req.method==='DELETE'&&!m[2]){await serializeArchive(()=>archive.delete(m[1]));json(res,200,{deleted:true,id:m[1]});return;}
+      if(!m||req.method!=='GET'||m[2]!=='audio'){json(res,404,{error:'配樂不存在。'});return;}
       const meta=await archive.get(m[1]),file=path.join(archive.dir(meta.id),'mix.wav');res.writeHead(200,{'Content-Type':'audio/wav','Content-Length':meta.bytes});await pipeline(createReadStream(file),res);return;
     }
     if(req.url==='/arrangements/jobs'&&req.method==='POST'){
@@ -65,9 +73,9 @@ export async function handleArrangements(req,res,{gpuBusy=()=>false,getSource,ge
     if(job.stage!=='ready')throw Error('配樂尚未完成。');
     if(req.method==='POST'&&m[2]==='save'){
       // Capture the original library on job creation; changing UI libraries cannot redirect a save.
-      job.saving??=new ArrangementArchive(job.library).save(job).catch(e=>{job.saving=null;throw e;});json(res,200,await job.saving);return;
+      const saved=await serializeArchive(async()=>{const archive=new ArrangementArchive(job.library);if((await archive.deleted()).includes(job.id))throw Error('這份配樂已刪除，請重新生成後保存。');job.saving??=archive.save(job).catch(e=>{job.saving=null;throw e;});return job.saving;});json(res,200,saved);return;
     }
     if(req.method==='GET'&&m[2]==='audio'){const file=path.join(jobsRoot,job.id,'clip.wav'),info=await stat(file);res.writeHead(200,{'Content-Type':'audio/wav','Content-Length':info.size});await pipeline(createReadStream(file),res);return;}
     json(res,405,{error:'不支援此操作。'});
-  }catch(error){if(!res.headersSent)json(res,400,{error:error.message});else res.destroy();}
+  }catch(error){if(!res.headersSent)json(res,error.status??400,{error:error.message});else res.destroy();}
 }

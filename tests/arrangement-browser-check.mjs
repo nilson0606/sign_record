@@ -6,7 +6,7 @@ const {chromium}=createRequire('C:/Users/User/.cache/codex-runtimes/codex-primar
 const server=spawn(process.execPath,['server.mjs'],{env:{...process.env,PORT:'4288'},windowsHide:true,stdio:['ignore','pipe','pipe']});let browser;
 function wav(seconds,hz,amplitude=.1,rate=48000){const n=seconds*rate,b=Buffer.alloc(44+n*2);b.write('RIFF');b.writeUInt32LE(b.length-8,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(rate,24);b.writeUInt32LE(rate*2,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(n*2,40);for(let i=0;i<n;i++)b.writeInt16LE(Math.round(amplitude*Math.sin(i/rate*2*Math.PI*hz)*32767),44+i*2);return b;}
 const backing=wav(6,110),voice=wav(6,440),generated=wav(6,220),id='00000000-0000-4000-8000-000000000001';
-let payload,soulPayload,saved=null,polls=0,modelCalls=0;const errors=[],calls=[];
+let payload,soulPayload,saved=null,polls=0,modelCalls=0,deletes=0,deleteBlocked=true;const errors=[],calls=[];
 const metadata=()=>({id,title:'測試曲_配樂_自選',cacheId:'test-song',start:0,end:6,sourceSeconds:6,settings:payload.settings,outputSamples:288000,generatedSamples:288000});
 try{
   await new Promise((resolve,reject)=>{server.stdout.once('data',resolve);server.once('error',reject);});browser=await chromium.launch({channel:'msedge',headless:true,args:['--mute-audio']});
@@ -17,6 +17,7 @@ try{
     assert.equal(req.headers()['x-karaoke-token'],'test');
     if(p==='/arrangements')return json({installed:true,maxSeconds:600});
     if(p==='/arrangements/library')return json({path:'測試配樂庫',records:saved?[saved]:[]});
+    if(p===`/arrangements/library/${id}`&&req.method()==='DELETE'){deletes++;if(deleteBlocked)return route.fulfill({status:409,contentType:'application/json',body:JSON.stringify({error:'這份配樂仍被 1 筆錄音使用。'})});saved=null;return json({deleted:true,id});}
     if(p==='/arrangements/jobs'&&req.method()==='POST'){payload=req.postDataJSON();modelCalls++;return json({id,stage:'starting',message:'準備中',progress:null});}
     if(p===`/arrangements/jobs/${id}`){polls++;return json(polls===1?{id,stage:'generating',message:'編曲中',progress:35}:{id,stage:'ready',message:'完成',progress:100,result:metadata()});}
     if(p===`/arrangements/jobs/${id}/save`){saved={...metadata(),_archiveRoot:'測試配樂庫'};return json(saved);}
@@ -57,5 +58,9 @@ try{
   await page.locator('#soulx-backing-choice').selectOption(id);assert.equal(await page.locator('#soulx-backing-choice').inputValue(),id);await page.locator('#soulx-listen-ai').click();await page.waitForFunction(()=>!document.getElementById('soulx-audio').paused);
   await page.locator('#soulx-save').click();await page.waitForFunction(()=>window.savedSoulx);const sx=await page.evaluate(()=>window.savedSoulx);assert.equal(sx.meta.arrangement.id,id);assert.deepEqual(sx.meta.stems,['arrangement']);assert.equal(sx.meta.seconds,6);assert.equal(sx.meta.rawBytes,sx.voiceBytes);assert.equal(sx.meta.bytes,sx.mixBytes);
   await page.locator('#soulx-panel>summary').click();await page.locator('#arrangement-panel').scrollIntoViewIfNeeded();await mkdir('test-results',{recursive:true});await page.locator('#arrangement-panel').screenshot({path:'test-results/arrangement-panel.png'});
+  page.once('dialog',d=>d.dismiss());await page.locator('#arrangement-delete').click();assert.equal(deletes,0);
+  page.once('dialog',d=>d.accept());await page.locator('#arrangement-delete').click();await page.waitForFunction(()=>document.getElementById('arrangement-status').textContent.includes('仍被 1 筆錄音使用'));assert.equal(await page.locator('#arrangement-result').isVisible(),true);
+  deleteBlocked=false;page.once('dialog',d=>d.accept());await page.locator('#arrangement-delete').click();await page.waitForFunction(()=>document.getElementById('arrangement-status').textContent==='已刪除選取配樂。');assert.equal(deletes,2);assert.equal(await page.locator('#arrangement-result').isVisible(),false);assert.equal(await page.locator('#arrangement-delete').isDisabled(),true);
+  await page.waitForFunction(()=>document.querySelectorAll('#soulx-backing-choice option').length===1);assert.equal(await page.locator('#soulx-backing-choice').inputValue(),'');
   assert.deepEqual(errors,[]);console.log('PASS: default closed, full-song request, custom instruments, estimated progress, singer-preserving mix, same-position audition, save/reopen and SoulX library choice.');
 }finally{await browser?.close();server.kill();}

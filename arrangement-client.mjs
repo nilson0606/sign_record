@@ -24,9 +24,10 @@ export function createArrangement({getReference,beforePlay}){
   const source=()=>{const r=getReference();return r?.hasPreview&&r.cacheId?r:null;};
   function controls(){
     $('content').hidden=!enabled();$('fields').disabled=!enabled()||!source()||busy||saving||locked;$('enable').disabled=saving;$('cancel').disabled=!busy||!active;
-    for(const id of ['listen-original','listen-new','download','load','refresh','listen-mode','match','library'])$(id).disabled=busy||saving||locked;
+    for(const id of ['listen-original','listen-new','download','load','delete','refresh','listen-mode','match','library'])$(id).disabled=busy||saving||locked;
     $('save').disabled=!result||!!result.saved||!result.jobId||busy||saving||locked;
     $('load').disabled||=!$('library').value;
+    $('delete').disabled||=!$('library').value;
   }
   function resetAudio(){player.pause();player.removeAttribute('src');player.load();urls.forEach(URL.revokeObjectURL);urls=[];mixes=null;renderVersion++;playVersion++;}
   function clear(){resetAudio();result=null;$('result').hidden=true;}
@@ -48,6 +49,16 @@ export function createArrangement({getReference,beforePlay}){
   $('enable').addEventListener('change',async()=>{controls();if(!enabled()){void cancel();return;}syncSource();const rev=revision;try{const state=await(await request('/arrangements')).json();if(rev!==revision||!enabled())return;say(state.installed?'配樂模型已就緒，預選整首。可先挑選組合，再生成試聽。':'配樂模型尚未安裝完成。');await refresh();}catch(e){say(e.message);}});
   $('panel').addEventListener('toggle',()=>{if(!$('panel').open)player.pause();});
   $('refresh').addEventListener('click',()=>void refresh().catch(e=>say(e.message)));$('library').addEventListener('change',controls);
+  $('delete').addEventListener('click',async()=>{
+    if(busy||saving||locked)return;const meta=library.find(m=>m.id===$('library').value);if(!meta)return;
+    if(!window.confirm(`刪除這份已保存配樂？\n${meta.title}\n\n會移除本機配樂檔案，無法復原。`))return;
+    saving=true;controls();
+    try{await request(`/arrangements/library/${meta.id}?root=${encodeURIComponent(meta._archiveRoot)}`,{method:'DELETE'});
+      if(result&&(result.meta.id===meta.id||result.jobId===meta.id))clear();
+      window.dispatchEvent(new CustomEvent('arrangement-deleted',{detail:{id:meta.id}}));
+      await refresh();say('已刪除選取配樂。');
+    }catch(e){say('配樂未刪除：'+e.message);}finally{saving=false;controls();}
+  });
   async function decode(blob){const c=new AudioContext({sampleRate:48000,sinkId:{type:'none'}});try{return await c.decodeAudioData(await blob.arrayBuffer());}finally{await c.close();}}
   function present(){const m=result.meta,adjust=((m.outputSamples-m.generatedSamples)/48000);if(result.saved){for(const k of ['preset','style','mood','density','strength','seed'])$(k).value=m.settings[k];for(const n of $('instruments').querySelectorAll('input'))n.checked=m.settings.instruments.includes(n.value);$('start').value=m.start;$('end').value=m.end;labels();}$('result').hidden=false;$('result-info').textContent=`${arrangementLabel(m.settings)} · ${m.start.toFixed(2)}～${m.end.toFixed(2)} 秒 · 原伴奏參考 ${Math.round(m.settings.strength*100)}% · 種子 ${m.settings.seed}。${Math.abs(adjust)>.0001?`尾端${adjust>0?'補靜音':'裁去'} ${Math.abs(adjust).toFixed(3)} 秒，沒有拉伸整首。`:''}請試聽拍點是否合適。`;controls();}
   $('generate').addEventListener('click',async()=>{

@@ -60,6 +60,7 @@ test('helper enforces setup, auth and idle-only changes; selected library surviv
     assert.equal((await request('/soulx', 'GET', undefined, false)).status, 403);
     assert.equal((await request('/arrangements', 'GET', undefined, false)).status, 403);
     assert.equal((await request('/arrangements/library', 'GET', undefined, false)).status, 403);
+    assert.equal((await request('/arrangements/library/00000000-0000-4000-8000-000000000001', 'DELETE', undefined, false)).status, 403);
     assert.equal((await (await request('/arrangements')).json()).installed, false);
     assert.equal((await (await request('/soulx')).json()).installed, false);
     assert.ok((await(await request('/session')).json()).features.includes('playback-trace'));

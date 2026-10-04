@@ -225,6 +225,7 @@ export function createSoulx({store,getSelected,getPosition,getReference=()=>null
     catch{/* Original accompaniment remains available on older helpers. */}
   }
   $('backing-refresh').addEventListener('click',()=>void refreshBackings());window.addEventListener('arrangement-saved',()=>void refreshBackings());
+  window.addEventListener('arrangement-deleted',({detail})=>{if($('backing-choice').value===detail.id){$('backing-choice').value='';player.pause();mixes=null;rendering++;$('listen-status').textContent='所選新配樂已刪除，已切回錄音原配樂，請重新試聽。';}void refreshBackings();});
   reset();syncSource();
   return {pause:()=>player.pause(),sync(row,locked){externalBusy=locked;syncSource();}};
 }
