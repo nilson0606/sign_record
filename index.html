@@ -176,6 +176,12 @@
             <div><label for="soulx-reference-seconds">參考長度 <output id="soulx-reference-seconds-value">8 秒</output></label><input id="soulx-reference-seconds" type="range" min="3" max="30" step="1" value="8"><p class="help">只取 3～30 秒，預設 8 秒；可比較 8／15／30 秒。參考 30 秒時，檔案至少需 30 秒；若起點設 10 秒，檔案至少需 40 秒。選清楚的單人乾歌聲，少配樂、少和聲；較長不保證較好。</p></div>
           </div>
           <div class="soulx-grid">
+            <section class="soulx-pitch" aria-labelledby="soulx-pitch-heading">
+              <strong id="soulx-pitch-heading">③ 歌聲音高</strong><output id="soulx-pitch-value">原音高（0 半音）</output>
+              <div class="button-row" role="group" aria-label="八度快捷設定"><button id="soulx-pitch-down" data-soulx-pitch="-12" type="button" class="secondary" aria-pressed="false">降低八度 −12</button><button id="soulx-pitch-original" data-soulx-pitch="0" type="button" class="secondary" aria-pressed="true">原音高 0</button><button id="soulx-pitch-up" data-soulx-pitch="12" type="button" class="secondary" aria-pressed="false">提高八度 +12</button></div>
+              <label for="soulx-pitch">半音微調（−12～+12）</label><input id="soulx-pitch" type="number" min="-12" max="12" step="1" value="0" aria-describedby="soulx-pitch-help">
+              <p id="soulx-pitch-help" class="help">以「待轉換的歌」音高為基準，預設 0。女原唱太高可先試 −12；只調整生成歌聲，速度與配樂不變。±12 是同調的不同八度，其他半音可能與原配樂不合調。修改後需重新產生；先用 AI 100% 比較，混入原聲會同時聽到兩個音高。</p>
+            </section>
             <div><label for="soulx-steps">生成步數 <output id="soulx-steps-value">32 步</output></label><input id="soulx-steps" type="range" min="8" max="64" step="1" value="32"><p class="help">8～64 步，預設 32。更多步通常更慢，不保證一定更好聽；可試 16／32／64。</p></div>
             <div><label for="soulx-guidance">引導強度 CFG <output id="soulx-guidance-value">3</output></label><input id="soulx-guidance" type="range" min="0" max="5" step="0.1" value="3"><p class="help">預設 3。改變條件引導程度，並非情緒濃度或相似度百分比；過高可能不自然。可試 1／3／5。</p></div>
             <div><label for="soulx-seed">隨機種子</label><input id="soulx-seed" type="number" min="0" max="2147483647" step="1" value="20261004"><button id="soulx-random" type="button" class="secondary">換一個種子</button><p class="help">相同種子方便比較其他參數；換數字探索生成差異，不是效果強度。</p></div>

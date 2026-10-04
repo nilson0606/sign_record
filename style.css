@@ -180,3 +180,8 @@ header{gap:18px;flex-wrap:wrap}
 .soulx-progress-heading { display: flex; justify-content: space-between; gap: 20px; color: var(--soulx-accent); }
 .soulx-progress progress { display: block; width: 100%; height: 18px; margin-top: 14px; accent-color: var(--soulx-accent); }
 .soulx-progress .help { margin-bottom: 0; }
+.soulx-pitch { grid-column: 1 / -1; padding: 18px; border: 1px solid var(--soulx-accent); border-radius: 10px; background: #102322; }
+.soulx-pitch > output { display: inline-block; margin-left: 20px; font-weight: 700; }
+.soulx-pitch .button-row { margin: 14px 0; }
+.soulx-pitch input[type=number] { max-width: 180px; }
+.soulx-pitch button[aria-pressed=true] { background: var(--soulx-accent); color: #102726; }

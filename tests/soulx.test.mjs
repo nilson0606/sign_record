@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {soulxSettings,soulxInterval,soulxRangeLabel,soulxSavedMetadata,soulxOriginalReference,soulxSongSource} from '../soulx-settings.mjs';
+import {soulxSettings,soulxInterval,soulxRangeLabel,soulxSavedMetadata,soulxOriginalReference,soulxSongSource,soulxPitchLabel} from '../soulx-settings.mjs';
 import {validateSoulxRequest,validateSoulxWav,soulxProgress} from '../soulx-server.mjs';
 test('SoulX progress belongs to the current phase and rejects invalid counts',()=>{
   const p={unit:'segments',completed:2,total:4};assert.deepEqual(soulxProgress('converting',p),p);
@@ -11,10 +11,14 @@ test('SoulX progress belongs to the current phase and rejects invalid counts',()
 function wav(seconds=3){
   const b=Buffer.alloc(44+48000*seconds);b.write('RIFF');b.writeUInt32LE(b.length-8,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(24000,24);b.writeUInt32LE(48000,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(b.length-44,40);return b;
 }
-test('SoulX rejects invalid controls and never accepts tempo/pitch overrides',()=>{
+test('SoulX accepts bounded manual semitones, defaults legacy requests to zero, and never accepts speed or automatic pitch overrides',()=>{
   for(const s of [{steps:7},{steps:65},{steps:16.2},{guidance:Infinity},{guidance:5.1},{seed:-1},{reference:'../../x'},{referenceSeconds:30.001},{referenceStart:-1}])assert.throws(()=>soulxSettings(s));
   assert.equal(soulxSettings({referenceSeconds:30}).referenceSeconds,30);
-  const s=soulxSettings({pitchShift:12,autoShift:true,speed:2});assert.equal(s.pitchShift,undefined);assert.equal(s.autoShift,undefined);assert.equal(s.speed,undefined);
+  const s=soulxSettings({pitchShift:12,autoShift:true,speed:2});assert.equal(s.pitchShift,12);assert.equal(s.autoShift,undefined);assert.equal(s.speed,undefined);
+  assert.equal(soulxSettings().pitchShift,0);
+  for(const pitchShift of [-13,13,1.5,NaN,Infinity,null,'-12',true])assert.throws(()=>soulxSettings({pitchShift}));
+  for(const pitchShift of [-12,-1,0,1,12])assert.equal(validateSoulxRequest({settings:{reference:'zh',pitchShift},audio:wav().toString('base64')}).settings.pitchShift,pitchShift);
+  assert.match(soulxPitchLabel(-12),/降低八度/);assert.match(soulxPitchLabel(12),/提高八度/);assert.match(soulxPitchLabel(-3),/-3 半音/);
 });
 test('SoulX waveform checks exact format, size and duration before launching Python',()=>{
   const valid=wav();assert.equal(validateSoulxWav(valid.toString('base64')).length,valid.length);
@@ -54,6 +58,11 @@ test('SoulX full-song labels require the actual end and saved clips rebase backi
   assert.deepEqual(saved.post.segments,[{offset:0,songTime:15,duration:1},{offset:1,songTime:20,duration:4}]);
   assert.equal(saved.seconds,5);assert.equal(saved.sourceSeconds,5);assert.equal(saved.post.audioAnalysis,undefined);assert.equal(saved.postResult,undefined);assert.deepEqual(saved.post.samples,[]);assert.equal(row.post.offsetMs,200);
   assert.match(saved.title,/SoulX.*片段5-10秒_AI75%/);
+  for(const pitchShift of [-12,12]){
+    const shifted=soulxSavedMetadata({...input,report:{...input.report,settings:soulxSettings({pitchShift}),pitchShift}});
+    assert.equal(shifted.soulx.report.settings.pitchShift,pitchShift);assert.match(shifted.title,pitchShift<0?/_移調-12半音/:/_移調\+12半音/);
+    assert.deepEqual(shifted.post.segments,saved.post.segments);assert.equal(shifted.seconds,saved.seconds);
+  }
   const full=soulxSavedMetadata({...input,interval:{start:0,end:20},report:{...input.report,sourceSamples:480000,outputSamples:480000},useBacking:false});
   assert.match(full.title,/整首/);assert.equal(full.mode,'voice');assert.deepEqual(full.stems,[]);
   assert.throws(()=>soulxSavedMetadata({...input,report:{...input.report,outputSamples:100}}));

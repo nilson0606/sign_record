@@ -1,5 +1,5 @@
 import {wavBlob} from './recording-process.mjs';
-import {SOULX_DEFAULTS,SOULX_REFERENCES,soulxSettings,soulxInterval,soulxRangeLabel,soulxSavedMetadata,soulxOriginalReference,soulxSongSource} from './soulx-settings.mjs';
+import {SOULX_DEFAULTS,SOULX_REFERENCES,soulxSettings,soulxInterval,soulxRangeLabel,soulxSavedMetadata,soulxOriginalReference,soulxSongSource,soulxPitchLabel} from './soulx-settings.mjs';
 const BASE='http://127.0.0.1:4274';
 const $=id=>document.getElementById('soulx-'+id);
 async function request(path,options={}){
@@ -62,9 +62,12 @@ export function createSoulx({store,getSelected,getPosition,getReference=()=>null
     for(const id of ['blend','match','loop'])$(id).disabled=saving;
     $('backing').disabled=saving||!result||result.row.mode!=='mix';
   }
-  function labels(){for(const [id,unit] of [['steps',' 步'],['guidance',''],['reference-seconds',' 秒'],['blend','%']])$(id+'-value').textContent=$(id).value+unit;$('upload-label').hidden=$('reference').value!=='custom';}
-  function settings(){return soulxSettings({reference:$('reference').value,referenceStart:$('reference-start').value===''?null:Number($('reference-start').value),referenceSeconds:Number($('reference-seconds').value),steps:Number($('steps').value),guidance:Number($('guidance').value),seed:Number($('seed').value)});}
-  function reset(){for(const [id,key] of [['reference','reference'],['reference-seconds','referenceSeconds'],['steps','steps'],['guidance','guidance'],['seed','seed']])$(id).value=SOULX_DEFAULTS[key];if($('source').value==='original')$('reference').value='custom';$('reference-start').value='';labels();}
+  function labels(){for(const [id,unit] of [['steps',' 步'],['guidance',''],['reference-seconds',' 秒'],['blend','%']])$(id+'-value').textContent=$(id).value+unit;$('upload-label').hidden=$('reference').value!=='custom';
+    const pitch=$('pitch').valueAsNumber;$('pitch-value').textContent=Number.isInteger(pitch)&&pitch>=-12&&pitch<=12?soulxPitchLabel(pitch):'請輸入 −12～+12 的整數';
+    for(const button of document.querySelectorAll('[data-soulx-pitch]'))button.setAttribute('aria-pressed',String(Number(button.dataset.soulxPitch)===pitch));
+  }
+  function settings(){return soulxSettings({reference:$('reference').value,referenceStart:$('reference-start').value===''?null:Number($('reference-start').value),referenceSeconds:Number($('reference-seconds').value),steps:Number($('steps').value),guidance:Number($('guidance').value),seed:Number($('seed').value),pitchShift:$('pitch').valueAsNumber});}
+  function reset(){for(const [id,key] of [['reference','reference'],['reference-seconds','referenceSeconds'],['steps','steps'],['guidance','guidance'],['seed','seed'],['pitch','pitchShift']])$(id).value=SOULX_DEFAULTS[key];if($('source').value==='original')$('reference').value='custom';$('reference-start').value='';labels();}
   async function cancel(){revision++;player.pause();if(busy)showProgress('cancelled','已取消轉換；原始音檔保留。');else{stopProgress();$('progress').hidden=true;}if(active)try{await request('/soulx/jobs/'+active,{method:'DELETE'});}catch{}say(enabled()?'已取消 SoulX；原始錄音保留。':'SoulX 已關閉。');}
   $('enable').addEventListener('change',async()=>{
     controls();if(!enabled()){void cancel();return;}
@@ -75,7 +78,8 @@ export function createSoulx({store,getSelected,getPosition,getReference=()=>null
   $('cancel').addEventListener('click',()=>void cancel());
   $('random').addEventListener('click',()=>{$('seed').value=crypto.getRandomValues(new Uint32Array(1))[0]%2147483648;dirty();});
   $('reset').addEventListener('click',()=>{reset();dirty();});
-  function draft(){return JSON.stringify(['source','start','end','reference','reference-start','reference-seconds','steps','guidance','seed'].map(id=>$(id).value).concat($('source').value==='original'&&$('reference').value==='self'?getSelected()?.id??null:[],Array.from($('upload').files??[],f=>[f.name,f.size,f.lastModified])));}
+  for(const button of document.querySelectorAll('[data-soulx-pitch]'))button.addEventListener('click',()=>{$('pitch').value=button.dataset.soulxPitch;dirty();});
+  function draft(){return JSON.stringify(['source','start','end','reference','reference-start','reference-seconds','steps','guidance','seed','pitch'].map(id=>$(id).value).concat($('source').value==='original'&&$('reference').value==='self'?getSelected()?.id??null:[],Array.from($('upload').files??[],f=>[f.name,f.size,f.lastModified])));}
   function rangeLabel(){const row=source();try{$('range-info').textContent='將轉換：'+soulxRangeLabel(soulxInterval(Number($('start').value),Number($('end').value),row?.sourceSeconds??row?.seconds),row.sourceSeconds??row.seconds);}catch{$('range-info').textContent='請設定有效的轉換起訖範圍。';}}
   function dirty(){labels();rangeLabel();controls();if(result)say(result.draft===draft()?'設定與已生成結果一致，可以試聽或保存。':'參數／範圍已修改；目前仍是上次結果，請重新產生後再保存。');}
   $('fields').addEventListener('input',dirty);$('fields').addEventListener('change',dirty);
@@ -120,7 +124,9 @@ export function createSoulx({store,getSelected,getPosition,getReference=()=>null
     if(document.getElementById('mic-stop')&&!document.getElementById('mic-stop').disabled){say('請先停止收音，再生成 SoulX，避免影響錄製。');return;}
     const rev=++revision,row=structuredClone(source()),generatedDraft=draft();busy=true;clear();controls();startProgress();
     try{
-      beforePlay();say('準備原始人聲與參考片段…');const input=await prepare(row,settings());if(rev!==revision)return;
+      beforePlay();say('準備原始人聲與參考片段…');const config=settings();
+      if(config.pitchShift!==0){const support=await(await request('/soulx')).json();if(support.pitchShiftRange?.[0]!==-12||support.pitchShiftRange?.[1]!==12)throw Error('本機工具尚未支援歌聲移調，請更新並重新啟動本機工具。');if(rev!==revision)return;}
+      const input=await prepare(row,config);if(rev!==revision)return;
       let state=await(await request('/soulx/jobs',{method:'POST',body:JSON.stringify(input.payload)})).json();active=state.id;controls();
       if(rev!==revision){await request('/soulx/jobs/'+active,{method:'DELETE'});return;}
       for(let attempt=0;attempt<610;attempt++){
@@ -131,13 +137,14 @@ export function createSoulx({store,getSelected,getPosition,getReference=()=>null
         state=await(await request('/soulx/jobs/'+active)).json();
       }
       if(state.stage!=='ready')throw Error('生成逾時，請重新嘗試。');
+      if((state.result.pitchShift??0)!==input.payload.settings.pitchShift)throw Error('模型回報的移調值與設定不符，未接受結果；請更新本機工具後重試。');
       const blobs=await Promise.all(['source','result'].map(async name=>(await request('/soulx/jobs/'+active+'/'+name)).blob()));if(rev!==revision)return;
       const context=new AudioContext({sampleRate:24000,sinkId:{type:'none'}});
       try{const [original,converted]=await Promise.all(blobs.map(async b=>context.decodeAudioData(await b.arrayBuffer())));if(rev!==revision)return;
         if(original.length!==converted.length||converted.length!==state.result.outputSamples||Math.abs(converted.duration-(input.interval.end-input.interval.start))>1/24000)throw Error('輸出長度與選取範圍不符，未接受結果。');
         result={row,original,converted,report:state.result,interval:input.interval,delayMs:input.delayMs,tracks:null,draft:generatedDraft};}finally{await context.close();}
       $('result').hidden=false;$('blend').value=100;$('backing').checked=row.mode==='mix';labels();
-      const s=result.report.settings;$('result-info').textContent=`已生成：${row.soulxSource==='original'?'原曲原唱':'我的錄音'} → ${SOULX_REFERENCES[s.reference]} · ${soulxRangeLabel(input.interval,row.sourceSeconds??row.seconds)} · ${s.steps} 步 · CFG ${s.guidance} · 種子 ${s.seed} · 參考 ${result.report.referenceSeconds??s.referenceSeconds} 秒 · 校正 ${input.delayMs} ms。輸入／輸出皆 ${result.converted.length} 個取樣；總長度一致不代表逐字對齊。`;
+      const s=result.report.settings;$('result-info').textContent=`已生成：${row.soulxSource==='original'?'原曲原唱':'我的錄音'} → ${SOULX_REFERENCES[s.reference]} · ${soulxRangeLabel(input.interval,row.sourceSeconds??row.seconds)} · ${s.steps} 步 · CFG ${s.guidance} · 種子 ${s.seed} · ${soulxPitchLabel(result.report.pitchShift??s.pitchShift??0)} · 參考 ${result.report.referenceSeconds??s.referenceSeconds} 秒 · 校正 ${input.delayMs} ms。輸入／輸出皆 ${result.converted.length} 個取樣；總長度一致不代表逐字對齊。`;
       say('已完成。按「原聲／SoulX」同位置切換比較；原錄音與 A／B 設定保留。');
       showProgress('ready',`已完成 ${result.report.convertedSegments??1} 段；音檔長度檢查通過，可以試聽。`);
     }catch(e){if(rev===revision){say(e.message);showProgress('failed',e.message);}if(active)await request('/soulx/jobs/'+active,{method:'DELETE'}).catch(()=>{});}
@@ -185,7 +192,7 @@ export function createSoulx({store,getSelected,getPosition,getReference=()=>null
   for(const id of ['blend','backing','match'])$(id).addEventListener('input',()=>{labels();mixes=null;rendering++;player.pause();$('listen-status').textContent='試聽混音已改，按「原聲／SoulX」聽新效果；不需重新生成。';});
   $('loop').addEventListener('change',()=>{player.loop=$('loop').checked;});
   $('download').addEventListener('click',async()=>{
-    try{const mix=await buildMixes(),s=result.report.settings,a=document.createElement('a');a.href=mix.urls[1];a.download=`${result.row.title}_SoulX_${SOULX_REFERENCES[s.reference]}_${s.steps}步_CFG${s.guidance}_${result.interval.start}-${result.interval.end}秒_AI${$('blend').value}%_試聽.wav`.replace(/[\\/:*?"<>|]/g,'_');a.click();}catch(e){$('listen-status').textContent=e.message;}
+    try{const mix=await buildMixes(),s=result.report.settings,a=document.createElement('a'),pitch=s.pitchShift??0;a.href=mix.urls[1];a.download=`${result.row.title}_SoulX_${SOULX_REFERENCES[s.reference]}_${s.steps}步_CFG${s.guidance}_${result.interval.start}-${result.interval.end}秒${pitch?`_移調${pitch>0?'+':''}${pitch}半音`:''}_AI${$('blend').value}%_試聽.wav`.replace(/[\\/:*?"<>|]/g,'_');a.click();}catch(e){$('listen-status').textContent=e.message;}
   });
   $('save').addEventListener('click',async()=>{
     if(!result||busy||saving||externalBusy||result.draft!==draft())return;

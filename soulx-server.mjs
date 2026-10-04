@@ -47,7 +47,7 @@ async function erase(job){
 export async function stopSoulx(){await Promise.allSettled([...jobs.values()].map(erase));}
 export async function handleSoulx(req,res,{gpuBusy=()=>false}={}){
   try{
-    if(req.url==='/soulx'&&req.method==='GET'){json(res,200,{installed:available(),references:SOULX_REFERENCES,maxSeconds:600});return;}
+    if(req.url==='/soulx'&&req.method==='GET'){json(res,200,{installed:available(),references:SOULX_REFERENCES,maxSeconds:600,pitchShiftRange:[-12,12]});return;}
     if(req.url==='/soulx/jobs'&&req.method==='POST'){
       if(!available()){json(res,409,{error:'SoulX 尚未安裝完成，請先執行獨立模型安裝。'});return;}
       if(gpuBusy()||soulxBusy()){json(res,409,{error:'目前有音訊工作進行中，完成後再產生 SoulX。'});return;}

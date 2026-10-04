@@ -1,4 +1,7 @@
-export const SOULX_DEFAULTS=Object.freeze({reference:'self',referenceStart:null,referenceSeconds:8,steps:32,guidance:3,seed:20261004});
+export const SOULX_DEFAULTS=Object.freeze({reference:'self',referenceStart:null,referenceSeconds:8,steps:32,guidance:3,seed:20261004,pitchShift:0});
+export function soulxPitchLabel(value=0){
+  return value===0?'原音高（0 半音）':`${value===-12?'降低八度':value===12?'提高八度':'移調'}（${value>0?'+':''}${value} 半音）`;
+}
 export const SOULX_REFERENCES=Object.freeze({self:'自己的歌聲',original:'原曲原唱',zh:'官方中文示範',en:'官方英文示範',custom:'自選參考歌聲'});
 export function soulxOriginalReference(row){
   const reference=row?.post?.reference;
@@ -16,7 +19,7 @@ export function soulxSongSource(reference){
 export function soulxSettings(v={}){
   const s={...SOULX_DEFAULTS,...v};
   if(!Object.hasOwn(SOULX_REFERENCES,s.reference))throw Error('請選擇參考歌聲。');
-  for(const [key,min,max,integer] of [['steps',8,64,true],['guidance',0,5,false],['seed',0,2147483647,true],['referenceSeconds',3,30,false]]){
+  for(const [key,min,max,integer] of [['steps',8,64,true],['guidance',0,5,false],['seed',0,2147483647,true],['referenceSeconds',3,30,false],['pitchShift',-12,12,true]]){
     if(!Number.isFinite(s[key])||s[key]<min||s[key]>max||(integer&&!Number.isInteger(s[key])))throw Error(`${key} 超出允許範圍。`);
   }
   if(s.referenceStart!==null&&(!Number.isFinite(s.referenceStart)||s.referenceStart<0||s.referenceStart>1800))throw Error('參考起點需介於 0～1800 秒，留白則自動挑選有聲片段。');
@@ -38,7 +41,8 @@ export function soulxSavedMetadata({row,interval,report,delayMs,blend,match,useB
     return end>start?[{offset:start-interval.start,songTime:s.songTime+start-s.offset,duration:end-start}]:[];
   });
   const range=soulxRangeLabel(interval,row.sourceSeconds??row.seconds),s=report.settings;
-  const suffix=`_SoulX_${row.soulxSource==='original'?'原唱換聲_':''}${SOULX_REFERENCES[s.reference]}_${range.startsWith('整首')?'整首':`片段${interval.start}-${interval.end}秒`}_AI${blend}%`;
+  const pitch=s.pitchShift??0;
+  const suffix=`_SoulX_${row.soulxSource==='original'?'原唱換聲_':''}${SOULX_REFERENCES[s.reference]}_${range.startsWith('整首')?'整首':`片段${interval.start}-${interval.end}秒`}${pitch?`_移調${pitch>0?'+':''}${pitch}半音`:''}_AI${blend}%`;
   const result={id:crypto.randomUUID(),created:Date.now(),title:row.title.slice(0,500-suffix.length)+suffix,...(row.soulxSource==='original'?{}:{parentId:row.id}),
     videoId:row.videoId,mode:useBacking?'mix':'voice',stems:useBacking?structuredClone(row.stems??[]):[],mime:'audio/wav',rawMime:'audio/wav',
     complete:true,seconds:duration,sourceSeconds:duration,bytes,rawBytes,appliedDelayMs:0,delayMs:0,

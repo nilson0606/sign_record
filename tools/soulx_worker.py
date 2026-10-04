@@ -17,6 +17,9 @@ def convert(request):
     from transformers import WhisperModel,WhisperFeatureExtractor
     settings=json.loads(request.read_text(encoding='utf8'));job=request.parent
     steps=settings['steps'];guidance=settings['guidance'];seed=settings['seed']
+    pitch_shift=settings.get('pitchShift',0)
+    if type(pitch_shift) is not int or not -12<=pitch_shift<=12:raise ValueError('歌聲移調需為 -12～+12 的整數半音。')
+    settings['pitchShift']=pitch_shift
     if not 8<=steps<=64 or not 0<=guidance<=5 or not 0<=seed<=2147483647:raise ValueError('生成參數超出範圍。')
     def read(p):
         x,rate=sf.read(p,dtype='float32',always_2d=True);x=x.mean(axis=1)
@@ -67,7 +70,7 @@ def convert(request):
     model.eval().half().to('cuda');model.mel.float()
     torch.manual_seed(seed);start=time.monotonic();emit('converting','依原時間位置產生歌聲…')
     with torch.inference_mode(), segment_progress(model,emit,torch.cuda.synchronize) as progress:
-        result,shift=model.infer(pt_wav=torch.from_numpy(p)[None].cuda(),gt_wav=torch.from_numpy(a)[None].cuda(),pt_f0=torch.from_numpy(fp)[None].cuda(),gt_f0=torch.from_numpy(fa)[None].cuda(),auto_shift=False,pitch_shift=0,n_steps=steps,cfg=guidance,use_fp16=True)
+        result,shift=model.infer(pt_wav=torch.from_numpy(p)[None].cuda(),gt_wav=torch.from_numpy(a)[None].cuda(),pt_f0=torch.from_numpy(fp)[None].cuda(),gt_f0=torch.from_numpy(fa)[None].cuda(),auto_shift=False,pitch_shift=pitch_shift,n_steps=steps,cfg=guidance,use_fp16=True)
     emit('finalizing','轉換完成，檢查長度並輸出音檔…')
     result=result.detach().float().cpu().numpy().reshape(-1)
     if len(result)!=len(a) or not np.isfinite(result).all():raise ValueError('輸出長度或數值異常，未接受這次結果。')

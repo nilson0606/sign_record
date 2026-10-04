@@ -45,6 +45,15 @@ try{
     await route.fulfill({status:response.status,contentType:response.headers.get('content-type')??'application/json',body});
   });
   await page.goto(site);
+  const measurePitch=async id=>page.evaluate(async({id,token})=>{
+    const {detectPitch}=await import('/audio.mjs'),context=new AudioContext({sampleRate:24000,sinkId:{type:'none'}});
+    try{
+      const audio=await Promise.all(['source','result'].map(async name=>context.decodeAudioData(await(await fetch(`http://127.0.0.1:4274/soulx/jobs/${id}/${name}`,{headers:{'X-Karaoke-Token':token}})).arrayBuffer())));
+      const [source,result]=audio.map(b=>b.getChannelData(0)),shifts=[];
+      for(let start=0;start+2048<source.length;start+=4800){const a=detectPitch(source.subarray(start,start+2048),24000),b=detectPitch(result.subarray(start,start+2048),24000);if(a.hz&&b.hz&&a.confidence>.85&&b.confidence>.85)shifts.push(12*Math.log2(b.hz/a.hz));}
+      shifts.sort((a,b)=>a-b);return {frames:source.length,outputFrames:result.length,voicedPairs:shifts.length,medianSemitones:shifts[Math.floor(shifts.length/2)]};
+    }finally{await context.close();}
+  },{id,token});
   const timing=await page.evaluate(async()=>{
     const {soulxSlice}=await import('/soulx-client.mjs');
     const raw=new AudioBuffer({length:48000,sampleRate:24000,numberOfChannels:1});raw.getChannelData(0)[12000]=.5;
@@ -65,6 +74,10 @@ try{
   await page.locator('#soulx-panel > summary').click();assert.deepEqual(calls,[]);
   await page.locator('#soulx-enable').check();await page.waitForFunction(()=>document.getElementById('soulx-status').textContent.includes('已就緒'));
   await page.locator('#soulx-source').selectOption('recording');
+  assert.equal(await page.locator('#soulx-pitch').inputValue(),'0');
+  await page.locator('#soulx-pitch-down').click();assert.equal(await page.locator('#soulx-pitch').inputValue(),'-12');assert.equal(await page.locator('#soulx-pitch-down').getAttribute('aria-pressed'),'true');
+  await page.locator('#soulx-pitch').fill('-3');assert.match(await page.locator('#soulx-pitch-value').textContent(),/-3 半音/);assert.equal(await page.locator('[data-soulx-pitch][aria-pressed=true]').count(),0);
+  await page.locator('#soulx-pitch-up').click();assert.equal(await page.locator('#soulx-pitch').inputValue(),'12');
   await page.locator('#soulx-full').click();assert.match(await page.locator('#soulx-range-info').textContent(),/整首.*20.00/);
   const abBefore=await page.locator('#post-reverb').inputValue();
   await page.locator('#soulx-reference').selectOption('original');await page.locator('#soulx-end').fill('8');
@@ -77,21 +90,29 @@ try{
   assert.equal(await page.locator('#soulx-progress-bar').getAttribute('value'),'100');
   assert.equal(await page.locator('#soulx-progress-stage').textContent(),'已完成');
   assert.match(await page.locator('#soulx-result-info').textContent(),/8 步 · CFG 1.5 · 種子 7/);
+  assert.match(await page.locator('#soulx-result-info').textContent(),/提高八度（\+12 半音）/);
+  const firstJob=states.findLast(s=>s.stage==='ready');assert.equal(firstJob.result.pitchShift,12);assert.equal(firstJob.result.autoShift,false);
+  const raised=await measurePitch(firstJob.id);assert.ok(raised.voicedPairs>5&&Math.abs(raised.medianSemitones-12)<2,JSON.stringify(raised));assert.equal(raised.frames,raised.outputFrames);
+  await page.locator('#soulx-pitch-original').click();assert.equal(await page.locator('#soulx-save').isDisabled(),true);assert.match(await page.locator('#soulx-result-info').textContent(),/提高八度/);
+  await page.locator('#soulx-pitch-up').click();assert.equal(await page.locator('#soulx-save').isDisabled(),false);
   assert.ok(calls.includes('GET /library/soulx-original-fixture/lead'));assert.match(await page.locator('#soulx-result-info').textContent(),/原曲原唱/);
   await page.locator('#soulx-listen-original').click();await page.waitForFunction(()=>document.getElementById('soulx-audio').currentTime>.4);
   await page.evaluate(()=>{document.getElementById('soulx-audio').pause();document.getElementById('soulx-audio').currentTime=3;});
   await page.locator('#soulx-listen-ai').click();await page.waitForFunction(()=>!document.getElementById('soulx-audio').paused);
   assert.ok(await page.locator('#soulx-audio').evaluate(el=>el.currentTime>=3&&el.currentTime<4));
-  const downloadPromise=page.waitForEvent('download');await page.locator('#soulx-download').click();const download=await downloadPromise;assert.match(download.suggestedFilename(),/SoulX.*8步_CFG1.5/);
+  const downloadPromise=page.waitForEvent('download');await page.locator('#soulx-download').click();const download=await downloadPromise;assert.match(download.suggestedFilename(),/SoulX.*8步_CFG1.5.*移調\+12半音/);
   await page.evaluate(()=>{window.failSoulxSave=true;});await page.locator('#soulx-save').click();await page.waitForFunction(()=>document.getElementById('soulx-status').textContent.includes('保存未完成'));
   assert.equal(await page.locator('#soulx-result').isVisible(),true);assert.equal((await archive.list()).records.length,0);
   await page.evaluate(()=>{window.failSoulxSave=false;});
   await mkdir('test-results',{recursive:true});await page.locator('#soulx-panel').screenshot({path:'test-results/soulx-panel.png'});
   await page.locator('#soulx-reset').click();assert.equal(await page.locator('#soulx-steps').inputValue(),'32');assert.equal(await page.locator('#soulx-guidance').inputValue(),'3');
+  assert.equal(await page.locator('#soulx-pitch').inputValue(),'0');assert.equal(await page.locator('#soulx-pitch-original').getAttribute('aria-pressed'),'true');
   assert.match(await page.locator('#soulx-status').textContent(),/目前仍是上次結果/);assert.equal(await page.locator('#soulx-save').isDisabled(),true);
   await page.locator('#soulx-reference').selectOption('original');await page.locator('#soulx-steps').fill('8');await page.locator('#soulx-guidance').fill('1.5');await page.locator('#soulx-seed').fill('7');
+  await page.locator('#soulx-pitch-up').click();
   await page.locator('#soulx-save').click();await page.waitForFunction(()=>document.getElementById('post-status').textContent.includes('已另存'));
   const saved=(await archive.list()).records[0];assert.equal(saved.seconds,8);assert.equal(saved.soulx.sourceDelayMs,200);assert.equal(saved.appliedDelayMs,0);assert.match(saved.title,/片段0-8秒/);
+  assert.equal(saved.soulx.report.settings.pitchShift,12);assert.match(saved.title,/移調\+12半音/);
   assert.equal(await page.locator('#post-recording').inputValue(),saved.id);assert.equal(await page.locator('#remix-delay').inputValue(),'0');assert.equal(await page.locator('#post-reverb').inputValue(),'0');
   const check=await page.evaluate(async id=>{
     const {RecordingStore}=await import('/recording-store.mjs'),fresh=new RecordingStore(),row=(await fresh.list()).find(r=>r.id===id);
@@ -127,6 +148,8 @@ try{
   assert.equal(await page.locator('#soulx-progress-stage').textContent(),'未完成');assert.equal(await page.locator('#soulx-progress-bar').isVisible(),false);
   const failedElapsed=await page.locator('#soulx-elapsed').textContent();await page.waitForTimeout(1100);assert.equal(await page.locator('#soulx-elapsed').textContent(),failedElapsed);
   await page.locator('#soulx-upload').setInputFiles({name:'my-voice-30s.wav',mimeType:'audio/wav',buffer:longReference});
+  await page.locator('#soulx-pitch-down').click();
+  await page.locator('.soulx-pitch').screenshot({path:'test-results/soulx-pitch.png'});
   await page.locator('#soulx-steps').fill('8');await page.locator('#soulx-full').click();
   assert.match(await page.locator('#soulx-range-info').textContent(),/整首.*40.00/);
   await page.locator('#soulx-generate').click();await page.waitForFunction(()=>!document.getElementById('soulx-cancel').disabled);
@@ -139,6 +162,8 @@ try{
   const jobId=calls.filter(c=>/^GET \/soulx\/jobs\/[^/]+$/.test(c)).at(-1).split('/').at(-1);
   const report=await(await fetch(api+'/soulx/jobs/'+jobId,{headers:{'X-Karaoke-Token':token}})).json();assert.equal(report.result.seconds,40);assert.equal(report.result.settings.referenceSeconds,30);assert.equal(report.result.referenceSamples,720000);assert.equal(report.result.referenceSeconds,30);
   assert.ok(report.result.convertedSegments>1);
+  assert.equal(report.result.pitchShift,-12);assert.equal(report.result.autoShift,false);
+  const lowered=await measurePitch(jobId);assert.ok(lowered.voicedPairs>5&&Math.abs(lowered.medianSemitones+12)<2,JSON.stringify(lowered));assert.equal(lowered.frames,lowered.outputFrames);
   const counts=states.filter(s=>s.id===jobId&&s.stage==='converting'&&s.progress).map(s=>s.progress);
   assert.ok(counts.some(p=>p.completed>0&&p.completed<p.total),'real intermediate multi-segment progress observed');
   assert.ok(counts.every((p,i)=>p.total===report.result.convertedSegments&&p.completed>=0&&p.completed<=p.total&&(!i||p.completed>=counts[i-1].completed)));
@@ -146,9 +171,10 @@ try{
   const doneElapsed=await page.locator('#soulx-elapsed').textContent();await page.waitForTimeout(1100);assert.equal(await page.locator('#soulx-elapsed').textContent(),doneElapsed);
   await page.locator('#soulx-save').click();await page.waitForFunction(()=>document.getElementById('post-status').textContent.includes('原唱換聲'));
   const song=(await archive.list()).records.find(r=>r.soulx?.sourceKind==='original');assert.equal(song.seconds,40);assert.equal(song.appliedDelayMs,0);assert.equal(song.parentId,undefined);assert.equal(song.mode,'mix');assert.equal(song.soulx.report.settings.reference,'custom');
+  assert.equal(song.soulx.report.settings.pitchShift,-12);assert.match(song.title,/移調-12半音/);
   assert.deepEqual(song.post.segments,[{offset:0,songTime:0,duration:40}]);
   assert.ok(calls.includes('GET /library/soulx-original-fixture/accompaniment'));assert.ok(calls.includes('GET /library/soulx-original-fixture/backing'));
   await page.locator('#soulx-panel').screenshot({path:'test-results/soulx-original-source.png'});
   assert.deepEqual(errors,[]);
-  console.log(JSON.stringify({passed:true,defaultCollapsed:true,defaultDisabled:true,noAutomaticRequests:true,realModel:true,settingsDelivered:true,samePositionSwitch:true,cancellation:true,abUnchanged:true,savedToDisk:true,reopenedAndEditable:true,neutralRemix:check,originalSourceWithoutRecording:true,shortCustomReferenceForWholeSong:true,progress:counts,elapsedStopsOnCompletionCancellationAndFailure:true,errors}));
+  console.log(JSON.stringify({passed:true,defaultCollapsed:true,defaultDisabled:true,noAutomaticRequests:true,realModel:true,settingsDelivered:true,samePositionSwitch:true,cancellation:true,abUnchanged:true,savedToDisk:true,reopenedAndEditable:true,neutralRemix:check,originalSourceWithoutRecording:true,shortCustomReferenceForWholeSong:true,progress:counts,raised,lowered,elapsedStopsOnCompletionCancellationAndFailure:true,errors}));
 }finally{await browser?.close();await stopSoulx();await new Promise(resolve=>backend.close(resolve));server.kill();if(path.dirname(archiveRoot)===path.resolve(tmpdir())&&path.basename(archiveRoot).startsWith('soulx-save-test-'))await rm(archiveRoot,{recursive:true,force:true});}
