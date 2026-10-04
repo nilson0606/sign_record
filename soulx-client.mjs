@@ -116,7 +116,7 @@ export function createSoulx({store,getSelected,getPosition,getReference=()=>null
         if(original.length!==converted.length||converted.length!==state.result.outputSamples||Math.abs(converted.duration-(input.interval.end-input.interval.start))>1/24000)throw Error('輸出長度與選取範圍不符，未接受結果。');
         result={row,original,converted,report:state.result,interval:input.interval,delayMs:input.delayMs,tracks:null,draft:generatedDraft};}finally{await context.close();}
       $('result').hidden=false;$('blend').value=100;$('backing').checked=row.mode==='mix';labels();
-      const s=result.report.settings;$('result-info').textContent=`已生成：${row.soulxSource==='original'?'原曲原唱':'我的錄音'} → ${SOULX_REFERENCES[s.reference]} · ${soulxRangeLabel(input.interval,row.sourceSeconds??row.seconds)} · ${s.steps} 步 · CFG ${s.guidance} · 種子 ${s.seed} · 校正 ${input.delayMs} ms。輸入／輸出皆 ${result.converted.length} 個取樣；總長度一致不代表逐字對齊。`;
+      const s=result.report.settings;$('result-info').textContent=`已生成：${row.soulxSource==='original'?'原曲原唱':'我的錄音'} → ${SOULX_REFERENCES[s.reference]} · ${soulxRangeLabel(input.interval,row.sourceSeconds??row.seconds)} · ${s.steps} 步 · CFG ${s.guidance} · 種子 ${s.seed} · 參考 ${result.report.referenceSeconds??s.referenceSeconds} 秒 · 校正 ${input.delayMs} ms。輸入／輸出皆 ${result.converted.length} 個取樣；總長度一致不代表逐字對齊。`;
       say('已完成。按「原聲／SoulX」同位置切換比較；原錄音與 A／B 設定保留。');
     }catch(e){if(rev===revision)say(e.message);if(active)await request('/soulx/jobs/'+active,{method:'DELETE'}).catch(()=>{});}
     finally{busy=false;active=null;controls();}

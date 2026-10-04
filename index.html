@@ -166,9 +166,9 @@
           </div>
           <p class="help">原曲原唱以歌曲時間為準，不套用麥克風延時；我的錄音則沿用已保存校正。先試 10～20 秒，滿意後按「整首」再產生。變更設定後需重新產生。</p>
           <div class="soulx-grid">
-            <div><label for="soulx-reference">② 要換成誰的聲音（參考）</label><select id="soulx-reference"><option value="custom">自選參考歌聲檔</option><option value="self">我的已保存歌聲（上方選取錄音）</option><option value="original">來源歌曲的原唱音色</option><option value="zh">官方中文示範</option><option value="en">官方英文示範</option></select><p class="help">這裡提供音色參考，不決定整首歌詞與節奏。可上傳自己約 8～15 秒清唱，或選上方已保存的自己的歌聲；不必先錄完整首。</p><label id="soulx-upload-label" hidden>參考音檔<input id="soulx-upload" type="file" accept="audio/*"></label></div>
+            <div><label for="soulx-reference">② 要換成誰的聲音（參考）</label><select id="soulx-reference"><option value="custom">自選參考歌聲檔</option><option value="self">我的已保存歌聲（上方選取錄音）</option><option value="original">來源歌曲的原唱音色</option><option value="zh">官方中文示範</option><option value="en">官方英文示範</option></select><p class="help">這裡提供音色參考，不決定整首歌詞與節奏。可上傳自己的清唱，擷取 3～30 秒參考，或選上方已保存的自己的歌聲；不必先錄完整首。</p><label id="soulx-upload-label" hidden>參考音檔<input id="soulx-upload" type="file" accept="audio/*"></label></div>
             <div><label for="soulx-reference-start">參考起點（秒）</label><input id="soulx-reference-start" type="number" min="0" max="1800" step="0.1" placeholder="留白：自動選有聲片段"><p class="help">自己的／原曲原唱／自選歌聲留白時，自動挑選較有聲的片段；官方示範留白由 0 秒開始。原曲原唱的起點以分離音軌為準。</p></div>
-            <div><label for="soulx-reference-seconds">參考長度 <output id="soulx-reference-seconds-value">8 秒</output></label><input id="soulx-reference-seconds" type="range" min="3" max="15" step="1" value="8"><p class="help">只取 3～15 秒，預設 8 秒；參考檔不必和整首一樣長。起點 30 秒＋長度 8 秒，檔案至少需 38 秒。選清楚的單人乾歌聲，少配樂、少和聲；較長不保證較好。</p></div>
+            <div><label for="soulx-reference-seconds">參考長度 <output id="soulx-reference-seconds-value">8 秒</output></label><input id="soulx-reference-seconds" type="range" min="3" max="30" step="1" value="8"><p class="help">只取 3～30 秒，預設 8 秒；可比較 8／15／30 秒。參考 30 秒時，檔案至少需 30 秒；若起點設 10 秒，檔案至少需 40 秒。選清楚的單人乾歌聲，少配樂、少和聲；較長不保證較好。</p></div>
           </div>
           <div class="soulx-grid">
             <div><label for="soulx-steps">生成步數 <output id="soulx-steps-value">32 步</output></label><input id="soulx-steps" type="range" min="8" max="64" step="1" value="32"><p class="help">8～64 步，預設 32。更多步通常更慢，不保證一定更好聽；可試 16／32／64。</p></div>

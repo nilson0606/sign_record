@@ -23,7 +23,7 @@ export function validateSoulxWav(value,maxSeconds=600){
 export function validateSoulxRequest(v){
   if(!v||typeof v!=='object')throw Error('缺少轉換設定。');
   const settings=soulxSettings(v.settings),audio=validateSoulxWav(v.audio);
-  const referenceAudio=['self','custom','original'].includes(settings.reference)?validateSoulxWav(v.referenceAudio,15):null;
+  const referenceAudio=['self','custom','original'].includes(settings.reference)?validateSoulxWav(v.referenceAudio,30):null;
   if(referenceAudio&&referenceAudio.length<3*48000+44)throw Error('參考歌聲至少需要 3 秒。');
   return {settings,audio,referenceAudio};
 }

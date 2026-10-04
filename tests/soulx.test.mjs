@@ -6,14 +6,16 @@ function wav(seconds=3){
   const b=Buffer.alloc(44+48000*seconds);b.write('RIFF');b.writeUInt32LE(b.length-8,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(24000,24);b.writeUInt32LE(48000,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(b.length-44,40);return b;
 }
 test('SoulX rejects invalid controls and never accepts tempo/pitch overrides',()=>{
-  for(const s of [{steps:7},{steps:65},{steps:16.2},{guidance:Infinity},{guidance:5.1},{seed:-1},{reference:'../../x'},{referenceSeconds:16},{referenceStart:-1}])assert.throws(()=>soulxSettings(s));
+  for(const s of [{steps:7},{steps:65},{steps:16.2},{guidance:Infinity},{guidance:5.1},{seed:-1},{reference:'../../x'},{referenceSeconds:30.001},{referenceStart:-1}])assert.throws(()=>soulxSettings(s));
+  assert.equal(soulxSettings({referenceSeconds:30}).referenceSeconds,30);
   const s=soulxSettings({pitchShift:12,autoShift:true,speed:2});assert.equal(s.pitchShift,undefined);assert.equal(s.autoShift,undefined);assert.equal(s.speed,undefined);
 });
 test('SoulX waveform checks exact format, size and duration before launching Python',()=>{
   const valid=wav();assert.equal(validateSoulxWav(valid.toString('base64')).length,valid.length);
   for(const offset of [4,16,20,22,24,32,34,40]){const b=Buffer.from(valid);b[offset]^=1;assert.throws(()=>validateSoulxWav(b.toString('base64')));}
   assert.throws(()=>validateSoulxWav(valid.subarray(0,-2).toString('base64')));
-  assert.throws(()=>validateSoulxWav(wav(16).toString('base64'),15));
+  assert.throws(()=>validateSoulxWav(wav(31).toString('base64'),30));
+  assert.equal(validateSoulxRequest({settings:{reference:'custom',referenceSeconds:30},audio:valid.toString('base64'),referenceAudio:wav(30).toString('base64')}).referenceAudio.length,1440044);
   assert.throws(()=>validateSoulxRequest({settings:{reference:'self'},audio:valid.toString('base64')}));
   assert.equal(validateSoulxRequest({settings:{reference:'zh'},audio:valid.toString('base64')}).referenceAudio,null);
   assert.throws(()=>validateSoulxRequest({settings:{reference:'original'},audio:valid.toString('base64')}));

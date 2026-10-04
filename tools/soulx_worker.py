@@ -30,7 +30,7 @@ def convert(request):
         if end>len(ref)/24000+.001:raise ValueError(f'官方參考只有 {len(ref)/24000:.2f} 秒，請縮短參考範圍。')
         p=ref[round(start*24000):round(end*24000)]
     else:raise ValueError('參考歌聲不存在。')
-    if not 3<=len(p)/24000<=15 or not np.isfinite(p).all() or np.sqrt(np.mean(p*p))<.001:raise ValueError('參考需為 3～15 秒清楚的乾人聲，請改選有聲區段。')
+    if not 3<=len(p)/24000<=30 or not np.isfinite(p).all() or np.sqrt(np.mean(p*p))<.001:raise ValueError('參考需為 3～30 秒清楚的乾人聲，請改選有聲區段。')
     if not torch.cuda.is_available():raise RuntimeError('SoulX 需要可用的 NVIDIA GPU。')
     emit('pitch','分析原始旋律與時間位置…')
     spec=importlib.util.spec_from_file_location('soulx_f0',REPO/'preprocess/tools/f0_extraction.py')
@@ -68,6 +68,7 @@ def convert(request):
     if peak<.0001:raise ValueError('生成歌聲接近靜音，請換參考或參數。')
     sf.write(job/'source.wav',a,24000,subtype='PCM_16');sf.write(job/'result.wav',result*scale,24000,subtype='PCM_16')
     report={'model':'SoulX-Singer-SVC','settings':settings,'sampleRate':24000,'sourceSamples':len(a),'outputSamples':len(result),'seconds':len(a)/24000,'elapsedSeconds':round(time.monotonic()-start,2),'pitchShift':shift,'autoShift':False,'peakScale':scale,'alignmentVerified':False,'codeRevision':'81aeb3ae772c70093c3de74dc23c92d983801ae4'}
+    report['referenceSamples']=len(p);report['referenceSeconds']=len(p)/24000
     (job/'result.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf8');emit('ready','SoulX 試聽完成。')
 if __name__=='__main__':
     sys.stdout.reconfigure(encoding='utf8');sys.stderr.reconfigure(encoding='utf8')

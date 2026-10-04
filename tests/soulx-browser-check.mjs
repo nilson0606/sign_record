@@ -10,6 +10,11 @@ import {handleSoulx,stopSoulx} from '../soulx-server.mjs';
 const {chromium}=createRequire('C:/Users/User/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/package.json')('playwright');
 const site='http://localhost:4288',api='http://127.0.0.1:4294',token='soulx-test-token';
 const fixture=await readFile('.runtime/soulx/results/contrast-source.wav');
+const longReference=Buffer.alloc(44+30*48000);fixture.copy(longReference,0,0,36);
+longReference.writeUInt32LE(longReference.length-8,4);longReference.writeUInt16LE(1,20);longReference.writeUInt32LE(48000,28);longReference.writeUInt16LE(2,32);longReference.writeUInt16LE(16,34);longReference.write('data',36);longReference.writeUInt32LE(longReference.length-44,40);
+let fixtureData=12;while(fixture.toString('ascii',fixtureData,fixtureData+4)!=='data')fixtureData+=8+fixture.readUInt32LE(fixtureData+4)+(fixture.readUInt32LE(fixtureData+4)%2);
+const fixtureFrames=fixture.readUInt32LE(fixtureData+4)/4;fixtureData+=8;
+for(let i=0;i<720000;i++){const sample=Math.max(-1,Math.min(1,fixture.readFloatLE(fixtureData+(i%fixtureFrames)*4)));longReference.writeInt16LE(Math.round(sample*(sample<0?32768:32767)),44+i*2);}
 const archiveRoot=await mkdtemp(path.join(tmpdir(),'soulx-save-test-')),archive=new RecordingArchive(archiveRoot);
 const backend=http.createServer(async(req,res)=>{
   if(req.url==='/session'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({token,features:['recording-library','recording-raw-mime']}));return;}
@@ -104,6 +109,11 @@ try{
   await page.locator('#soulx-source').selectOption('original');
   assert.equal(await page.locator('#soulx-reference').inputValue(),'custom');assert.equal(await page.locator('#post-recording option').count(),0);
   await page.locator('#soulx-upload').setInputFiles({name:'my-voice.wav',mimeType:'audio/wav',buffer:fixture});
+  await page.locator('#soulx-reference-seconds').fill('30');assert.equal(await page.locator('#soulx-reference-seconds-value').textContent(),'30 秒');
+  const postsBefore=calls.filter(c=>c==='POST /soulx/jobs').length;
+  await page.locator('#soulx-generate').click();await page.waitForFunction(()=>document.getElementById('soulx-status').textContent.includes('參考音檔比設定長度短'));
+  assert.equal(calls.filter(c=>c==='POST /soulx/jobs').length,postsBefore,'short reference rejected before starting GPU job');
+  await page.locator('#soulx-upload').setInputFiles({name:'my-voice-30s.wav',mimeType:'audio/wav',buffer:longReference});
   await page.locator('#soulx-steps').fill('8');await page.locator('#soulx-full').click();
   assert.match(await page.locator('#soulx-range-info').textContent(),/整首.*20.00/);
   await page.locator('#soulx-generate').click();await page.waitForFunction(()=>!document.getElementById('soulx-cancel').disabled);
@@ -112,7 +122,7 @@ try{
   assert.match(await page.locator('#soulx-result-info').textContent(),/原曲原唱 → 自選參考歌聲.*整首/);
   assert.equal(await page.evaluate(()=>window.testVoiceReads),0,'must not read the user recording as source');
   const jobId=calls.filter(c=>/^GET \/soulx\/jobs\/[^/]+$/.test(c)).at(-1).split('/').at(-1);
-  const report=await(await fetch(api+'/soulx/jobs/'+jobId,{headers:{'X-Karaoke-Token':token}})).json();assert.equal(report.result.seconds,20);assert.equal(report.result.settings.referenceSeconds,8);
+  const report=await(await fetch(api+'/soulx/jobs/'+jobId,{headers:{'X-Karaoke-Token':token}})).json();assert.equal(report.result.seconds,20);assert.equal(report.result.settings.referenceSeconds,30);assert.equal(report.result.referenceSamples,720000);assert.equal(report.result.referenceSeconds,30);
   await page.locator('#soulx-save').click();await page.waitForFunction(()=>document.getElementById('post-status').textContent.includes('原唱換聲'));
   const song=(await archive.list()).records.find(r=>r.soulx?.sourceKind==='original');assert.equal(song.seconds,20);assert.equal(song.appliedDelayMs,0);assert.equal(song.parentId,undefined);assert.equal(song.mode,'mix');assert.equal(song.soulx.report.settings.reference,'custom');
   assert.deepEqual(song.post.segments,[{offset:0,songTime:0,duration:20}]);
