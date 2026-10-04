@@ -1,6 +1,6 @@
 import { recordingTuningSuffix } from './recording-tune.mjs';
 import { createRecordingAudition } from './recording-audition.mjs';
-import { recordingScenes, initialRecordingEffects, matchingRecordingScene } from './recording-scenes.mjs';
+import { recordingScenes, initialRecordingEffects, matchingRecordingScene, recordingEmotions, matchingRecordingEmotion } from './recording-scenes.mjs';
 import { PITCH_DETECTOR_VERSION } from './audio.mjs';
 import { softeningProfile, recordingSofteningSuffix, recordingEffectsSuffix, vocalEffects, reverbProfile, reverbSpacePresets } from './recording-soften.mjs';
 import { scoringProfile } from './scoring.mjs';
@@ -40,6 +40,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
   const status=text=>{$(statusTarget).textContent=text;};
   function clearAudio(){audition?.stop();const a=$('post-audio');a.pause();a.removeAttribute('src');a.load();a.hidden=true;if(url)URL.revokeObjectURL(url);url=null;}
   function effectLabels(){
+    emotionLabels();
     $('post-reverb-space-help').textContent=reverbSpacePresets[$('post-reverb-space').value].help;
     for(const band of ['low','mid','high'])$('post-eq-'+band+'-value').textContent=$('post-eq-'+band).value+' dB';
     $('post-reverb-value').textContent=$('post-reverb').value+'%';
@@ -49,6 +50,13 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     const spatial=readSpatialEffects(),key=matchingRecordingScene(spatial),r=spatial.reverbOptions,t=spatial.reverbTone,e=spatial.echo;
     $('post-scene').value=key;
     $('post-scene-status').textContent=`${key?recordingScenes[key].label:'自訂空間效果'} · 殘響 ${spatial.reverb}% · ${reverbSpacePresets[r.space].label} · 尾音 ${r.decay} 秒 · 預延遲 ${r.preDelayMs} ms · 明亮 ${t.brightness} · 寬度 ${t.width}% · 回聲 ${e.amount}%${e.amount?`／${e.timeMs} ms／${e.repeats} 次／每次保留 ${e.feedback}%／${e.pingPong?'左右交替':'中央'}`:''}。`;
+  }
+  function readEmotionSettings(){return {softening:$('post-softening').value,effects:{eq:Object.fromEntries(['low','mid','high'].map(b=>[b,Number($('post-eq-'+b).value)])),compression:$('post-compression').value}};}
+  function emotionLabels(){
+    const settings=readEmotionSettings(),key=matchingRecordingEmotion(settings),preset=recordingEmotions[key];
+    $('post-emotion').value=key;
+    const strength={off:'關閉',light:'輕度',medium:'中度',strong:'強烈'};
+    $('post-emotion-status').textContent=`${preset?.help??'已自行微調音色，可繼續調整或重新選擇情緒。'} EQ 低／中／高：${['low','mid','high'].map(b=>settings.effects.eq[b]).join('／')} dB · 柔化：${strength[settings.softening]} · 壓縮：${strength[settings.effects.compression]}。`;
   }
   function readSpatialEffects(){
     return {reverb:Number($('post-reverb').value),reverbOptions:{space:$('post-reverb-space').value,decay:Number($('post-reverb-decay').value),preDelayMs:Number($('post-reverb-predelay').value)},reverbTone:{brightness:Number($('post-reverb-brightness').value),width:Number($('post-reverb-width').value)},echo:{amount:Number($('post-echo-amount').value),timeMs:Number($('post-echo-time').value),repeats:Number($('post-echo-repeats').value),feedback:Number($('post-echo-feedback').value),pingPong:$('post-echo-pingpong').value==='on'}};
@@ -64,6 +72,9 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
   }
   for(const [key,scene] of Object.entries(recordingScenes)){
     const option=document.createElement('option');option.value=key;option.textContent=scene.label;$('post-scene').append(option);
+  }
+  for(const [key,preset] of Object.entries(recordingEmotions)){
+    const option=document.createElement('option');option.value=key;option.textContent=preset.label+(key==='original'?'（預設，不額外調整音色）':'');$('post-emotion').append(option);
   }
   function addRegion(value){
     const row=document.createElement('div');row.className='post-region-row';
@@ -202,6 +213,15 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     $('post-reverb-decay').value=preset.decay;$('post-reverb-predelay').value=preset.preDelayMs;effectLabels();
   });
   $('post-echo-pingpong').addEventListener('change',effectLabels);
+  for(const id of ['post-softening','post-compression'])$(id).addEventListener('change',emotionLabels);
+  $('post-emotion').addEventListener('change',()=>{
+    const preset=recordingEmotions[$('post-emotion').value];if(!preset)return;
+    audition?.stop();
+    $('post-softening').value=preset.softening;
+    for(const band of ['low','mid','high'])$('post-eq-'+band).value=preset.eq[band];
+    $('post-compression').value=preset.compression;effectLabels();
+    $('post-audition-status').textContent=`已套用 ${$('post-ab-editor').dataset.slot.toUpperCase()} 組「${preset.label}」音色，空間設定保留；按試聽聽取新效果，滿意後重新合成另存。`;
+  });
   $('post-scene').addEventListener('change',()=>{
     const scene=recordingScenes[$('post-scene').value];if(!scene)return;
     audition?.stop();setSpatialEffects(scene.effects);
@@ -254,6 +274,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
       result.postVolume=volume;
       result.vocalEffects=effects;
       result.postScene={version:1,id:matchingRecordingScene(effects)||'custom'};
+      result.postEmotion={version:1,id:matchingRecordingEmotion({effects,softening:softening.id})};
       result.postEdit=edit;
       result.rawBytes=rawBlob.size;result.rawMime=row.rawMime||rawBlob.type||row.mime;
       result.post=structuredClone(row.post);result.post.offsetMs=delayMs;
@@ -286,7 +307,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
   audition=createRecordingAudition({run,getPosition:originalPlayhead,beforePlay:()=>{$('post-audio').pause();pause();},
     onEditor:name=>{const panel=$('post-ab-editor'),label=name.toUpperCase();panel.dataset.slot=name;panel.className='audition-slot-'+name;$('post-ab-editor-heading').textContent=`正在調整 ${label} 組`;$('post-audition-quick').textContent=`片段試聽目前 ${label} 設定`;$('post-remix').textContent=`重新合成 ${label}（音量／延時／音色／剪輯）`;},
     read:()=>{const delayMs=Number($('remix-delay').value);delaySeconds(delayMs);return {delayMs,softening:$('post-softening').value,volume:recordingVolume({voice:Number($('post-voice-level').value),backing:Number($('post-backing-level').value)}),effects:readEffects()};},
-    apply:s=>{setEffects(s.effects);$('post-softening').value=s.softening;$('remix-delay').value=s.delayMs;$('post-delay').value=s.delayMs;$('post-voice-level').value=s.volume.voice;$('post-backing-level').value=s.volume.backing;volumeLabels();},
+    apply:s=>{$('post-softening').value=s.softening;setEffects(s.effects);$('remix-delay').value=s.delayMs;$('post-delay').value=s.delayMs;$('post-voice-level').value=s.volume.voice;$('post-backing-level').value=s.volume.backing;volumeLabels();},
     render:async(row,settings,interval,solo)=>{
       if(!previewSources){const c=new AudioContext({sinkId:{type:'none'}});try{
         const blob=await store.blob(row,'voice');if(!blob.size||blob.size!==row.rawBytes)throw Error('原始歌聲不完整，無法比較。');

@@ -190,6 +190,12 @@
     <details id="post-effects-panel" class="post-effects"><summary><span class="post-effects-heading"><strong>人聲進階後製</strong><span>局部音量 · EQ · 動態壓縮 · 殘響</span></span><span class="post-effects-toggle"><span class="when-closed">點此展開</span><span class="when-open">收合設定</span></span></summary>
       <fieldset id="post-effects-fields" disabled><legend>只處理歌唱者</legend>
         <p class="help">新版錄製的音檔，A／B 後製起始設定皆為大廳殘響 20%＋回聲 10%；舊錄音沿用原有設定。可先用片段試聽比較，滿意後按「重新合成」另存；每次從原始歌聲重算，效果不會疊加。配樂／和音不套用這些效果。</p>
+        <div class="post-emotion-card">
+          <label for="post-emotion">人聲情緒 · 選取即套用目前組別</label>
+          <select id="post-emotion" aria-describedby="post-emotion-help post-emotion-status"><option value="custom" disabled>自訂音色</option></select>
+          <p id="post-emotion-status" class="help" role="status"></p>
+          <p id="post-emotion-help" class="help">預設「原音」，不額外調整音色。10 種情緒會帶入 EQ、柔化與壓縮，可再微調；不改變唱法與音高。殘響、回聲、音量、校正、剪輯及另一組設定保留。原音不等於關閉所有後製；想聽乾聲，另將殘響與回聲調為 0%。已有後製的錄音沿用保存的音色。按「試聽 A／B」比較，滿意後「重新合成」另存。</p>
+        </div>
         <div class="post-scene-card">
           <label for="post-scene">情境預設 · 選取即套用目前組別</label>
           <select id="post-scene" aria-describedby="post-scene-help post-scene-status"><option value="" disabled>自訂空間效果</option></select>

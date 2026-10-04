@@ -136,5 +136,44 @@ try{
  assert.equal(await $('post-scene').inputValue(),'hall');assert.equal(await $('post-echo-amount').inputValue(),'10');await $('post-audition-a-edit').click();assert.equal(await $('post-scene').inputValue(),'hall');assert.equal(await $('post-echo-amount').inputValue(),'10');assert.equal(await page.evaluate(()=>fixtureRows.get('new-capture').meta.vocalEffects),undefined);
  await $('post-scene').selectOption('sacred');await $('post-audition-reset').click();assert.equal(await $('post-scene').inputValue(),'hall');assert.equal(await $('post-echo-amount').inputValue(),'10');
  await page.locator('.post-scene-card').screenshot({path:'test-results/recording-scene-a.png'});
- assert.deepEqual(errors,[]);console.log(JSON.stringify({saved:check.meta.postEdit,reverb:check.meta.vocalEffects.reverbOptions,solo,repeatIdentical:true,sourceRestored:true,mappedPlayhead:true,abRestore:true,spaceCount:12,sceneSaved:true,errors}));
+ // Emotion presets use the same visible timbre controls and leave the other draft/space alone.
+ await $('post-recording').selectOption(restored);
+ const beforeEmotionMeta=await page.evaluate(id=>structuredClone(fixtureRows.get(id).meta),restored);
+ assert.equal(await $('post-emotion').inputValue(),'original');
+ await $('post-scene').selectOption('hall');
+ await $('post-emotion').selectOption('intimate');
+ assert.equal(await $('post-softening').inputValue(),'light');
+ assert.equal(await $('post-eq-high').inputValue(),'-2');
+ assert.equal(await $('post-scene').inputValue(),'hall');
+ assert.equal(await $('post-echo-amount').inputValue(),'10');
+ const emotionDiff=$('post-audition-differences-body').locator('tr').filter({has:page.getByRole('rowheader',{name:'人聲情緒',exact:true})});
+ assert.deepEqual(await emotionDiff.locator('td').allTextContents(),['原音','溫柔親密']);
+ await $('post-audition-a-edit').click();assert.equal(await $('post-emotion').inputValue(),'original');assert.equal(await $('post-softening').inputValue(),'off');
+ await $('post-emotion').selectOption('passionate');
+ await $('post-audition-b-edit').click();assert.equal(await $('post-emotion').inputValue(),'intimate');assert.equal(await $('post-softening').inputValue(),'light');
+ await $('post-eq-high').fill('-4');assert.equal(await $('post-emotion').inputValue(),'custom');
+ await $('post-emotion').selectOption('original');assert.equal(await $('post-softening').inputValue(),'off');assert.equal(await $('post-eq-high').inputValue(),'0');assert.equal(await $('post-compression').inputValue(),'off');assert.equal(await $('post-echo-amount').inputValue(),'10');
+ const emotionPresets=await page.evaluate(async()=> (await import('/recording-scenes.mjs')).recordingEmotions);
+ assert.equal(await $('post-emotion').locator('option:not([disabled])').count(),11);
+ for(const [id,p] of Object.entries(emotionPresets)){
+   await $('post-emotion').selectOption(id);assert.equal(await $('post-emotion').inputValue(),id);
+   assert.equal(await $('post-softening').inputValue(),p.softening);assert.equal(await $('post-compression').inputValue(),p.compression);
+   assert.equal(await $('post-scene').inputValue(),'hall');
+ }
+ await $('post-emotion').selectOption('intimate');
+ await page.locator('.post-emotion-card').evaluate(el=>el.scrollIntoView({block:'center'}));
+ await page.locator('.post-emotion-card').screenshot({path:'test-results/recording-emotion-b.png'});
+ await $('post-audition-quick').click();await page.waitForFunction(()=>document.querySelector('#post-audition-position').textContent.startsWith('B'));
+ await $('post-emotion').selectOption('sincere');assert.equal(await $('post-audition-position').textContent(),'');
+ const emotionSaved=await remix();
+ assert.deepEqual(await page.evaluate(id=>fixtureRows.get(id).meta.postEmotion,emotionSaved),{version:1,id:'sincere'});
+ assert.match(await $('post-recording').locator('option:checked').textContent(),/情緒_深情真摯/);
+ assert.equal(await $('post-emotion').inputValue(),'sincere');await $('post-audition-a-edit').click();assert.equal(await $('post-emotion').inputValue(),'sincere');
+ await $('post-emotion').selectOption('dreamy');await $('post-audition-reset').click();assert.equal(await $('post-emotion').inputValue(),'sincere');
+ await page.locator('.post-emotion-card').evaluate(el=>el.scrollIntoView({block:'center'}));
+ await page.locator('.post-emotion-card').screenshot({path:'test-results/recording-emotion-a.png'});
+ assert.deepEqual(await page.evaluate(id=>fixtureRows.get(id).meta,restored),beforeEmotionMeta);
+ assert.equal(await page.evaluate(async id=>await hash(fixtureRows.get(id).mix),restored),await page.evaluate(()=>originalHash));
+ assert.equal(await page.evaluate(async id=>await hash(fixtureRows.get(id).voice),restored),await page.evaluate(()=>rawHash));
+ assert.deepEqual(errors,[]);console.log(JSON.stringify({saved:check.meta.postEdit,reverb:check.meta.vocalEffects.reverbOptions,solo,repeatIdentical:true,sourceRestored:true,mappedPlayhead:true,abRestore:true,spaceCount:12,sceneSaved:true,emotionCount:10,emotionSaved:true,errors}));
 }finally{await browser?.close();server.kill();}

@@ -34,3 +34,34 @@ export function matchingRecordingScene(value){
       &&Object.entries(p.echo).every(([k,v])=>(value.echo?.[k]??echo()[k])===v);
   })?.[0]??'';
 }
+
+// Timbre starting points, independent of space, timing, capture and scoring.
+// All parameters remain visible/editable; selecting repeatedly never stacks effects.
+const emotion=(label,help,low,mid,high,compression='off',softening='off')=>({label,help,eq:{low,mid,high},compression,softening});
+export const recordingEmotions={
+  original:emotion('原音','不額外調整音色：EQ 歸零、柔化與壓縮關閉；空間效果仍保留。',0,0,0),
+  intimate:emotion('溫柔親密','柔和、貼近耳邊，收斂尖亮感；可搭配「貼近耳邊」情境。',1,-1,-2,'off','light'),
+  sweet:emotion('甜蜜幸福','輕盈明亮、帶微笑感，輕度壓縮讓輕聲較穩定。',-1,1,2,'light'),
+  sincere:emotion('深情真摯','溫暖厚實，保留較多演唱起伏；可搭配大廳。',2,1,0,'light'),
+  nostalgic:emotion('思念懷舊','柔暗溫暖，收斂高頻，烘托回憶感。',1,-1,-3,'off','light'),
+  lonely:emotion('孤單落寞','音色清瘦、稍微退後，保留原有強弱；可搭配寬廣空間。',-2,-1,-1),
+  fragile:emotion('悲傷脆弱','保留氣息、細節與大小聲起伏，不加柔化或壓縮。',-1,0,1),
+  calm:emotion('釋懷平靜','自然平順，稍微收斂中高頻，保留演唱動態。',0,-1,-1),
+  resolute:emotion('堅定振奮','增加清晰度與存在感，用輕度壓縮穩住人聲。',1,2,1,'light'),
+  passionate:emotion('激昂奔放','突出咬字與明亮度，中度壓縮控制較大的音量落差。',-1,3,2,'medium'),
+  dreamy:emotion('夢幻迷離','柔和、朦朧，降低直接感；可搭配夢幻空間與回聲。',0,-2,-2,'off','light'),
+};
+export function matchingRecordingEmotion({effects={},softening='off'}={}){
+  return Object.entries(recordingEmotions).find(([,p])=>p.softening===softening
+    &&p.compression===(effects.compression??'off')
+    &&['low','mid','high'].every(k=>p.eq[k]===(effects.eq?.[k]??0)))?.[0]??'custom';
+}
+export function recordingEmotionLabel(settings){
+  return recordingEmotions[matchingRecordingEmotion(settings)]?.label??'自訂音色';
+}
+export function recordingEmotionSuffix(meta){
+  const saved=meta.postEmotion;
+  if(saved?.version!==1||saved.id==='original')return '';
+  const label=saved.id==='custom'?'自訂音色':recordingEmotions[saved.id]?.label;
+  return label?`情緒_${label}`:'';
+}

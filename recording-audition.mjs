@@ -1,5 +1,6 @@
 // Temporary A/B renders share a source-time interval. They never write to the archive.
 import {reverbSpaces} from './recording-soften.mjs';
+import {recordingEmotionLabel} from './recording-scenes.mjs';
 const $=id=>document.getElementById('post-audition-'+id);
 // Compare displayed settings, including inactive effect parameters, without touching audio.
 export function settingDifferences(a,b,{includeBacking=true}={}){
@@ -10,6 +11,7 @@ export function settingDifferences(a,b,{includeBacking=true}={}){
   if(includeBacking)add('配樂／和音音量',a.volume?.backing??100,b.volume?.backing??100,unit('%'));
   add('歌聲延時校正',a.delayMs??0,b.delayMs??0,signed(' ms'));
   add('歌聲柔化',a.softening??'off',b.softening??'off',strength);
+  add('人聲情緒',recordingEmotionLabel(a),recordingEmotionLabel(b));
   const x=a.effects??{},y=b.effects??{};
   for(const [key,label] of [['low','低頻'],['mid','中頻'],['high','高頻']])add(`EQ ${label}`,x.eq?.[key]??0,y.eq?.[key]??0,signed(' dB'));
   add('動態壓縮',x.compression??'off',y.compression??'off',strength);
@@ -62,7 +64,7 @@ export function createRecordingAudition({read,apply,render,run,beforePlay,onEdit
     for(const name of ['a','b']){const button=$(name+'-play');button.setAttribute('aria-pressed',String(active===name));button.textContent=loading===name?`準備 ${name.toUpperCase()}…`:active===name?`● 正在聽 ${name.toUpperCase()}`:`▶ 試聽 ${name.toUpperCase()}`;}
     $('stop').disabled=!active&&!busy;$('mode').disabled=busy||!enabled||row?.mode==='voice';
   }
-  function describe(name){const s=slots[name];$(name+'-info').textContent=s?`殘響 ${s.effects.reverb}% · 明亮 ${s.effects.reverbTone?.brightness??0} · 寬度 ${s.effects.reverbTone?.width??100}% · 回聲 ${s.effects.echo?.amount??0}% · ${s.effects.effectRegions?.length??0} 段局部效果 · 校正 ${s.delayMs} ms`:'尚未記住設定';}
+  function describe(name){const s=slots[name];$(name+'-info').textContent=s?`情緒 ${recordingEmotionLabel(s)} · 殘響 ${s.effects.reverb}% · 明亮 ${s.effects.reverbTone?.brightness??0} · 寬度 ${s.effects.reverbTone?.width??100}% · 回聲 ${s.effects.echo?.amount??0}% · ${s.effects.effectRegions?.length??0} 段局部效果 · 校正 ${s.delayMs} ms`:'尚未記住設定';}
   function reset(value){invalidate();row=value;const settings=value?read():null;slots=value?{a:structuredClone(settings),b:structuredClone(settings)}:{};initial=structuredClone(slots);for(const name of ['a','b'])describe(name);showTab('b');$('start').value=0;$('end').value=Math.min(10,value?.sourceSeconds??value?.seconds??10).toFixed(2);$('mode').value=value?.mode==='voice'?'voice':'mix';say(value?'A、B 已帶入相同的初始設定，可各自調整後比較。預設調整 B；點標籤即可切換整組數值。':'選取錄音後即可比較。');controls();}
   function restoreEditor(){
     if(busy||!initial[editor])return;
