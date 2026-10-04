@@ -22,12 +22,27 @@ export function createArrangement({getReference,beforePlay}){
   let sourceId=null,busy=false,saving=false,locked=false,revision=0,active=null,result=null,library=[],urls=[],mixes=null,renderVersion=0,playVersion=0,timer=null;
   const player=$('audio'),say=t=>{$('status').textContent=t;},enabled=()=>$('enable').checked;
   const source=()=>{const r=getReference();return r?.hasPreview&&r.cacheId?r:null;};
+  function relation(meta){
+    const ref=getReference();if(!ref?.cacheId)return 'none';
+    if(meta.cacheId===ref.cacheId)return 'match';
+    const video=m=>m.videoId||/^([\w-]{11})_/.exec(m.cacheId??'')?.[1];
+    return video(meta)&&video(meta)===video(ref)?'related':'other';
+  }
+  function libraryRelation(){
+    const labels={match:'同曲同版本',related:'同曲・不同分離版本',other:'其他歌曲',none:'未載入歌曲'};
+    for(const option of $('library').options){const meta=library.find(m=>m.id===option.value);if(!meta)continue;const kind=relation(meta);option.dataset.relation=kind;const text=`【${labels[kind]}】${meta.title}`;if(option.textContent!==text)option.textContent=text;}
+    const selected=library.find(m=>m.id===$('library').value),kind=selected?relation(selected):'none';
+    $('library').dataset.relation=kind;$('library-relation').dataset.relation=kind;
+    const title=getReference()?.title??'目前歌曲';
+    $('library-relation').textContent=!selected?'高亮：同曲同版本 · 金色：同曲不同分離版本 · 暗色：其他歌曲。全部都可選取、試聽或刪除。':kind==='match'?`✓ 與「${title}」同曲同版本。SoulX 可選用，配樂範圍仍需涵蓋歌聲。`:kind==='related'?`△ 與「${title}」是同一首歌，但分離版本不同。目前 SoulX 只提供同版本配樂選用。`:kind==='other'?`這份配樂屬於其他歌曲，與目前載入的「${title}」不同。`:'尚未載入歌曲，暫不判斷關聯；仍可試聽或刪除。';
+  }
   function controls(){
     $('content').hidden=!enabled();$('fields').disabled=!enabled()||!source()||busy||saving||locked;$('enable').disabled=saving;$('cancel').disabled=!busy||!active;
     for(const id of ['listen-original','listen-new','download','load','delete','refresh','listen-mode','match','library'])$(id).disabled=busy||saving||locked;
     $('save').disabled=!result||!!result.saved||!result.jobId||busy||saving||locked;
     $('load').disabled||=!$('library').value;
     $('delete').disabled||=!$('library').value;
+    libraryRelation();
   }
   function resetAudio(){player.pause();player.removeAttribute('src');player.load();urls.forEach(URL.revokeObjectURL);urls=[];mixes=null;renderVersion++;playVersion++;}
   function clear(){resetAudio();result=null;$('result').hidden=true;}
