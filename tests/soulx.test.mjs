@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {soulxSettings,soulxInterval,soulxRangeLabel,soulxSavedMetadata,soulxOriginalReference,soulxSongSource} from '../soulx-settings.mjs';
-import {validateSoulxRequest,validateSoulxWav} from '../soulx-server.mjs';
+import {validateSoulxRequest,validateSoulxWav,soulxProgress} from '../soulx-server.mjs';
+test('SoulX progress belongs to the current phase and rejects invalid counts',()=>{
+  const p={unit:'segments',completed:2,total:4};assert.deepEqual(soulxProgress('converting',p),p);
+  for(const stage of ['loading','pitch','ready','failed','cancelled'])assert.equal(soulxProgress(stage,p),null);
+  for(const value of [null,{}, {...p,total:0},{...p,completed:5},{...p,completed:-1},{...p,completed:NaN},{...p,total:2.5}])assert.equal(soulxProgress('converting',value),null);
+  assert.deepEqual(soulxProgress('pitch',{unit:'frames',completed:100,total:200}),{unit:'frames',completed:100,total:200});
+});
 function wav(seconds=3){
   const b=Buffer.alloc(44+48000*seconds);b.write('RIFF');b.writeUInt32LE(b.length-8,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(24000,24);b.writeUInt32LE(48000,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(b.length-44,40);return b;
 }

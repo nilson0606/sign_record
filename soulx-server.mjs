@@ -27,7 +27,12 @@ export function validateSoulxRequest(v){
   if(referenceAudio&&referenceAudio.length<3*48000+44)throw Error('參考歌聲至少需要 3 秒。');
   return {settings,audio,referenceAudio};
 }
-const summary=j=>({id:j.id,stage:j.stage,message:j.message,result:j.result??null});
+export function soulxProgress(stage, value){
+  const unit=stage==='pitch'?'frames':stage==='converting'?'segments':null;
+  if(!unit||value?.unit!==unit||!Number.isSafeInteger(value.completed)||!Number.isSafeInteger(value.total)||value.total<1||value.completed<0||value.completed>value.total)return null;
+  return {completed:value.completed,total:value.total,unit};
+}
+const summary=j=>({id:j.id,stage:j.stage,message:j.message,progress:soulxProgress(j.stage,j.progress),result:j.result??null});
 async function kill(job){
   if(!job.child||!job.running)return;
   const closed=new Promise(resolve=>job.child.once('close',resolve));job.child.kill();await closed;
@@ -61,7 +66,7 @@ export async function handleSoulx(req,res,{gpuBusy=()=>false}={}){
         job.child=child;job.running=true;let pending='',diagnostic='',ready=false;
         const event=line=>{let d;try{d=JSON.parse(line);}catch{return;}if(finished(job))return;
           if(d.stage==='ready'){ready=true;return;}
-          if(['loading','pitch','converting','failed'].includes(d.stage)){job.stage=d.stage;job.message=String(d.message??d.stage).slice(0,600);}
+          if(['starting','loading','pitch','converting','finalizing','failed'].includes(d.stage)){job.stage=d.stage;job.message=String(d.message??d.stage).slice(0,600);job.progress=soulxProgress(d.stage,d.progress);}
         };
         child.stdout.setEncoding('utf8');child.stderr.setEncoding('utf8');
         child.stdout.on('data',x=>{pending+=x;const lines=pending.split(/\r?\n/);pending=lines.pop();lines.forEach(event);if(pending.length>100000)pending='';});

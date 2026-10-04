@@ -151,6 +151,11 @@
       <label class="soulx-enable"><input id="soulx-enable" type="checkbox"> 啟用 SoulX 實驗選項</label>
       <p class="help">先選「待轉換的歌」，再選「要換成誰的聲音」。原曲原唱提供歌詞、旋律與演唱節奏，自選短段歌聲提供音色參考；不需要自己先唱完整首。尚未保證逐字對齊或完全重現本人聲音。速度固定，自動移調關閉。</p>
       <p id="soulx-status" class="status" role="status">SoulX 已關閉；展開不會載入模型。</p>
+      <section id="soulx-progress" class="soulx-progress" hidden aria-label="SoulX 轉換進度">
+        <div class="soulx-progress-heading"><strong id="soulx-progress-stage">準備音訊</strong><span id="soulx-elapsed">已用時間 0:00</span></div>
+        <progress id="soulx-progress-bar" max="100" aria-labelledby="soulx-progress-stage" aria-describedby="soulx-progress-detail"></progress>
+        <p id="soulx-progress-detail" class="help">正在準備原始人聲與參考片段…</p>
+      </section>
       <div id="soulx-content" hidden>
         <label for="soulx-source">① 待轉換的歌（來源）</label>
         <select id="soulx-source" disabled><option value="original">原曲原唱（目前載入歌曲）</option><option value="recording">我的錄音（上方選取的錄音）</option></select>

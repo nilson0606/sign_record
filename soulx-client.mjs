@@ -27,6 +27,26 @@ function automaticReference(buffer,seconds){
 export function createSoulx({store,getSelected,getPosition,getReference=()=>null,beforePlay,onSaved=async()=>{}}){
   let selectedId=null,externalBusy=false,busy=false,saving=false,revision=0,active=null,result=null,urls=[],mixes=null,rendering=0,side='ai';
   const say=text=>{$('status').textContent=text;};
+  let progressTimer=null,progressStarted=0;
+  function stopProgress(){clearInterval(progressTimer);progressTimer=null;}
+  function showProgress(stage,detail,progress=null){
+    const names={preparing:'準備音訊',starting:'啟動本機環境',pitch:'分析旋律',loading:'載入模型',converting:'轉換歌聲',finalizing:'整理與檢查音檔',ready:'已完成',failed:'未完成',cancelled:'已取消'};
+    $('progress').hidden=false;$('progress-stage').textContent=names[stage]??'處理中';
+    const bar=$('progress-bar');bar.hidden=['failed','cancelled'].includes(stage);
+    const unit=stage==='converting'?'segments':stage==='pitch'?'frames':null;
+    if(unit&&progress?.unit===unit&&Number.isSafeInteger(progress.total)&&progress.total>0&&Number.isSafeInteger(progress.completed)&&progress.completed>=0&&progress.completed<=progress.total){
+      const percent=Math.floor(progress.completed/progress.total*100);bar.value=percent;
+      detail=unit==='segments'?`已完成 ${progress.completed}／${progress.total} 段 · 本階段 ${percent}%。${detail}`:`旋律分析 ${percent}%。${detail}`;
+    }else if(stage==='ready')bar.value=100;
+    else bar.removeAttribute('value');
+    $('progress-detail').textContent=detail;
+    if(['ready','failed','cancelled'].includes(stage))stopProgress();
+  }
+  function startProgress(){
+    stopProgress();progressStarted=performance.now();
+    const tick=()=>{const seconds=Math.floor((performance.now()-progressStarted)/1000);$('elapsed').textContent=`已用時間 ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;};
+    tick();progressTimer=setInterval(tick,1000);showProgress('preparing','正在準備原始人聲與參考片段…');
+  }
   const source=()=>$('source').value==='original'?soulxSongSource(getReference()):getSelected();
   const eligible=()=>{const row=source();return !!(row?.complete&&(row.rawBytes||row.soulxSource==='original'));};
   const enabled=()=>$('enable').checked;
@@ -45,7 +65,7 @@ export function createSoulx({store,getSelected,getPosition,getReference=()=>null
   function labels(){for(const [id,unit] of [['steps',' 步'],['guidance',''],['reference-seconds',' 秒'],['blend','%']])$(id+'-value').textContent=$(id).value+unit;$('upload-label').hidden=$('reference').value!=='custom';}
   function settings(){return soulxSettings({reference:$('reference').value,referenceStart:$('reference-start').value===''?null:Number($('reference-start').value),referenceSeconds:Number($('reference-seconds').value),steps:Number($('steps').value),guidance:Number($('guidance').value),seed:Number($('seed').value)});}
   function reset(){for(const [id,key] of [['reference','reference'],['reference-seconds','referenceSeconds'],['steps','steps'],['guidance','guidance'],['seed','seed']])$(id).value=SOULX_DEFAULTS[key];if($('source').value==='original')$('reference').value='custom';$('reference-start').value='';labels();}
-  async function cancel(){revision++;player.pause();if(active)try{await request('/soulx/jobs/'+active,{method:'DELETE'});}catch{}say(enabled()?'已取消 SoulX；原始錄音保留。':'SoulX 已關閉。');}
+  async function cancel(){revision++;player.pause();if(busy)showProgress('cancelled','已取消轉換；原始音檔保留。');else{stopProgress();$('progress').hidden=true;}if(active)try{await request('/soulx/jobs/'+active,{method:'DELETE'});}catch{}say(enabled()?'已取消 SoulX；原始錄音保留。':'SoulX 已關閉。');}
   $('enable').addEventListener('change',async()=>{
     controls();if(!enabled()){void cancel();return;}
     const rev=revision;say('檢查本機 SoulX 環境…');
@@ -98,13 +118,14 @@ export function createSoulx({store,getSelected,getPosition,getReference=()=>null
   $('generate').addEventListener('click',async()=>{
     if(!enabled()||busy||externalBusy||!eligible())return;
     if(document.getElementById('mic-stop')&&!document.getElementById('mic-stop').disabled){say('請先停止收音，再生成 SoulX，避免影響錄製。');return;}
-    const rev=++revision,row=structuredClone(source()),generatedDraft=draft();busy=true;clear();controls();
+    const rev=++revision,row=structuredClone(source()),generatedDraft=draft();busy=true;clear();controls();startProgress();
     try{
       beforePlay();say('準備原始人聲與參考片段…');const input=await prepare(row,settings());if(rev!==revision)return;
       let state=await(await request('/soulx/jobs',{method:'POST',body:JSON.stringify(input.payload)})).json();active=state.id;controls();
       if(rev!==revision){await request('/soulx/jobs/'+active,{method:'DELETE'});return;}
       for(let attempt=0;attempt<610;attempt++){
         if(rev!==revision)return;say(state.message);
+        showProgress(state.stage==='ready'?'finalizing':state.stage,state.stage==='ready'?'模型已完成，正在取得音檔並確認取樣長度…':state.message,state.progress);
         if(state.stage==='ready')break;if(['failed','cancelled'].includes(state.stage))throw Error(state.message);
         await new Promise(resolve=>setTimeout(resolve,1500));if(rev!==revision)return;
         state=await(await request('/soulx/jobs/'+active)).json();
@@ -118,8 +139,9 @@ export function createSoulx({store,getSelected,getPosition,getReference=()=>null
       $('result').hidden=false;$('blend').value=100;$('backing').checked=row.mode==='mix';labels();
       const s=result.report.settings;$('result-info').textContent=`已生成：${row.soulxSource==='original'?'原曲原唱':'我的錄音'} → ${SOULX_REFERENCES[s.reference]} · ${soulxRangeLabel(input.interval,row.sourceSeconds??row.seconds)} · ${s.steps} 步 · CFG ${s.guidance} · 種子 ${s.seed} · 參考 ${result.report.referenceSeconds??s.referenceSeconds} 秒 · 校正 ${input.delayMs} ms。輸入／輸出皆 ${result.converted.length} 個取樣；總長度一致不代表逐字對齊。`;
       say('已完成。按「原聲／SoulX」同位置切換比較；原錄音與 A／B 設定保留。');
-    }catch(e){if(rev===revision)say(e.message);if(active)await request('/soulx/jobs/'+active,{method:'DELETE'}).catch(()=>{});}
-    finally{busy=false;active=null;controls();}
+      showProgress('ready',`已完成 ${result.report.convertedSegments??1} 段；音檔長度檢查通過，可以試聽。`);
+    }catch(e){if(rev===revision){say(e.message);showProgress('failed',e.message);}if(active)await request('/soulx/jobs/'+active,{method:'DELETE'}).catch(()=>{});}
+    finally{stopProgress();busy=false;active=null;controls();}
   });
   async function buildMixes(){
     if(!result)throw Error('請先產生 SoulX。');const snapshot=result,rev=revision,pass=++rendering;
