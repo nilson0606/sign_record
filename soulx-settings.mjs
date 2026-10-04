@@ -1,5 +1,10 @@
 export const SOULX_DEFAULTS=Object.freeze({reference:'self',referenceStart:null,referenceSeconds:8,steps:32,guidance:3,seed:20261004});
-export const SOULX_REFERENCES=Object.freeze({self:'自己的歌聲',zh:'官方中文示範',en:'官方英文示範',custom:'自選參考歌聲'});
+export const SOULX_REFERENCES=Object.freeze({self:'自己的歌聲',original:'原曲原唱',zh:'官方中文示範',en:'官方英文示範',custom:'自選參考歌聲'});
+export function soulxOriginalReference(row){
+  const reference=row?.post?.reference;
+  if(!reference?.cacheId)throw Error('這筆錄音沒有原曲音軌資料，請改選自選參考歌聲檔。');
+  return `/library/${encodeURIComponent(reference.cacheId)}/${reference.vocalMode==='lead'?'lead':'vocals'}`;
+}
 export function soulxSettings(v={}){
   const s={...SOULX_DEFAULTS,...v};
   if(!Object.hasOwn(SOULX_REFERENCES,s.reference))throw Error('請選擇參考歌聲。');

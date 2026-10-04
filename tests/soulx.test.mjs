@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {soulxSettings,soulxInterval,soulxRangeLabel,soulxSavedMetadata} from '../soulx-settings.mjs';
+import {soulxSettings,soulxInterval,soulxRangeLabel,soulxSavedMetadata,soulxOriginalReference} from '../soulx-settings.mjs';
 import {validateSoulxRequest,validateSoulxWav} from '../soulx-server.mjs';
 function wav(seconds=3){
   const b=Buffer.alloc(44+48000*seconds);b.write('RIFF');b.writeUInt32LE(b.length-8,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(24000,24);b.writeUInt32LE(48000,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(b.length-44,40);return b;
@@ -16,6 +16,13 @@ test('SoulX waveform checks exact format, size and duration before launching Pyt
   assert.throws(()=>validateSoulxWav(wav(16).toString('base64'),15));
   assert.throws(()=>validateSoulxRequest({settings:{reference:'self'},audio:valid.toString('base64')}));
   assert.equal(validateSoulxRequest({settings:{reference:'zh'},audio:valid.toString('base64')}).referenceAudio,null);
+  assert.throws(()=>validateSoulxRequest({settings:{reference:'original'},audio:valid.toString('base64')}));
+  assert.ok(validateSoulxRequest({settings:{reference:'original'},audio:valid.toString('base64'),referenceAudio:valid.toString('base64')}).referenceAudio);
+});
+test('original singer uses this recording library version and isolated lead when available',()=>{
+  assert.equal(soulxOriginalReference({post:{reference:{cacheId:'song_v1'}}}),'/library/song_v1/vocals');
+  assert.equal(soulxOriginalReference({post:{reference:{cacheId:'song_lead_v1',vocalMode:'lead'}}}),'/library/song_lead_v1/lead');
+  assert.throws(()=>soulxOriginalReference({}));
 });
 test('SoulX ranges reject reversed, non-finite and overly long input',()=>{
   for(const args of [[1,0,20],[0,20,10],[0,601,1000],[NaN,10,20],[0,.5,10]])assert.throws(()=>soulxInterval(...args));

@@ -23,7 +23,7 @@ def convert(request):
     if not 1<=len(a)/24000<=600 or not np.isfinite(a).all():raise ValueError('人聲需要 1 秒～10 分鐘。')
     if np.max(np.abs(a))<.001:raise ValueError('這段人聲接近靜音，請選擇有演唱的區段。')
     key=settings['reference']
-    if key in ['self','custom']:p=read(job/'reference.wav')
+    if key in ['self','custom','original']:p=read(job/'reference.wav')
     elif key in ['zh','en']:
         ref=read(REPO/'example/audio'/f'{key}_prompt.mp3')
         start=settings.get('referenceStart') or 0;end=start+settings['referenceSeconds']

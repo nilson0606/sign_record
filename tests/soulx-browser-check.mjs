@@ -14,6 +14,7 @@ const archiveRoot=await mkdtemp(path.join(tmpdir(),'soulx-save-test-')),archive=
 const backend=http.createServer(async(req,res)=>{
   if(req.url==='/session'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({token,features:['recording-library','recording-raw-mime']}));return;}
   if(req.headers['x-karaoke-token']!==token){res.writeHead(403);res.end();return;}
+  if(req.url==='/library/soulx-original-fixture/lead'){res.setHeader('Content-Type','audio/wav');res.end(fixture);return;}
   if(req.url.startsWith('/recordings'))await handleRecordingArchive(req,res,{get:async()=>({configured:true,path:archiveRoot})});else await handleSoulx(req,res);
 });
 await new Promise(resolve=>backend.listen(4294,'127.0.0.1',resolve));
@@ -45,7 +46,7 @@ try{
     const {RecordingStore}=await import('/recording-store.mjs');window.testStore=new RecordingStore();
     const blob=await(await fetch('/fixture-voice')).blob();
     window.soulxTestPost=createRecordingPost({store:{blob:(row,track)=>row.id==='soulx-fixture'?Promise.resolve(blob):testStore.blob(row,track),saveRemix:(...args)=>{if(window.failSoulxSave)throw Error('test save failure');return testStore.saveRemix(...args);},list:async()=>[window.originalSoulxRow,...await testStore.list()]},stop:async()=>{},pause:()=>{},download:()=>{},onDelete:()=>{}});
-    window.originalSoulxRow={id:'soulx-fixture',title:'SoulX 獨立測試',mode:'voice',complete:true,rawBytes:size,created:Date.now(),seconds:20,appliedDelayMs:200,balance:{manual:true,voice:100,backing:0},post:{reference:{duration:20,frames:[],step:.02},segments:[{offset:0,songTime:0,duration:20}],samples:[]}};
+    window.originalSoulxRow={id:'soulx-fixture',title:'SoulX 獨立測試',mode:'voice',complete:true,rawBytes:size,created:Date.now(),seconds:20,appliedDelayMs:200,balance:{manual:true,voice:100,backing:0},post:{reference:{duration:20,frames:[],step:.02,cacheId:'soulx-original-fixture',vocalMode:'lead'},segments:[{offset:0,songTime:0,duration:20}],samples:[]}};
     window.soulxTestPost.refresh([window.originalSoulxRow]);
   },fixture.length);
   assert.equal(await page.locator('#soulx-panel').evaluate(el=>el.open),false);
@@ -54,7 +55,7 @@ try{
   await page.locator('#soulx-enable').check();await page.waitForFunction(()=>document.getElementById('soulx-status').textContent.includes('已就緒'));
   await page.locator('#soulx-full').click();assert.match(await page.locator('#soulx-range-info').textContent(),/整首.*20.00/);
   const abBefore=await page.locator('#post-reverb').inputValue();
-  await page.locator('#soulx-reference').selectOption('zh');await page.locator('#soulx-end').fill('8');
+  await page.locator('#soulx-reference').selectOption('original');await page.locator('#soulx-end').fill('8');
   await page.locator('#soulx-steps').fill('8');await page.locator('#soulx-guidance').fill('1.5');await page.locator('#soulx-seed').fill('7');
   assert.equal(await page.locator('#post-reverb').inputValue(),abBefore);
   await page.locator('#soulx-generate').click();await page.waitForFunction(()=>!document.getElementById('soulx-cancel').disabled);
@@ -62,6 +63,7 @@ try{
   await page.waitForFunction(()=>!document.getElementById('soulx-result').hidden||!document.getElementById('soulx-generate').matches(':disabled'),{},{timeout:180000});
   assert.equal(await page.locator('#soulx-result').isVisible(),true,await page.locator('#soulx-status').textContent());
   assert.match(await page.locator('#soulx-result-info').textContent(),/8 步 · CFG 1.5 · 種子 7/);
+  assert.ok(calls.includes('GET /library/soulx-original-fixture/lead'));assert.match(await page.locator('#soulx-result-info').textContent(),/原曲原唱/);
   await page.locator('#soulx-listen-original').click();await page.waitForFunction(()=>document.getElementById('soulx-audio').currentTime>.4);
   await page.evaluate(()=>{document.getElementById('soulx-audio').pause();document.getElementById('soulx-audio').currentTime=3;});
   await page.locator('#soulx-listen-ai').click();await page.waitForFunction(()=>!document.getElementById('soulx-audio').paused);
@@ -73,7 +75,7 @@ try{
   await mkdir('test-results',{recursive:true});await page.locator('#soulx-panel').screenshot({path:'test-results/soulx-panel.png'});
   await page.locator('#soulx-reset').click();assert.equal(await page.locator('#soulx-steps').inputValue(),'32');assert.equal(await page.locator('#soulx-guidance').inputValue(),'3');
   assert.match(await page.locator('#soulx-status').textContent(),/目前仍是上次結果/);assert.equal(await page.locator('#soulx-save').isDisabled(),true);
-  await page.locator('#soulx-reference').selectOption('zh');await page.locator('#soulx-steps').fill('8');await page.locator('#soulx-guidance').fill('1.5');await page.locator('#soulx-seed').fill('7');
+  await page.locator('#soulx-reference').selectOption('original');await page.locator('#soulx-steps').fill('8');await page.locator('#soulx-guidance').fill('1.5');await page.locator('#soulx-seed').fill('7');
   await page.locator('#soulx-save').click();await page.waitForFunction(()=>document.getElementById('post-status').textContent.includes('已另存'));
   const saved=(await archive.list()).records[0];assert.equal(saved.seconds,8);assert.equal(saved.soulx.sourceDelayMs,200);assert.equal(saved.appliedDelayMs,0);assert.match(saved.title,/片段0-8秒/);
   assert.equal(await page.locator('#post-recording').inputValue(),saved.id);assert.equal(await page.locator('#remix-delay').inputValue(),'0');assert.equal(await page.locator('#post-reverb').inputValue(),'0');

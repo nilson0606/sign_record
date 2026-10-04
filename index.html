@@ -163,9 +163,9 @@
           </div>
           <p class="help">以原錄音套用已保存校正後、尚未剪輯的時間為準；先試 10～20 秒較容易比較。變更設定後需重新產生。</p>
           <div class="soulx-grid">
-            <div><label for="soulx-reference">參考歌聲</label><select id="soulx-reference"><option value="self">自己的歌聲（預設）</option><option value="zh">官方中文示範</option><option value="en">官方英文示範</option><option value="custom">自選參考歌聲檔</option></select><p class="help">主要決定參考音色與唱法特徵；選別人的聲音可能更像對方，不是單純調情緒。</p><label id="soulx-upload-label" hidden>參考音檔<input id="soulx-upload" type="file" accept="audio/*"></label></div>
-            <div><label for="soulx-reference-start">參考起點（秒）</label><input id="soulx-reference-start" type="number" min="0" max="1800" step="0.1" placeholder="留白：自動選有聲片段"><p class="help">自己的／自選歌聲留白時，自動挑選較有聲的片段；官方示範留白由 0 秒開始。</p></div>
-            <div><label for="soulx-reference-seconds">參考長度 <output id="soulx-reference-seconds-value">8 秒</output></label><input id="soulx-reference-seconds" type="range" min="3" max="15" step="1" value="8"><p class="help">3～15 秒；參考宜為清楚乾人聲，避免混入配樂。長度不能超出參考檔。</p></div>
+            <div><label for="soulx-reference">參考歌聲</label><select id="soulx-reference"><option value="self">自己的歌聲（預設）</option><option value="original">原曲原唱（已分離人聲）</option><option value="zh">官方中文示範</option><option value="en">官方英文示範</option><option value="custom">自選參考歌聲檔</option></select><p class="help">原曲原唱使用這筆錄音對應的分離音軌；已分離主唱時使用主唱，否則使用人聲軌。主要參考音色與唱法特徵，選別人的聲音可能更像對方。</p><label id="soulx-upload-label" hidden>參考音檔<input id="soulx-upload" type="file" accept="audio/*"></label></div>
+            <div><label for="soulx-reference-start">參考起點（秒）</label><input id="soulx-reference-start" type="number" min="0" max="1800" step="0.1" placeholder="留白：自動選有聲片段"><p class="help">自己的／原曲原唱／自選歌聲留白時，自動挑選較有聲的片段；官方示範留白由 0 秒開始。原曲原唱的起點以分離音軌為準。</p></div>
+            <div><label for="soulx-reference-seconds">參考長度 <output id="soulx-reference-seconds-value">8 秒</output></label><input id="soulx-reference-seconds" type="range" min="3" max="15" step="1" value="8"><p class="help">只取 3～15 秒，預設 8 秒；參考檔不必和整首一樣長。起點 30 秒＋長度 8 秒，檔案至少需 38 秒。選清楚的單人乾歌聲，少配樂、少和聲；較長不保證較好。</p></div>
           </div>
           <div class="soulx-grid">
             <div><label for="soulx-steps">生成步數 <output id="soulx-steps-value">32 步</output></label><input id="soulx-steps" type="range" min="8" max="64" step="1" value="32"><p class="help">8～64 步，預設 32。更多步通常更慢，不保證一定更好聽；可試 16／32／64。</p></div>

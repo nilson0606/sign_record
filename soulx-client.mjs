@@ -1,5 +1,5 @@
 import {wavBlob} from './recording-process.mjs';
-import {SOULX_DEFAULTS,SOULX_REFERENCES,soulxSettings,soulxInterval,soulxRangeLabel,soulxSavedMetadata} from './soulx-settings.mjs';
+import {SOULX_DEFAULTS,SOULX_REFERENCES,soulxSettings,soulxInterval,soulxRangeLabel,soulxSavedMetadata,soulxOriginalReference} from './soulx-settings.mjs';
 const BASE='http://127.0.0.1:4274';
 const $=id=>document.getElementById('soulx-'+id);
 async function request(path,options={}){
@@ -68,14 +68,19 @@ export function createSoulx({store,getSelected,getPosition,beforePlay,onSaved=as
       const raw=await context.decodeAudioData(await blob.arrayBuffer());
       const source=await soulxSlice(raw,interval.start+delayMs/1000,interval.end+delayMs/1000);
       const audio=await encode(wavBlob(source));let referenceAudio;
-      if(['self','custom'].includes(config.reference)){
+      if(['self','custom','original'].includes(config.reference)){
         let ref=raw;
+        if(config.reference==='original'){
+          const route=soulxOriginalReference(row);
+          let blob;try{blob=await(await request(route)).blob();}catch{throw Error('找不到這筆錄音對應的原唱分離音軌。請補建同版本歌曲音軌，或改選自選參考歌聲檔。');}
+          ref=await context.decodeAudioData(await blob.arrayBuffer());
+        }
         if(config.reference==='custom'){
           const file=$('upload').files[0];if(!file||file.size>50*1024*1024)throw Error('請選擇 50 MB 以內的參考音檔。');
           ref=await context.decodeAudioData(await file.arrayBuffer());
         }
         const start=config.referenceStart??automaticReference(ref,config.referenceSeconds),end=start+config.referenceSeconds;
-        if(end>ref.duration+.001)throw Error('參考區段超出音檔長度。');
+        if(end>ref.duration+.001)throw Error(`參考音檔長 ${ref.duration.toFixed(2)} 秒，起點加長度為 ${end.toFixed(2)} 秒，請縮短參考區段。`);
         config={...config,referenceStart:start};referenceAudio=await encode(wavBlob(await soulxSlice(ref,start,end)));
       }
       return {payload:{audio,referenceAudio,settings:config},interval,delayMs};
