@@ -4,7 +4,7 @@ import {mkdtemp,mkdir,writeFile,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
-import {arrangementSettings,arrangementCaption,arrangementRange,arrangementCovers,recordingBackingRoute,ARRANGEMENT_PRESETS} from '../arrangement-settings.mjs';
+import {arrangementSettings,arrangementCaption,arrangementRange,arrangementCovers,recordingBackingRoute,ARRANGEMENT_PRESETS,arrangementPlan,arrangementSections} from '../arrangement-settings.mjs';
 import {ArrangementArchive,handleArrangements} from '../arrangement-server.mjs';
 import http from 'node:http';
 import {RecordingArchive} from '../recording-archive.mjs';
@@ -13,7 +13,7 @@ import {soulxSavedMetadata,soulxSettings} from '../soulx-settings.mjs';
 test('arrangement captions support six presets and validated custom instruments without accepting unknown parameters',()=>{
   for(const [preset,p] of Object.entries(ARRANGEMENT_PRESETS)){const s=arrangementSettings({...p,preset});assert.match(arrangementCaption(s),/no vocals/);assert.deepEqual(s.instruments,p.instruments);}
   const s=arrangementSettings({preset:'custom',instruments:['flute','piano'],seed:0,unknown:'ignored'});assert.match(arrangementCaption(s),/flute, acoustic piano/);assert.equal(s.unknown,undefined);
-  for(const bad of [{instruments:[]},{instruments:['piano','piano']},{instruments:['voice']},{strength:1.1},{seed:1.3},{style:'bad'}])assert.throws(()=>arrangementSettings(bad));
+  for(const bad of [{instruments:[]},{instruments:['piano','piano']},{instruments:['voice']},{chordStyle:'bad'},{chordsPerBar:3},{key:'H'},{seed:1.3},{style:'bad'}])assert.throws(()=>arrangementSettings(bad));
   assert.deepEqual(arrangementRange(0,600,600),{start:0,end:600});for(const a of [[0,601,610],[-1,30,40],[10,31,30],[1,1,30]])assert.throws(()=>arrangementRange(...a));
 });
 test('saved accompaniment coverage follows original song timestamps through split recording segments',()=>{
@@ -23,6 +23,14 @@ test('saved accompaniment coverage follows original song timestamps through spli
   assert.equal(arrangementCovers({cacheId:'other',start:0,end:60},row,{start:5,end:7}),false);
   assert.equal(arrangementCovers({cacheId:'song',start:0,end:60},row,{start:17,end:18}),false);
 });
+test('MIDI-SAG converts absolute song sections to bounded continuation windows without changing the timeline',()=>{
+  const settings=arrangementSettings({sections:arrangementSections('0 intro\n20 verse\n55 chorus')});
+  assert.equal(settings.strength,undefined);
+  assert.deepEqual(arrangementPlan(settings,30,90),[{start:0,tag:'verse'},{start:22,tag:'verse'},{start:25,tag:'chorus'},{start:47,tag:'chorus'}]);
+  const full=arrangementPlan({},0,600);assert.equal(full.length,28);assert.equal(full.at(-1).start,594);
+  for(const sections of [[{start:4,tag:'invalid'}],[{start:5,tag:'verse'},{start:4,tag:'chorus'}],[{start:NaN,tag:'verse'}]])assert.throws(()=>arrangementSettings({sections}));
+  assert.deepEqual(arrangementPlan(settings,30,50),[{start:0,tag:'verse'}]);assert.throws(()=>arrangementSections('10 chorus extra'));
+});
 test('SoulX keeps generated accompaniment separately through saving and neutral reprocessing',()=>{
   const arrangement={id:randomUUID(),cacheId:'song',start:0,end:60},row={id:'old',title:'曲名',seconds:30,stems:['accompaniment','backing'],post:{reference:{cacheId:'song'},segments:[{offset:0,songTime:10,duration:30}]}};
   const input={row,arrangement,interval:{start:5,end:7},report:{settings:soulxSettings(),sourceSamples:48000,outputSamples:48000,sampleRate:24000},blend:100,match:true,useBacking:true,bytes:1,rawBytes:1};
@@ -31,7 +39,7 @@ test('SoulX keeps generated accompaniment separately through saving and neutral 
   assert.equal(recordingBackingRoute(row,'backing'),'/library/song/backing');
 });
 test('accompaniment archive saves a durable aligned track with a descriptive filename and idempotent retry',async()=>{
-  const library=await mkdtemp(path.join(tmpdir(),'arrangement-archive-')),id=randomUUID(),jobDir=path.resolve('.runtime/acestep/jobs',id);
+  const library=await mkdtemp(path.join(tmpdir(),'arrangement-archive-')),id=randomUUID(),jobDir=path.resolve('.runtime/midi-sag/jobs',id);
   try{await mkdir(jobDir,{recursive:true});const wav=Buffer.from('fixture aligned audio');await writeFile(path.join(jobDir,'aligned.wav'),wav);
     const job={id,result:{title:'測試曲',cacheId:'song',sourceSeconds:194,start:0,end:194,settings:arrangementSettings()}};
     const first=await new ArrangementArchive(library).save(job),archive=new ArrangementArchive(library),rows=await archive.list();
@@ -50,5 +58,5 @@ test('accompaniment archive saves a durable aligned track with a descriptive fil
     }finally{await new Promise(r=>server.close(r));}
     assert.equal((await new ArrangementArchive(library).list()).records.length,0);
     await assert.rejects(archive.get(id));await archive.delete(id);await assert.rejects(archive.save(job),/已刪除/);
-  }finally{if(path.dirname(jobDir)===path.resolve('.runtime/acestep/jobs'))await rm(jobDir,{recursive:true,force:true});if(path.dirname(library)===path.resolve(tmpdir())&&path.basename(library).startsWith('arrangement-archive-'))await rm(library,{recursive:true,force:true,maxRetries:4});}
+  }finally{if(path.dirname(jobDir)===path.resolve('.runtime/midi-sag/jobs'))await rm(jobDir,{recursive:true,force:true});if(path.dirname(library)===path.resolve(tmpdir())&&path.basename(library).startsWith('arrangement-archive-'))await rm(library,{recursive:true,force:true,maxRetries:4});}
 });

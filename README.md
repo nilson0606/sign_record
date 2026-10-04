@@ -289,3 +289,15 @@ RMVPE 驗證：33 項 JavaScript、24 項 Python 測試；Edge／Chrome 的正�
 SoulX 保留輸入總樣本數，但這不保證每個字的節奏完全一致，仍屬實驗選項。首次安裝先完成原本本機環境，再執行 `.runtime\venv\Scripts\python.exe tools\setup_soulx.py`。需要 NVIDIA CUDA GPU；程式與固定版本權重存於 `.runtime/soulx`，新套件安裝在獨立環境。推論只使用本機音檔，不上傳歌聲。安裝／更新後重新啟動本機工具；GitHub Pages 介面同樣透過本機工具生成。工作結果保留最多一小時，需保留時請下載。
 
 驗證：`node --test tests/*.test.mjs`；已安裝模型時另執行 `node tests/soulx-browser-check.mjs`，涵蓋預設關閉、不自動請求、正負 200 ms 切片校正、實際模型生成、參數傳遞、同位置切換、下載、取消及 A／B 設定保留。
+
+### MIDI-SAG 配樂編曲
+
+配樂介面改用 MIDI-SAG：依歌曲庫的原唱音軌分析拍點與旋律、安排和弦（已分離主唱時優先使用主唱），再生成獨立伴奏。可選和弦類型、每小節一次／每半小節一次、自動或指定調性，以及選填的段落秒數與類型。曲風、氣氛、樂器與豐富程度屬文字提示，不能保證每種樂器均出現。原唱保持原本時間與音高；伴奏最多生成 10 分鐘，以不超過 22 秒的新內容接續前段。總長度檢查不代表每一拍或和聲都適合，仍須試聽。
+
+可同位置切換「原配樂／新配樂」，選原唱混音或配樂單聽、音量匹配及下載。保存後清單列出全部配樂，標示與目前歌曲的關聯；SoulX 可選同曲同分離版本、且範圍涵蓋歌聲的配樂。被已保存錄音引用的配樂不能直接刪除。ACE-Step 已移出生成介面，本機模型與舊配樂不刪除。
+
+模型與套件放在獨立的 `.runtime/midi-sag`，不發布至 GitHub Pages。`tools/setup_midi_sag.py --install` 建立環境，隔離環境中的 Python 執行 `--models` 下載權重；Stable Audio Open 需要先以自己的 Hugging Face 帳號取得存取權並在終端登入。推論讀取本機音檔，不上傳歌聲。Windows 的原生依賴需要 Visual Studio C++ Build Tools；LinearAttention 使用 PyTorch CUDA，未使用的 fast-transformers 自訂 CUDA 核心不編譯。
+
+`tools/midi_sag_worker.py` 適配固定版本上游的 Windows 路徑、半精度、CPU 卸載、種子、真實生成步數及獨立伴奏輸出；`tools/midi_sag_beat.py` 保留原權重，處理 beat tracker 的 Python 版本相容性。每個前處理階段使用獨立程序釋放顯存。進度每 1.5 秒查詢，顯示目前段數／步數，不估算剩餘時間；生成期間可取消，與其他 GPU 音訊工作互斥。
+
+首次啟用前須執行 `tools/setup_midi_sag.py --verify <request.json>`，以至少 60 秒的真實整首輸入完成生成，才寫入本機 `verified.json`。工具亦核對適配器檔案雜湊；適配器更新後須重新驗證。UI 模擬測試不會產生可用標記。一般驗證使用 `node --test tests/*.test.mjs` 與 `node tests/arrangement-browser-check.mjs`；後者驗證操作、原唱取樣位置、保存、SoulX 搭配與未就緒保護，不評估模型的音樂品質。

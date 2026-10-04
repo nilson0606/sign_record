@@ -6,8 +6,8 @@ const {chromium}=createRequire('C:/Users/User/.cache/codex-runtimes/codex-primar
 const server=spawn(process.execPath,['server.mjs'],{env:{...process.env,PORT:'4288'},windowsHide:true,stdio:['ignore','pipe','pipe']});let browser;
 function wav(seconds,hz,amplitude=.1,rate=48000){const n=seconds*rate,b=Buffer.alloc(44+n*2);b.write('RIFF');b.writeUInt32LE(b.length-8,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(rate,24);b.writeUInt32LE(rate*2,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(n*2,40);for(let i=0;i<n;i++)b.writeInt16LE(Math.round(amplitude*Math.sin(i/rate*2*Math.PI*hz)*32767),44+i*2);return b;}
 const backing=wav(6,110),voice=wav(6,440),generated=wav(6,220),id='00000000-0000-4000-8000-000000000001';
-let payload,soulPayload,saved=null,polls=0,modelCalls=0,deletes=0,deleteBlocked=true;const errors=[],calls=[];
-const metadata=()=>({id,title:'測試曲_配樂_自選',cacheId:'test-song',start:0,end:6,sourceSeconds:6,settings:payload.settings,outputSamples:288000,generatedSamples:288000});
+let payload,soulPayload,saved=null,polls=0,modelCalls=0,deletes=0,deleteBlocked=true;let readiness={installed:true,model:'midi-sag',maxSeconds:600};const errors=[],calls=[];
+const metadata=()=>({id,model:'MIDI-SAG',title:'測試曲_配樂_自選',cacheId:'test-song',start:0,end:6,sourceSeconds:6,settings:payload.settings,outputSamples:288000,generatedSamples:288000});
 try{
   await new Promise((resolve,reject)=>{server.stdout.once('data',resolve);server.once('error',reject);});browser=await chromium.launch({channel:'msedge',headless:true,args:['--mute-audio']});
   const page=await browser.newPage({viewport:{width:1500,height:1100}});page.on('pageerror',e=>errors.push(e.message));await page.route('**/app.mjs',r=>r.fulfill({contentType:'text/javascript',body:''}));
@@ -15,7 +15,7 @@ try{
     const req=route.request(),p=new URL(req.url()).pathname;calls.push(req.method()+' '+p);const json=value=>route.fulfill({contentType:'application/json',body:JSON.stringify(value)});
     if(p==='/session')return json({token:'test'});
     assert.equal(req.headers()['x-karaoke-token'],'test');
-    if(p==='/arrangements')return json({installed:true,maxSeconds:600});
+    if(p==='/arrangements')return json(readiness);
     if(p==='/arrangements/library')return json({path:'測試配樂庫',records:saved?[saved]:[]});
     if(p===`/arrangements/library/${id}`&&req.method()==='DELETE'){deletes++;if(deleteBlocked)return route.fulfill({status:409,contentType:'application/json',body:JSON.stringify({error:'這份配樂仍被 1 筆錄音使用。'})});saved=null;return json({deleted:true,id});}
     if(p==='/arrangements/jobs'&&req.method()==='POST'){payload=req.postDataJSON();modelCalls++;return json({id,stage:'starting',message:'準備中',progress:null});}
@@ -43,15 +43,16 @@ try{
   const impulses=await page.evaluate(()=>window.impulses);for(const x of impulses){assert.equal(x[0],48000);assert.ok(Math.abs(x[1]-.3)<1e-6);}assert.ok(Math.abs(impulses[0][2]-.1)<1e-6);assert.ok(Math.abs(impulses[1][3]-.2)<1e-6);
   await page.locator('#arrangement-panel>summary').click();await page.locator('#arrangement-enable').check();assert.equal(await page.locator('#arrangement-end').inputValue(),'6');
   await page.locator('#arrangement-preset').selectOption('jazz');await page.locator('#arrangement-instruments input[value=flute]').check();assert.equal(await page.locator('#arrangement-preset').inputValue(),'custom');
-  await page.locator('#arrangement-generate').click();await page.waitForFunction(()=>document.getElementById('arrangement-progress-label').textContent.includes('模型估計'));await page.waitForFunction(()=>!document.getElementById('arrangement-result').hidden);
-  assert.equal(payload.end,6);assert.ok(payload.settings.instruments.includes('flute'));assert.equal(modelCalls,1);
+  await page.locator('#arrangement-chordStyle').selectOption('POP_COMPLEX');await page.locator('#arrangement-key').selectOption('Am');
+  await page.locator('#arrangement-generate').click();await page.waitForFunction(()=>document.getElementById('arrangement-progress-label').textContent.includes('生成進度'));await page.waitForFunction(()=>!document.getElementById('arrangement-result').hidden);
+  assert.equal(payload.end,6);assert.equal(payload.settings.chordStyle,'POP_COMPLEX');assert.equal(payload.settings.key,'Am');assert.equal(payload.settings.strength,undefined);assert.ok(payload.settings.instruments.includes('flute'));assert.equal(modelCalls,1);
   await page.locator('#arrangement-listen-new').click();await page.waitForFunction(()=>!document.getElementById('arrangement-audio').paused);await page.evaluate(()=>{document.getElementById('arrangement-audio').currentTime=2;});await page.locator('#arrangement-listen-original').click();
   const position=await page.locator('#arrangement-audio').evaluate(a=>a.currentTime);assert.ok(position>=2&&position<3);
   await page.locator('#arrangement-listen-mode').selectOption('solo');await page.locator('#arrangement-listen-new').click();await page.waitForFunction(()=>!document.getElementById('arrangement-audio').paused);
   await page.locator('#arrangement-save').click();await page.waitForFunction(()=>document.getElementById('arrangement-status').textContent.includes('已保存至'));assert.ok(saved);assert.equal(await page.locator('#arrangement-save').isDisabled(),true);
   // Fresh UI instance reloads the durable library and its audio without another generation.
   await page.reload();await page.evaluate(async()=>{const {createArrangement}=await import('/arrangement-client.mjs');window.arr=createArrangement({getReference:()=>({cacheId:'test-song',title:'測試曲',duration:6,hasPreview:true}),beforePlay:()=>{}});});
-  await page.locator('#arrangement-panel>summary').click();await page.locator('#arrangement-enable').check();await page.locator('#arrangement-library').selectOption(id);await page.locator('#arrangement-load').click();await page.waitForFunction(()=>!document.getElementById('arrangement-result').hidden);await page.locator('#arrangement-listen-new').click();await page.waitForFunction(()=>!document.getElementById('arrangement-audio').paused);assert.equal(modelCalls,1);
+  await page.locator('#arrangement-panel>summary').click();await page.locator('#arrangement-enable').check();await page.locator('#arrangement-library').selectOption(id);await page.locator('#arrangement-load').click();await page.waitForFunction(()=>!document.getElementById('arrangement-result').hidden);await page.locator('#arrangement-listen-new').click();await page.waitForFunction(()=>!document.getElementById('arrangement-audio').paused);assert.equal(modelCalls,1);assert.equal(await page.locator('#arrangement-key').inputValue(),'Am');assert.equal(await page.locator('#arrangement-chordStyle').inputValue(),'POP_COMPLEX');
   await page.evaluate(async()=>{const {createSoulx}=await import('/soulx-client.mjs');document.getElementById('mic-stop').disabled=true;window.sx=createSoulx({store:{saveRemix:async(meta,mix,voice)=>{window.savedSoulx={meta,mixBytes:mix.size,voiceBytes:voice.size};}},getSelected:()=>null,getReference:()=>({cacheId:'test-song',title:'測試曲',duration:6,hasPreview:true}),getPosition:()=>0,beforePlay:()=>{}});});
   await page.locator('#soulx-panel>summary').click();await page.locator('#soulx-enable').check();await page.locator('#soulx-source').selectOption('original');await page.waitForFunction(()=>document.querySelectorAll('#soulx-backing-choice option').length===2);
   await page.locator('#soulx-reference').selectOption('zh');await page.locator('#soulx-generate').click();await page.waitForFunction(()=>!document.getElementById('soulx-result').hidden);
@@ -62,5 +63,8 @@ try{
   page.once('dialog',d=>d.accept());await page.locator('#arrangement-delete').click();await page.waitForFunction(()=>document.getElementById('arrangement-status').textContent.includes('仍被 1 筆錄音使用'));assert.equal(await page.locator('#arrangement-result').isVisible(),true);
   deleteBlocked=false;page.once('dialog',d=>d.accept());await page.locator('#arrangement-delete').click();await page.waitForFunction(()=>document.getElementById('arrangement-status').textContent==='已刪除選取配樂。');assert.equal(deletes,2);assert.equal(await page.locator('#arrangement-result').isVisible(),false);assert.equal(await page.locator('#arrangement-delete').isDisabled(),true);
   await page.waitForFunction(()=>document.querySelectorAll('#soulx-backing-choice option').length===1);assert.equal(await page.locator('#soulx-backing-choice').inputValue(),'');
-  assert.deepEqual(errors,[]);console.log('PASS: default closed, full-song request, custom instruments, estimated progress, singer-preserving mix, same-position audition, save/reopen and SoulX library choice.');
+  for(const state of [{installed:true,model:'ace-step'},{installed:false,model:'midi-sag'}]){
+    readiness=state;await page.locator('#arrangement-enable').uncheck();await page.locator('#arrangement-enable').check();await page.waitForFunction(()=>/重新啟動|尚未安裝/.test(document.getElementById('arrangement-model-state').textContent));assert.equal(await page.locator('#arrangement-generate').isDisabled(),true);
+  }
+  assert.deepEqual(errors,[]);console.log('PASS: default closed, full-song request, custom instruments, model progress, singer-preserving mix, same-position audition, save/reopen and SoulX library choice.');
 }finally{await browser?.close();server.kill();}

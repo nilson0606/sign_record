@@ -1,17 +1,17 @@
 // Authenticated, loopback-only accompaniment generation and durable local library.
 import {spawn} from 'node:child_process';
-import {randomUUID} from 'node:crypto';
-import {existsSync,createReadStream} from 'node:fs';
+import {randomUUID,createHash} from 'node:crypto';
+import {existsSync,createReadStream,readFileSync} from 'node:fs';
 import {mkdir,writeFile,readFile,stat,rm} from 'node:fs/promises';
 import {Readable} from 'node:stream';
 import {pipeline} from 'node:stream/promises';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import {RecordingArchive,serializeArchive} from './recording-archive.mjs';
-import {arrangementSettings,arrangementCaption,arrangementLabel,arrangementRange} from './arrangement-settings.mjs';
-const root=fileURLToPath(new URL('./',import.meta.url)),runtime=path.join(root,'.runtime/acestep'),jobsRoot=path.join(runtime,'jobs'),python=path.join(runtime,'venv/Scripts/python.exe'),jobs=new Map();
+import {arrangementSettings,arrangementCaption,arrangementLabel,arrangementRange,arrangementPlan} from './arrangement-settings.mjs';
+const root=fileURLToPath(new URL('./',import.meta.url)),runtime=path.join(root,'.runtime/midi-sag'),jobsRoot=path.join(runtime,'jobs'),python=path.join(runtime,'venv/Scripts/python.exe'),jobs=new Map();
 const done=j=>['ready','failed','cancelled'].includes(j.stage),json=(res,code,v)=>{res.writeHead(code,{'Content-Type':'application/json'});res.end(JSON.stringify(v));};
-const available=()=>[python,path.join(runtime,'manifest.json'),path.join(runtime,'checkpoints/acestep-v15-turbo/model.safetensors')].every(existsSync);
+const available=()=>{try{const state=JSON.parse(readFileSync(path.join(runtime,'verified.json'),'utf8'));return existsSync(python)&&state.verified===true&&state.model==='midi-sag'&&['midi_sag_worker.py','midi_sag_beat.py'].every(name=>state.scripts?.[name]===createHash('sha256').update(readFileSync(path.join(root,'tools',name))).digest('hex'))&&existsSync(path.join(runtime,'base-model/model_index.json'))&&existsSync(path.join(runtime,'repo/GAME/GAME-1.0-medium/model.pt'));}catch{return false;}};
 export const arrangementBusy=()=>[...jobs.values()].some(j=>j.running||!done(j));
 const summary=j=>({id:j.id,stage:j.stage,message:j.message,progress:j.progress??null,result:j.result??null});
 async function kill(j){if(!j.running)return;const closed=new Promise(resolve=>j.child.once('close',resolve));if(process.platform==='win32')await new Promise(resolve=>{const p=spawn('taskkill',['/PID',String(j.child.pid),'/T','/F'],{windowsHide:true,stdio:'ignore'});p.once('error',()=>{j.child.kill();resolve();});p.once('close',resolve);});else j.child.kill();await closed;}
@@ -34,7 +34,7 @@ export class ArrangementArchive extends RecordingArchive{
 }
 export async function handleArrangements(req,res,{gpuBusy=()=>false,getSource,getLibrary}={}){
   try{
-    if(req.url==='/arrangements'&&req.method==='GET'){json(res,200,{installed:available(),maxSeconds:600});return;}
+    if(req.url==='/arrangements'&&req.method==='GET'){json(res,200,{installed:available(),model:'midi-sag',maxSeconds:600,message:available()?'MIDI-SAG 已就緒。':'MIDI-SAG 安裝／本機生成驗證尚未完成，暫不開放生成。舊配樂仍可試聽。'});return;}
     if(req.url.startsWith('/arrangements/library')){
       const library=await getLibrary();if(!library)throw Error('請先設定本機歌曲庫。');const archive=new ArrangementArchive(library);
       if(req.url==='/arrangements/library'&&req.method==='GET'){json(res,200,await archive.list());return;}
@@ -45,25 +45,26 @@ export async function handleArrangements(req,res,{gpuBusy=()=>false,getSource,ge
       const meta=await archive.get(m[1]),file=path.join(archive.dir(meta.id),'mix.wav');res.writeHead(200,{'Content-Type':'audio/wav','Content-Length':meta.bytes});await pipeline(createReadStream(file),res);return;
     }
     if(req.url==='/arrangements/jobs'&&req.method==='POST'){
-      if(!available())throw Error('配樂模型尚未安裝完成。');
+      if(!available())throw Error('MIDI-SAG 安裝／生成驗證尚未完成。');
       if(gpuBusy()||arrangementBusy())throw Error('目前有音訊工作進行中，請完成或取消後再產生配樂。');
       let text='';for await(const b of req){text+=b;if(text.length>16384)throw Error('設定太大。');}
       const v=JSON.parse(text),settings=arrangementSettings(v.settings),source=await getSource(v.cacheId);
       if(!source?.reference?.hasPreview)throw Error('請載入保有原伴奏音軌的歌曲。');
       const ref=source.reference,range=arrangementRange(v.start,v.end,ref.duration);
+      if(settings.sections.some(r=>r.start>=ref.duration))throw Error('段落起點需在歌曲範圍內。');
       if(gpuBusy()||arrangementBusy())throw Error('另一個音訊工作已開始，請稍後再試。');
-      const id=randomUUID(),dir=path.join(jobsRoot,id),job={id,stage:'starting',message:'準備原伴奏…',running:false,library:source.library};jobs.set(id,job);
+      const id=randomUUID(),dir=path.join(jobsRoot,id),job={id,stage:'starting',message:'準備原唱旋律…',running:false,library:source.library};jobs.set(id,job);
       try{
         for(const old of [...jobs.values()].filter(j=>j!==job&&done(j)&&!j.running).slice(0,-3))await erase(old);
         await mkdir(dir,{recursive:true});
-        const config={...range,settings,caption:arrangementCaption(settings),cacheId:ref.cacheId,title:ref.title,videoId:ref.videoId,sourceSeconds:ref.duration,bpm:ref.bpm,source:path.join(source.directory,'accompaniment.mp3')};
+        const config={...range,settings,caption:arrangementCaption(settings),cacheId:ref.cacheId,title:ref.title,videoId:ref.videoId,sourceSeconds:ref.duration,bpm:ref.bpm,plan:arrangementPlan(settings,range.start,range.end),source:path.join(source.directory,ref.vocalMode==='lead'?'lead.mp3':'vocals.mp3')};
         await writeFile(path.join(dir,'request.json'),JSON.stringify(config));
-        const child=spawn(python,['-u',path.join(root,'tools/arrangement_worker.py'),'--request',path.join(dir,'request.json')],{cwd:root,windowsHide:true,stdio:['ignore','pipe','pipe'],env:{...process.env,PYTHONIOENCODING:'utf-8'}});
+        const child=spawn(python,['-u',path.join(root,'tools/midi_sag_worker.py'),'--request',path.join(dir,'request.json')],{cwd:root,windowsHide:true,stdio:['ignore','pipe','pipe'],env:{...process.env,PYTHONIOENCODING:'utf-8',TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD:'1'}});
         job.child=child;job.running=true;let pending='',diagnostic='',ready=false;
         const event=line=>{let d;try{d=JSON.parse(line);}catch{return;}if(done(job))return;if(d.stage==='ready'){ready=true;return;}if(['starting','loading','generating','finalizing','failed'].includes(d.stage)){job.stage=d.stage;job.message=String(d.message??'處理中').slice(0,600);job.progress=d.stage==='generating'&&Number.isFinite(d.progress)?Math.min(100,Math.max(0,d.progress)):null;}};
         child.stdout.setEncoding('utf8');child.stderr.setEncoding('utf8');child.stdout.on('data',x=>{pending+=x;const lines=pending.split(/\r?\n/);pending=lines.pop();lines.forEach(event);if(pending.length>100000)pending='';});child.stderr.on('data',x=>{diagnostic=(diagnostic+x).slice(-16000);});
         child.on('error',()=>{job.stage='failed';job.message='無法啟動配樂模型。';});
-        child.on('close',async code=>{job.running=false;clearTimeout(job.timer);if(pending)event(pending);if(job.deleted)return;if(!done(job))try{if(code!==0||!ready)throw Error();job.result=JSON.parse(await readFile(path.join(dir,'result.json'),'utf8'));await stat(path.join(dir,'aligned.wav'));job.stage='ready';job.message='新配樂已生成。請試聽與原唱的拍點，再保存。';}catch{job.stage='failed';job.message='配樂生成未完成；原曲保留。';}if(diagnostic)await writeFile(path.join(dir,'diagnostic.log'),diagnostic).catch(()=>{});job.expiry=setTimeout(()=>void erase(job).catch(()=>{}),3600000);job.expiry.unref();});
+        child.on('close',async code=>{job.running=false;clearTimeout(job.timer);if(pending)event(pending);if(job.deleted)return;if(!done(job))try{if(code!==0||!ready)throw Error();job.result=JSON.parse(await readFile(path.join(dir,'result.json'),'utf8'));await stat(path.join(dir,'aligned.wav'));job.stage='ready';job.message='新配樂已生成。請試聽與原唱的和聲、拍點及銜接，再保存。';}catch{job.stage='failed';job.message='配樂生成未完成；原曲保留。';}if(diagnostic)await writeFile(path.join(dir,'diagnostic.log'),diagnostic).catch(()=>{});job.expiry=setTimeout(()=>void erase(job).catch(()=>{}),3600000);job.expiry.unref();});
         job.timer=setTimeout(()=>{job.stage='failed';job.message='生成超過 30 分鐘，已停止。';void kill(job);},1800000);job.timer.unref();json(res,202,summary(job));
       }catch(e){job.stage='failed';await erase(job).catch(()=>{});throw e;}return;
     }

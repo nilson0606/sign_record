@@ -204,23 +204,38 @@
       </div>
     </details>
     <details id="arrangement-panel" class="post-effects arrangement-panel">
-      <summary><span class="post-effects-heading"><strong>配樂編曲實驗室</strong><span>推薦組合／自選樂器 · 整首生成 · 原唱搭配試聽</span></span></summary>
+      <summary><span class="post-effects-heading"><strong>MIDI-SAG 配樂編曲實驗室</strong><span>依原唱旋律編曲 · 和弦／段落設定 · 原唱搭配試聽</span></span></summary>
       <label><input id="arrangement-enable" type="checkbox"> 啟用本機配樂編曲（預設關閉）</label>
       <p id="arrangement-status" role="status">先載入歌曲庫中的歌曲，再啟用。</p>
       <div id="arrangement-content" hidden>
         <p id="arrangement-source"></p>
-        <p class="help">以原伴奏重新編曲，原唱保持原音與時間位置。AI 不保證每個拍點完全一致，也不保證每種指定樂器都出現；請比較整首前、中、後段再保存。</p>
+        <p class="help">分析已分離原唱的旋律與拍點，再安排和弦、生成新伴奏；原唱保留原音與時間位置。整首採分段延續，仍需試聽和聲、拍點與銜接是否適合。</p>
+        <p id="arrangement-model-state" role="status">正在等待本機模型狀態。</p>
         <fieldset id="arrangement-fields" disabled><legend>編曲設定</legend>
+          <h4>和聲設定</h4>
+          <div class="soulx-grid">
+            <label>和弦類型<select id="arrangement-chordStyle"></select></label>
+            <label>和弦變化<select id="arrangement-chordsPerBar"><option value="1">每小節一次（推薦）</option><option value="2">每半小節一次</option></select><span class="help">半小節模式會安排更密集的和弦變化；不代表每次一定換成不同和弦。</span></label>
+            <label>歌曲調性<select id="arrangement-key"></select><span class="help">自動分析可能判錯，聽到和聲不合時可手動指定；不會改變原唱音高。</span></label>
+          </div>
+          <h4>音色與曲風方向</h4><p class="help">以下會轉成模型的文字提示；樂器與氣氛是生成方向，不是可獨立開關的樂器音軌。</p>
           <div class="soulx-grid"><label>推薦組合<select id="arrangement-preset"></select></label><label>曲風<select id="arrangement-style"></select></label><label>氣氛<select id="arrangement-mood"></select></label></div>
           <p>自選樂器（1～8 種）</p><div id="arrangement-instruments" class="arrangement-instruments"></div>
           <div class="soulx-grid">
             <label>豐富程度<select id="arrangement-density"><option value="light">簡潔，留給歌聲空間</option><option value="balanced">適中</option><option value="rich">豐富多層</option></select></label>
-            <label>原伴奏參考強度 <output id="arrangement-strength-value">80%</output><input id="arrangement-strength" type="range" min="0.3" max="1" step="0.05" value="0.8"><span class="help">越高越依照原伴奏；不是節拍對齊的保證。</span></label>
             <label>隨機種子<input id="arrangement-seed" type="number" min="0" max="2147483647" value="20261004"><button id="arrangement-random" type="button" class="secondary">換一個種子</button></label>
+          </div>
+          <h4>生成範圍</h4><div class="soulx-grid">
             <label>開始（歌曲秒數）<input id="arrangement-start" type="number" min="0" step="0.01" value="0"></label>
             <label>結束（歌曲秒數）<input id="arrangement-end" type="number" min="1" step="0.01" value="30"></label>
             <div class="arrangement-stack"><button id="arrangement-full" type="button" class="secondary">整首（最多 10 分鐘）</button><button id="arrangement-clip" type="button" class="secondary">從試聽位置取 30 秒</button></div>
-          </div><button id="arrangement-generate" type="button">產生新配樂</button>
+          </div>
+          <details><summary>段落設定（選填）</summary>
+            <p class="help">留白時沿用同一編曲方向分段延續，不會自動辨識主副歌。指定段落可讓模型知道何時進入副歌或間奏；較長段落會自動拆成連續小段。</p>
+            <label>每行填「歌曲秒數 段落代碼」<textarea id="arrangement-sections" rows="5" placeholder="0 intro&#10;20 verse&#10;55 chorus"></textarea></label>
+            <p class="help">intro 前奏 · verse 主歌 · chorus 副歌 · inst 間奏 · bridge 橋段 · outro 尾奏 · break 過門 · solo 獨奏。秒數以整首歌曲為準。</p>
+          </details>
+          <button id="arrangement-generate" type="button" disabled>產生 MIDI-SAG 配樂</button>
         </fieldset>
         <div id="arrangement-progress" hidden><p id="arrangement-progress-label"></p><progress id="arrangement-progress-bar" max="100"></progress><span id="arrangement-elapsed"></span></div>
         <button id="arrangement-cancel" type="button" class="secondary" disabled>取消生成</button>

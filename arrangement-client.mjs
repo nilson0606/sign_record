@@ -1,5 +1,5 @@
 import {wavBlob} from './recording-process.mjs';
-import {ARRANGEMENT_PRESETS,ARRANGEMENT_INSTRUMENTS,ARRANGEMENT_STYLES,ARRANGEMENT_MOODS,arrangementSettings,arrangementRange,arrangementLabel} from './arrangement-settings.mjs';
+import {ARRANGEMENT_PRESETS,ARRANGEMENT_INSTRUMENTS,ARRANGEMENT_STYLES,ARRANGEMENT_MOODS,ARRANGEMENT_CHORDS,ARRANGEMENT_KEYS,arrangementSections,arrangementPlan,arrangementSettings,arrangementRange,arrangementLabel} from './arrangement-settings.mjs';
 const $=id=>document.getElementById('arrangement-'+id),BASE='http://127.0.0.1:4274';
 async function request(route,options={}){
   let session;try{const r=await fetch(BASE+'/session',{signal:AbortSignal.timeout(8000)});if(!r.ok)throw Error();session=await r.json();}catch{throw Error('請啟動本機唱錄工具。');}
@@ -19,7 +19,7 @@ export async function arrangementMixes(original,generated,voice,{solo=false,matc
   return audio;
 }
 export function createArrangement({getReference,beforePlay}){
-  let sourceId=null,busy=false,saving=false,locked=false,revision=0,active=null,result=null,library=[],urls=[],mixes=null,renderVersion=0,playVersion=0,timer=null;
+  let sourceId=null,modelReady=false,busy=false,saving=false,locked=false,revision=0,active=null,result=null,library=[],urls=[],mixes=null,renderVersion=0,playVersion=0,timer=null;
   const player=$('audio'),say=t=>{$('status').textContent=t;},enabled=()=>$('enable').checked;
   const source=()=>{const r=getReference();return r?.hasPreview&&r.cacheId?r:null;};
   function relation(meta){
@@ -37,7 +37,7 @@ export function createArrangement({getReference,beforePlay}){
     $('library-relation').textContent=!selected?'高亮：同曲同版本 · 金色：同曲不同分離版本 · 暗色：其他歌曲。全部都可選取、試聽或刪除。':kind==='match'?`✓ 與「${title}」同曲同版本。SoulX 可選用，配樂範圍仍需涵蓋歌聲。`:kind==='related'?`△ 與「${title}」是同一首歌，但分離版本不同。目前 SoulX 只提供同版本配樂選用。`:kind==='other'?`這份配樂屬於其他歌曲，與目前載入的「${title}」不同。`:'尚未載入歌曲，暫不判斷關聯；仍可試聽或刪除。';
   }
   function controls(){
-    $('content').hidden=!enabled();$('fields').disabled=!enabled()||!source()||busy||saving||locked;$('enable').disabled=saving;$('cancel').disabled=!busy||!active;
+    $('content').hidden=!enabled();$('fields').disabled=!enabled()||!source()||busy||saving||locked;$('enable').disabled=saving;$('generate').disabled=!modelReady||busy||saving||locked;$('cancel').disabled=!busy||!active;
     for(const id of ['listen-original','listen-new','download','load','delete','refresh','listen-mode','match','library'])$(id).disabled=busy||saving||locked;
     $('save').disabled=!result||!!result.saved||!result.jobId||busy||saving||locked;
     $('load').disabled||=!$('library').value;
@@ -46,22 +46,23 @@ export function createArrangement({getReference,beforePlay}){
   }
   function resetAudio(){player.pause();player.removeAttribute('src');player.load();urls.forEach(URL.revokeObjectURL);urls=[];mixes=null;renderVersion++;playVersion++;}
   function clear(){resetAudio();result=null;$('result').hidden=true;}
-  function settings(){return arrangementSettings({preset:$('preset').value,style:$('style').value,mood:$('mood').value,density:$('density').value,instruments:[...$('instruments').querySelectorAll('input:checked')].map(n=>n.value),strength:Number($('strength').value),seed:Number($('seed').value)});}
-  function labels(){$('strength-value').textContent=Math.round(Number($('strength').value)*100)+'%';}
+  function settings(){return arrangementSettings({preset:$('preset').value,style:$('style').value,mood:$('mood').value,density:$('density').value,instruments:[...$('instruments').querySelectorAll('input:checked')].map(n=>n.value),chordStyle:$('chordStyle').value,chordsPerBar:Number($('chordsPerBar').value),key:$('key').value,sections:arrangementSections($('sections').value),seed:Number($('seed').value)});}
   function preset(key){const p=ARRANGEMENT_PRESETS[key];if(!p)return;for(const id of ['style','mood','density'])$(id).value=p[id];for(const n of $('instruments').querySelectorAll('input'))n.checked=p.instruments.includes(n.value);}
   for(const [id,items] of [['preset',Object.fromEntries([...Object.entries(ARRANGEMENT_PRESETS).map(([k,v])=>[k,v.label]),['custom','自選組合']])],['style',ARRANGEMENT_STYLES],['mood',ARRANGEMENT_MOODS]])for(const [key,v] of Object.entries(items))$(id).add(new Option(Array.isArray(v)?v[0]:v,key));
   for(const [key,[label]] of Object.entries(ARRANGEMENT_INSTRUMENTS)){const l=document.createElement('label'),n=document.createElement('input');n.type='checkbox';n.value=key;l.append(n,document.createTextNode(' '+label));$('instruments').append(l);}
+  for(const [key,label] of Object.entries(ARRANGEMENT_CHORDS))$('chordStyle').add(new Option(label,key));
+  for(const key of ARRANGEMENT_KEYS)$('key').add(new Option(key==='auto'?'自動分析':key.endsWith('m')?key.slice(0,-1)+' 小調':key+' 大調',key));
   preset('piano');
   $('preset').addEventListener('change',()=>preset($('preset').value));
   for(const id of ['instruments','style','mood','density'])$(id).addEventListener('change',()=>{$('preset').value='custom';});
-  $('fields').addEventListener('input',()=>{labels();if(result)say('設定已調整，目前試聽仍是上次生成結果；按「產生新配樂」套用。');});
+  $('fields').addEventListener('input',()=>{if(result)say('設定已調整，目前試聽仍是上次生成結果；按「產生 MIDI-SAG 配樂」套用。');});
   $('random').addEventListener('click',()=>{$('seed').value=crypto.getRandomValues(new Uint32Array(1))[0]%2147483648;});
   $('full').addEventListener('click',()=>{const r=source();if(!r)return;if(r.duration>600){say('每次最多 10 分鐘，請選取範圍。');return;}$('start').value=0;$('end').value=r.duration;});
   $('clip').addEventListener('click',()=>{const r=source();if(!r)return;const t=Math.min(r.duration-1,(result?.meta.start??0)+(player.currentTime||0));$('start').value=t.toFixed(2);$('end').value=Math.min(r.duration,t+30).toFixed(2);});
   async function refresh(){const data=await(await request('/arrangements/library')).json();library=data.records;const previous=$('library').value;$('library').replaceChildren(new Option(library.length?'選擇已保存配樂':'尚無已保存配樂',''));for(const m of library)$('library').add(new Option(m.title,m.id));if(library.some(m=>m.id===previous))$('library').value=previous;$('library-path').textContent=`本機保存位置：${data.path}。共 ${library.length} 份，包含所有歌曲與分離版本。`;controls();}
   async function cancel(){revision++;player.pause();if(active)await request('/arrangements/jobs/'+active,{method:'DELETE'}).catch(()=>{});say('已取消；原曲保留。');}
   $('cancel').addEventListener('click',()=>void cancel());
-  $('enable').addEventListener('change',async()=>{controls();if(!enabled()){void cancel();return;}syncSource();const rev=revision;try{const state=await(await request('/arrangements')).json();if(rev!==revision||!enabled())return;say(state.installed?'配樂模型已就緒，預選整首。可先挑選組合，再生成試聽。':'配樂模型尚未安裝完成。');await refresh();}catch(e){say(e.message);}});
+  $('enable').addEventListener('change',async()=>{modelReady=false;controls();if(!enabled()){void cancel();return;}syncSource();const rev=revision;try{const state=await(await request('/arrangements')).json();if(rev!==revision||!enabled())return;modelReady=state.installed===true&&state.model==='midi-sag';$('model-state').textContent=modelReady?'MIDI-SAG 已通過本機生成驗證。':state.model==='midi-sag'?(state.message||'MIDI-SAG 尚未安裝與驗證完成，暫不開放生成。'):'請重新啟動新版本機工具，以使用 MIDI-SAG。';say(modelReady?'MIDI-SAG 已就緒，預選整首；可調整和弦與音色方向。':$('model-state').textContent);controls();await refresh();}catch(e){say(e.message);}});
   $('panel').addEventListener('toggle',()=>{if(!$('panel').open)player.pause();});
   $('refresh').addEventListener('click',()=>void refresh().catch(e=>say(e.message)));$('library').addEventListener('change',controls);
   $('delete').addEventListener('click',async()=>{
@@ -75,18 +76,24 @@ export function createArrangement({getReference,beforePlay}){
     }catch(e){say('配樂未刪除：'+e.message);}finally{saving=false;controls();}
   });
   async function decode(blob){const c=new AudioContext({sampleRate:48000,sinkId:{type:'none'}});try{return await c.decodeAudioData(await blob.arrayBuffer());}finally{await c.close();}}
-  function present(){const m=result.meta,adjust=((m.outputSamples-m.generatedSamples)/48000);if(result.saved){for(const k of ['preset','style','mood','density','strength','seed'])$(k).value=m.settings[k];for(const n of $('instruments').querySelectorAll('input'))n.checked=m.settings.instruments.includes(n.value);$('start').value=m.start;$('end').value=m.end;labels();}$('result').hidden=false;$('result-info').textContent=`${arrangementLabel(m.settings)} · ${m.start.toFixed(2)}～${m.end.toFixed(2)} 秒 · 原伴奏參考 ${Math.round(m.settings.strength*100)}% · 種子 ${m.settings.seed}。${Math.abs(adjust)>.0001?`尾端${adjust>0?'補靜音':'裁去'} ${Math.abs(adjust).toFixed(3)} 秒，沒有拉伸整首。`:''}請試聽拍點是否合適。`;controls();}
+  function present(){
+    const m=result.meta,adjust=(m.outputSamples-m.generatedSamples)/48000,isMidi=m.model==='MIDI-SAG';
+    if(result.saved&&isMidi){const cfg=arrangementSettings(m.settings);for(const k of ['preset','style','mood','density','seed','chordStyle','chordsPerBar','key'])$(k).value=cfg[k];for(const n of $('instruments').querySelectorAll('input'))n.checked=cfg.instruments.includes(n.value);$('sections').value=cfg.sections.map(r=>`${r.start} ${r.tag}`).join('\n');$('start').value=m.start;$('end').value=m.end;}
+    $('result').hidden=false;
+    const description=isMidi?`${ARRANGEMENT_CHORDS[m.settings.chordStyle]} · ${m.settings.key==='auto'?'自動調性':m.settings.key} · 每小節 ${m.settings.chordsPerBar} 次和弦`:'舊版保存配樂（可繼續試聽及使用）';
+    $('result-info').textContent=`${arrangementLabel(m.settings)} · ${m.start.toFixed(2)}～${m.end.toFixed(2)} 秒 · ${description} · 種子 ${m.settings.seed}。${Number.isFinite(adjust)&&Math.abs(adjust)>.0001?`尾端${adjust>0?'補靜音':'裁去'} ${Math.abs(adjust).toFixed(3)} 秒，沒有拉伸整首。`:''}請比較和聲、拍點與段落銜接。`;controls();
+  }
   $('generate').addEventListener('click',async()=>{
-    if(busy||saving||locked||!enabled()||!source())return;
+    if(busy||saving||locked||!modelReady||!enabled()||!source())return;
     if(document.getElementById('mic-stop')&&!document.getElementById('mic-stop').disabled){say('請先停止收音，再生成配樂。');return;}
     const ref=structuredClone(source()),rev=++revision;busy=true;clear();controls();beforePlay();const began=performance.now();
     $('progress').hidden=false;$('progress-bar').removeAttribute('value');$('progress-label').textContent='準備生成…';
     const elapsed=()=>{const sec=Math.floor((performance.now()-began)/1000);$('elapsed').textContent=`已用時間 ${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;};elapsed();timer=setInterval(elapsed,1000);
     try{
-      const range=arrangementRange(Number($('start').value),Number($('end').value),ref.duration),config=settings();
+      const range=arrangementRange(Number($('start').value),Number($('end').value),ref.duration),config=settings();arrangementPlan(config,range.start,range.end);
       let state=await(await request('/arrangements/jobs',{method:'POST',body:JSON.stringify({cacheId:ref.cacheId,...range,settings:config})})).json();active=state.id;controls();
       if(rev!==revision){await request('/arrangements/jobs/'+active,{method:'DELETE'});return;}
-      while(rev===revision){say(state.message);$('progress-label').textContent=state.message+(state.progress!==null?` 模型估計進度 ${Math.round(state.progress)}%`:'');if(Number.isFinite(state.progress))$('progress-bar').value=state.progress;else $('progress-bar').removeAttribute('value');if(state.stage==='ready')break;if(['failed','cancelled'].includes(state.stage))throw Error(state.message);await new Promise(r=>setTimeout(r,1500));if(rev!==revision)return;state=await(await request('/arrangements/jobs/'+active)).json();}
+      while(rev===revision){say(state.message);$('progress-label').textContent=state.message+(state.progress!==null?` 生成進度 ${Math.round(state.progress)}%`:'');if(Number.isFinite(state.progress))$('progress-bar').value=state.progress;else $('progress-bar').removeAttribute('value');if(state.stage==='ready')break;if(['failed','cancelled'].includes(state.stage))throw Error(state.message);await new Promise(r=>setTimeout(r,1500));if(rev!==revision)return;state=await(await request('/arrangements/jobs/'+active)).json();}
       if(rev!==revision)return;
       const generated=await decode(await(await request('/arrangements/jobs/'+active+'/audio')).blob());if(rev!==revision)return;
       if(generated.length!==state.result.outputSamples)throw Error('新配樂長度檢查未通過。');
