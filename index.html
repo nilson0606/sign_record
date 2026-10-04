@@ -149,11 +149,12 @@
     <details id="soulx-panel" class="post-effects soulx-panel">
       <summary><span class="post-effects-heading"><strong>SoulX 獨立實驗室</strong><span>歌聲／音色轉換 · 預設關閉 · 與 A／B 分開</span></span><span class="post-effects-toggle"><span class="when-closed">點此展開</span><span class="when-open">收合設定</span></span></summary>
       <label class="soulx-enable"><input id="soulx-enable" type="checkbox"> 啟用 SoulX 實驗選項</label>
-      <p class="help">沿用原錄音旋律與時間位置，用參考歌聲探索不同音色。尚未保證逐字對齊；這裡只產生試聽副本，不覆蓋錄音或套用 A／B 情緒、殘響。速度固定，自動移調關閉。</p>
+      <p class="help">沿用原錄音旋律與時間位置，用參考歌聲探索不同音色。尚未保證逐字對齊；可另存新錄音，不覆蓋原檔或套用 A／B 情緒、殘響。速度固定，自動移調關閉。</p>
       <p id="soulx-status" class="status" role="status">SoulX 已關閉；展開不會載入模型。</p>
       <div id="soulx-content" hidden>
         <p id="soulx-source-info" class="help">請在上方選擇保留原始人聲的錄音。</p>
         <fieldset id="soulx-fields" disabled>
+          <p id="soulx-range-info" class="status" role="status"></p>
           <legend>獨立轉換設定</legend>
           <div class="soulx-grid">
             <div><label for="soulx-start">轉換開始（秒）</label><input id="soulx-start" type="number" min="0" step="0.01" value="0"></div>
@@ -183,7 +184,8 @@
           </div>
           <audio id="soulx-audio" controls></audio>
           <p id="soulx-listen-status" class="help" role="status"></p>
-          <button id="soulx-download" type="button" class="secondary">下載 SoulX 試聽 WAV</button>
+          <div class="button-row"><button id="soulx-save" type="button">儲存到已保存錄音</button><button id="soulx-download" type="button" class="secondary">下載 SoulX 試聽 WAV</button></div>
+          <p class="help">保存已生成範圍及目前 AI 混合／配樂設定，另存新錄音與獨立人聲，可繼續後製。要轉完整錄音，先按「整首」再產生；只改範圍不會補轉。片段會在名稱標明秒數。</p>
         </section>
       </div>
     </details>

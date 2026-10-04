@@ -156,6 +156,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     $('post-delay').value=selected?.postResult?.delayMs??selected?.post?.offsetMs??0;
     $('remix-delay').value=$('post-delay').value;
     $('post-info').textContent=selected?(selected.post&&selected.rawBytes?'已保存乾淨歌聲、播放位置與當次基準，可重評／重合成。':'此錄音未保存後處理來源，可轉 MP3 下載。'): '請先保存一段演唱錄音。';
+    if(selected?.soulx)$('post-info').textContent=`SoulX 成品已保留獨立人聲，可繼續後製。來源 ${selected.soulx.range.start.toFixed(2)}～${selected.soulx.range.end.toFixed(2)} 秒；原校正 ${selected.soulx.sourceDelayMs} ms 已套用，不需再填一次。`;
     audition?.reset(selected);
     showScore();controls();
   }
@@ -281,6 +282,8 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
       result.rawBytes=rawBlob.size;result.rawMime=row.rawMime||rawBlob.type||row.mime;
       result.post=structuredClone(row.post);result.post.offsetMs=delayMs;
       result.balance=structuredClone(row.balance);
+      if(row.fixedMixGains)result.fixedMixGains=structuredClone(row.fixedMixGains);
+      if(row.soulx)result.soulx=structuredClone(row.soulx);
       result.sourceSeconds=row.sourceSeconds??row.seconds;
       await store.saveRemix(result,blob,rawBlob);refresh(await store.list());$('post-recording').value=result.id;choose();clearAudio();url=URL.createObjectURL(blob);$('post-audio').src=url;$('post-audio').hidden=false;
       status(`已另存校正後錄音${softening.id==='off'?'':`（歌聲柔化：${softening.label}）`} · 歌唱者 ${volume.voice}%${row.mode==='mix'?` · 配樂／和音 ${volume.backing}%`:''}，請按播放器試聽；可轉 MP3。原錄音保留，這筆成品也可繼續後製。`);
@@ -322,7 +325,11 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
       return remixRecording(previewSources.raw,solo?[]:previewSources.tracks??[],row,settings.delayMs,{...settings,edit:{...interval,fadeIn:fade,fadeOut:fade}});
     }
   });
-  soulx=createSoulx({store,getSelected:()=>selected,getPosition:originalPlayhead,beforePlay:()=>{audition?.stop();$('post-audio').pause();pause();}});
+  soulx=createSoulx({store,getSelected:()=>selected,getPosition:originalPlayhead,beforePlay:()=>{audition?.stop();$('post-audio').pause();pause();},onSaved:async meta=>{
+    refresh(await store.list());select(meta.id,{scroll:false});
+    $('post-status').textContent=`已另存 ${meta.title}。${meta._archiveRoot?'保存至 '+meta._archiveRoot:'已暫存此瀏覽器，待本機工具連線後搬存'}；原錄音保留，可繼續調整 EQ、殘響與剪輯。`;
+    window.dispatchEvent(new Event('recording-post-saved'));
+  }});
   window.addEventListener('pagehide',clearAudio);
   return {refresh,select,controls,clearAudio};
 }

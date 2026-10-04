@@ -1,6 +1,6 @@
 import { softenedVoice, vocalEffects, processedVoice, effectsDuration } from './recording-soften.mjs';
 import { ScoringTake, validateReference } from './scoring.mjs';
-import { balanceGains, createRecordingMix } from './recording-mix.mjs';
+import { balanceGains, createRecordingMix, recordingVolume } from './recording-mix.mjs';
 // Describe the audio that was actually rendered, never a pending score correction.
 export function recordingDelaySuffix(meta) {
   const ms=meta.appliedDelayMs ?? (meta.parentId ? meta.delayMs : undefined);
@@ -77,6 +77,15 @@ export function editRecordingAudio(buffer,value={}){
   }
   return result;
 }
+function fixedRecordingMix(context,voice,meta,volume){
+  const fixed=meta.fixedMixGains,trim=recordingVolume(volume);
+  if(fixed.version!==1||![fixed.voice,fixed.backing].every(n=>Number.isFinite(n)&&n>=0&&n<=16))throw Error('保存的混音音量無效。');
+  const input=context.createGain(),v=context.createGain(),b=context.createGain(),ceiling=context.createWaveShaper();
+  v.gain.value=fixed.voice*trim.voice/100;b.gain.value=meta.mode==='mix'?fixed.backing*trim.backing/100:0;
+  ceiling.curve=Float32Array.from({length:4097},(_,i)=>Math.max(-.98,Math.min(.98,i/2048-1)));
+  voice.connect(v);input.connect(b);v.connect(ceiling);b.connect(ceiling);ceiling.connect(context.destination);
+  return {input,disconnect(){for(const node of [input,v,b,ceiling])node.disconnect();}};
+}
 export async function remixRecording(raw, tracks, meta, ms, {softening='off',volume,effects,edit=meta.postEdit}={}) {
   const shift=delaySeconds(ms), rate=raw.sampleRate;
   const sourceDuration=Math.max(raw.duration+Math.max(0,-shift),meta.sourceSeconds??meta.seconds);
@@ -87,7 +96,7 @@ export async function remixRecording(raw, tracks, meta, ms, {softening='off',vol
   const p=voicePlacement(raw.duration,ms);
   const singer=await softenedVoice(context,voice,voice.buffer,p,softening);
   const processed=processedVoice(context,singer,recipe);
-  const mix=createRecordingMix(context,processed.output,context.destination,{mode:meta.mode,settings:meta.balance,voiced:()=>false,volume});
+  const mix=meta.fixedMixGains?fixedRecordingMix(context,processed.output,meta,volume):createRecordingMix(context,processed.output,context.destination,{mode:meta.mode,settings:meta.balance,voiced:()=>false,volume});
   if(p.duration>0)voice.start(p.when,p.source,p.duration);
   const rms=(buffer,time)=>{
     const a=buffer.getChannelData(0),start=Math.max(0,Math.floor(time*rate)),end=Math.min(a.length,start+Math.floor(.1*rate));
@@ -100,7 +109,7 @@ export async function remixRecording(raw, tracks, meta, ms, {softening='off',vol
   }
   // Automate the same two buses offline. Both accompaniment and harmony share one gain.
   let sampleIndex=0;
-  for(let t=0;t<duration;t+=.1){
+  for(let t=0;!meta.fixedMixGains&&t<duration;t+=.1){
     const sourceTime=t+shift, segment=meta.post.segments.find(s=>t>=s.offset&&t<s.offset+s.duration);
     while(sampleIndex+1<meta.post.samples.length&&meta.post.samples[sampleIndex+1].offset<=sourceTime)sampleIndex++;
     const sample=meta.post.samples[sampleIndex];
