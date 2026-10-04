@@ -149,9 +149,12 @@
     <details id="soulx-panel" class="post-effects soulx-panel">
       <summary><span class="post-effects-heading"><strong>SoulX 獨立實驗室</strong><span>歌聲／音色轉換 · 預設關閉 · 與 A／B 分開</span></span><span class="post-effects-toggle"><span class="when-closed">點此展開</span><span class="when-open">收合設定</span></span></summary>
       <label class="soulx-enable"><input id="soulx-enable" type="checkbox"> 啟用 SoulX 實驗選項</label>
-      <p class="help">沿用原錄音旋律與時間位置，用參考歌聲探索不同音色。尚未保證逐字對齊；可另存新錄音，不覆蓋原檔或套用 A／B 情緒、殘響。速度固定，自動移調關閉。</p>
+      <p class="help">先選「待轉換的歌」，再選「要換成誰的聲音」。原曲原唱提供歌詞、旋律與演唱節奏，自選短段歌聲提供音色參考；不需要自己先唱完整首。尚未保證逐字對齊或完全重現本人聲音。速度固定，自動移調關閉。</p>
       <p id="soulx-status" class="status" role="status">SoulX 已關閉；展開不會載入模型。</p>
       <div id="soulx-content" hidden>
+        <label for="soulx-source">① 待轉換的歌（來源）</label>
+        <select id="soulx-source" disabled><option value="original">原曲原唱（目前載入歌曲）</option><option value="recording">我的錄音（上方選取的錄音）</option></select>
+        <p class="help">要讓 SoulX 參考你的聲音唱原曲，先在歌曲庫載入歌曲，這裡選「原曲原唱」，下方選「自選參考歌聲檔」。只取分離人聲來轉換，最後配回同一首的伴奏；未分離主唱時，人聲軌可能含和聲。</p>
         <p id="soulx-source-info" class="help">請在上方選擇保留原始人聲的錄音。</p>
         <fieldset id="soulx-fields" disabled>
           <p id="soulx-range-info" class="status" role="status"></p>
@@ -161,9 +164,9 @@
             <div><label for="soulx-end">轉換結束（秒）</label><input id="soulx-end" type="number" min="1" step="0.01" value="20"></div>
             <div class="soulx-actions"><button id="soulx-now" type="button" class="secondary">從目前位置取 20 秒</button><button id="soulx-full" type="button" class="secondary">整首（最多 10 分鐘）</button></div>
           </div>
-          <p class="help">以原錄音套用已保存校正後、尚未剪輯的時間為準；先試 10～20 秒較容易比較。變更設定後需重新產生。</p>
+          <p class="help">原曲原唱以歌曲時間為準，不套用麥克風延時；我的錄音則沿用已保存校正。先試 10～20 秒，滿意後按「整首」再產生。變更設定後需重新產生。</p>
           <div class="soulx-grid">
-            <div><label for="soulx-reference">參考歌聲</label><select id="soulx-reference"><option value="self">自己的歌聲（預設）</option><option value="original">原曲原唱（已分離人聲）</option><option value="zh">官方中文示範</option><option value="en">官方英文示範</option><option value="custom">自選參考歌聲檔</option></select><p class="help">原曲原唱使用這筆錄音對應的分離音軌；已分離主唱時使用主唱，否則使用人聲軌。主要參考音色與唱法特徵，選別人的聲音可能更像對方。</p><label id="soulx-upload-label" hidden>參考音檔<input id="soulx-upload" type="file" accept="audio/*"></label></div>
+            <div><label for="soulx-reference">② 要換成誰的聲音（參考）</label><select id="soulx-reference"><option value="custom">自選參考歌聲檔</option><option value="self">我的已保存歌聲（上方選取錄音）</option><option value="original">來源歌曲的原唱音色</option><option value="zh">官方中文示範</option><option value="en">官方英文示範</option></select><p class="help">這裡提供音色參考，不決定整首歌詞與節奏。可上傳自己約 8～15 秒清唱，或選上方已保存的自己的歌聲；不必先錄完整首。</p><label id="soulx-upload-label" hidden>參考音檔<input id="soulx-upload" type="file" accept="audio/*"></label></div>
             <div><label for="soulx-reference-start">參考起點（秒）</label><input id="soulx-reference-start" type="number" min="0" max="1800" step="0.1" placeholder="留白：自動選有聲片段"><p class="help">自己的／原曲原唱／自選歌聲留白時，自動挑選較有聲的片段；官方示範留白由 0 秒開始。原曲原唱的起點以分離音軌為準。</p></div>
             <div><label for="soulx-reference-seconds">參考長度 <output id="soulx-reference-seconds-value">8 秒</output></label><input id="soulx-reference-seconds" type="range" min="3" max="15" step="1" value="8"><p class="help">只取 3～15 秒，預設 8 秒；參考檔不必和整首一樣長。起點 30 秒＋長度 8 秒，檔案至少需 38 秒。選清楚的單人乾歌聲，少配樂、少和聲；較長不保證較好。</p></div>
           </div>

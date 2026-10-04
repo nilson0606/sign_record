@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {soulxSettings,soulxInterval,soulxRangeLabel,soulxSavedMetadata,soulxOriginalReference} from '../soulx-settings.mjs';
+import {soulxSettings,soulxInterval,soulxRangeLabel,soulxSavedMetadata,soulxOriginalReference,soulxSongSource} from '../soulx-settings.mjs';
 import {validateSoulxRequest,validateSoulxWav} from '../soulx-server.mjs';
 function wav(seconds=3){
   const b=Buffer.alloc(44+48000*seconds);b.write('RIFF');b.writeUInt32LE(b.length-8,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(24000,24);b.writeUInt32LE(48000,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(b.length-44,40);return b;
@@ -23,6 +23,14 @@ test('original singer uses this recording library version and isolated lead when
   assert.equal(soulxOriginalReference({post:{reference:{cacheId:'song_v1'}}}),'/library/song_v1/vocals');
   assert.equal(soulxOriginalReference({post:{reference:{cacheId:'song_lead_v1',vocalMode:'lead'}}}),'/library/song_lead_v1/lead');
   assert.throws(()=>soulxOriginalReference({}));
+});
+test('original song is a full-length source without a recorded take or microphone delay',()=>{
+  assert.equal(soulxSongSource(null),null);assert.equal(soulxSongSource({cacheId:'x',duration:264}),null);
+  const song=soulxSongSource({cacheId:'song_lead_v1',duration:264.5,hasPreview:true,vocalMode:'lead',title:'Song'});
+  assert.equal(song.rawBytes,undefined);assert.equal(song.appliedDelayMs,0);assert.equal(song.seconds,264.5);
+  assert.deepEqual(song.stems,['accompaniment','backing']);assert.deepEqual(song.post.segments,[{offset:0,songTime:0,duration:264.5}]);
+  const saved=soulxSavedMetadata({row:song,interval:{start:0,end:264.5},report:{settings:soulxSettings({reference:'custom'}),sourceSamples:6348000,outputSamples:6348000,sampleRate:24000},delayMs:0,blend:100,match:true,useBacking:true,bytes:10,rawBytes:8});
+  assert.equal(saved.parentId,undefined);assert.equal(saved.soulx.sourceKind,'original');assert.equal(saved.soulx.sourceCacheId,'song_lead_v1');assert.match(saved.title,/原唱換聲.*整首/);
 });
 test('SoulX ranges reject reversed, non-finite and overly long input',()=>{
   for(const args of [[1,0,20],[0,20,10],[0,601,1000],[NaN,10,20],[0,.5,10]])assert.throws(()=>soulxInterval(...args));

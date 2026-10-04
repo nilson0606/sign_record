@@ -325,7 +325,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
       return remixRecording(previewSources.raw,solo?[]:previewSources.tracks??[],row,settings.delayMs,{...settings,edit:{...interval,fadeIn:fade,fadeOut:fade}});
     }
   });
-  soulx=createSoulx({store,getSelected:()=>selected,getPosition:originalPlayhead,beforePlay:()=>{audition?.stop();$('post-audio').pause();pause();},onSaved:async meta=>{
+  soulx=createSoulx({store,getSelected:()=>selected,getReference:reference,getPosition:originalPlayhead,beforePlay:()=>{audition?.stop();$('post-audio').pause();pause();},onSaved:async meta=>{
     refresh(await store.list());select(meta.id,{scroll:false});
     $('post-status').textContent=`已另存 ${meta.title}。${meta._archiveRoot?'保存至 '+meta._archiveRoot:'已暫存此瀏覽器，待本機工具連線後搬存'}；原錄音保留，可繼續調整 EQ、殘響與剪輯。`;
     window.dispatchEvent(new Event('recording-post-saved'));

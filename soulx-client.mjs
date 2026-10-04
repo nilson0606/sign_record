@@ -1,5 +1,5 @@
 import {wavBlob} from './recording-process.mjs';
-import {SOULX_DEFAULTS,SOULX_REFERENCES,soulxSettings,soulxInterval,soulxRangeLabel,soulxSavedMetadata,soulxOriginalReference} from './soulx-settings.mjs';
+import {SOULX_DEFAULTS,SOULX_REFERENCES,soulxSettings,soulxInterval,soulxRangeLabel,soulxSavedMetadata,soulxOriginalReference,soulxSongSource} from './soulx-settings.mjs';
 const BASE='http://127.0.0.1:4274';
 const $=id=>document.getElementById('soulx-'+id);
 async function request(path,options={}){
@@ -24,15 +24,17 @@ function automaticReference(buffer,seconds){
   for(let start=0;start+seconds<=buffer.duration;start+=.5){let sum=0;for(let i=Math.floor(start*rate);i<Math.floor((start+seconds)*rate);i+=hop)sum+=a[i]*a[i];if(sum>bestPower){best=start;bestPower=sum;}}
   return best;
 }
-export function createSoulx({store,getSelected,getPosition,beforePlay,onSaved=async()=>{}}){
+export function createSoulx({store,getSelected,getPosition,getReference=()=>null,beforePlay,onSaved=async()=>{}}){
   let selectedId=null,externalBusy=false,busy=false,saving=false,revision=0,active=null,result=null,urls=[],mixes=null,rendering=0,side='ai';
   const say=text=>{$('status').textContent=text;};
-  const eligible=()=>!!(getSelected()?.complete&&getSelected()?.rawBytes);
+  const source=()=>$('source').value==='original'?soulxSongSource(getReference()):getSelected();
+  const eligible=()=>{const row=source();return !!(row?.complete&&(row.rawBytes||row.soulxSource==='original'));};
   const enabled=()=>$('enable').checked;
   const player=$('audio');
   function clear(){player.pause();player.removeAttribute('src');player.load();for(const u of urls)URL.revokeObjectURL(u);urls=[];mixes=null;result=null;rendering++;$('result').hidden=true;}
   function controls(){
     $('content').hidden=!enabled();$('fields').disabled=!enabled()||!eligible()||busy||saving||externalBusy;
+    $('source').disabled=!enabled()||busy||saving||externalBusy;
     $('cancel').disabled=!busy||!active;
     for(const id of ['listen-original','listen-ai','download','save'])$(id).disabled=!result||busy||saving||externalBusy;
     $('save').disabled||=!!result&&result.draft!==draft();
@@ -42,7 +44,7 @@ export function createSoulx({store,getSelected,getPosition,beforePlay,onSaved=as
   }
   function labels(){for(const [id,unit] of [['steps',' 步'],['guidance',''],['reference-seconds',' 秒'],['blend','%']])$(id+'-value').textContent=$(id).value+unit;$('upload-label').hidden=$('reference').value!=='custom';}
   function settings(){return soulxSettings({reference:$('reference').value,referenceStart:$('reference-start').value===''?null:Number($('reference-start').value),referenceSeconds:Number($('reference-seconds').value),steps:Number($('steps').value),guidance:Number($('guidance').value),seed:Number($('seed').value)});}
-  function reset(){for(const [id,key] of [['reference','reference'],['reference-seconds','referenceSeconds'],['steps','steps'],['guidance','guidance'],['seed','seed']])$(id).value=SOULX_DEFAULTS[key];$('reference-start').value='';labels();}
+  function reset(){for(const [id,key] of [['reference','reference'],['reference-seconds','referenceSeconds'],['steps','steps'],['guidance','guidance'],['seed','seed']])$(id).value=SOULX_DEFAULTS[key];if($('source').value==='original')$('reference').value='custom';$('reference-start').value='';labels();}
   async function cancel(){revision++;player.pause();if(active)try{await request('/soulx/jobs/'+active,{method:'DELETE'});}catch{}say(enabled()?'已取消 SoulX；原始錄音保留。':'SoulX 已關閉。');}
   $('enable').addEventListener('change',async()=>{
     controls();if(!enabled()){void cancel();return;}
@@ -53,23 +55,30 @@ export function createSoulx({store,getSelected,getPosition,beforePlay,onSaved=as
   $('cancel').addEventListener('click',()=>void cancel());
   $('random').addEventListener('click',()=>{$('seed').value=crypto.getRandomValues(new Uint32Array(1))[0]%2147483648;dirty();});
   $('reset').addEventListener('click',()=>{reset();dirty();});
-  function draft(){return JSON.stringify(['start','end','reference','reference-start','reference-seconds','steps','guidance','seed'].map(id=>$(id).value).concat(Array.from($('upload').files??[],f=>[f.name,f.size,f.lastModified])));}
-  function rangeLabel(){const row=getSelected();try{$('range-info').textContent='將轉換：'+soulxRangeLabel(soulxInterval(Number($('start').value),Number($('end').value),row?.sourceSeconds??row?.seconds),row.sourceSeconds??row.seconds);}catch{$('range-info').textContent='請設定有效的轉換起訖範圍。';}}
+  function draft(){return JSON.stringify(['source','start','end','reference','reference-start','reference-seconds','steps','guidance','seed'].map(id=>$(id).value).concat($('source').value==='original'&&$('reference').value==='self'?getSelected()?.id??null:[],Array.from($('upload').files??[],f=>[f.name,f.size,f.lastModified])));}
+  function rangeLabel(){const row=source();try{$('range-info').textContent='將轉換：'+soulxRangeLabel(soulxInterval(Number($('start').value),Number($('end').value),row?.sourceSeconds??row?.seconds),row.sourceSeconds??row.seconds);}catch{$('range-info').textContent='請設定有效的轉換起訖範圍。';}}
   function dirty(){labels();rangeLabel();controls();if(result)say(result.draft===draft()?'設定與已生成結果一致，可以試聽或保存。':'參數／範圍已修改；目前仍是上次結果，請重新產生後再保存。');}
   $('fields').addEventListener('input',dirty);$('fields').addEventListener('change',dirty);
-  $('now').addEventListener('click',()=>{const row=getSelected(),duration=row.sourceSeconds??row.seconds;const start=Math.min(Math.max(0,duration-1),getPosition());$('start').value=start.toFixed(2);$('end').value=Math.min(duration,start+20).toFixed(2);dirty();});
-  $('full').addEventListener('click',()=>{const row=getSelected(),duration=row.sourceSeconds??row.seconds;if(duration>600){say('每次最多 10 分鐘，請分段選取。');return;}$('start').value=0;$('end').value=duration;dirty();});
+  $('source').addEventListener('change',()=>{if($('source').value==='original')$('reference').value='custom';syncSource();labels();});
+  $('now').addEventListener('click',()=>{const row=source(),duration=row.sourceSeconds??row.seconds;const position=row.soulxSource==='original'?(result?result.interval.start+player.currentTime:0):getPosition();const start=Math.min(Math.max(0,duration-1),position);$('start').value=start.toFixed(2);$('end').value=Math.min(duration,start+20).toFixed(2);dirty();});
+  $('full').addEventListener('click',()=>{const row=source(),duration=row.sourceSeconds??row.seconds;if(duration>600){say('每次最多 10 分鐘，請分段選取。');return;}$('start').value=0;$('end').value=duration;dirty();});
   async function prepare(row,config){
+    const referenceRecording=structuredClone(getSelected());
     const interval=soulxInterval(Number($('start').value),Number($('end').value),row.sourceSeconds??row.seconds);
     const delayMs=row.appliedDelayMs??row.recordingDelayMs??row.post?.offsetMs??0;
     const context=new AudioContext({sampleRate:24000,sinkId:{type:'none'}});
     try{
-      const blob=await store.blob(row,'voice');if(!blob.size||blob.size!==row.rawBytes)throw Error('原始人聲不完整，無法轉換。');
+      const blob=row.soulxSource==='original'?await(await request(soulxOriginalReference(row))).blob():await store.blob(row,'voice');
+      if(!blob.size||(row.soulxSource!=='original'&&blob.size!==row.rawBytes))throw Error('來源人聲不完整，無法轉換。');
       const raw=await context.decodeAudioData(await blob.arrayBuffer());
       const source=await soulxSlice(raw,interval.start+delayMs/1000,interval.end+delayMs/1000);
       const audio=await encode(wavBlob(source));let referenceAudio;
       if(['self','custom','original'].includes(config.reference)){
         let ref=raw;
+        if(config.reference==='self'&&row.soulxSource==='original'){
+          const recording=referenceRecording;if(!recording?.complete||!recording.rawBytes)throw Error('請先選擇保留人聲的個人錄音，或改用自選參考音檔。');
+          ref=await context.decodeAudioData(await(await store.blob(recording,'voice')).arrayBuffer());
+        }
         if(config.reference==='original'){
           const route=soulxOriginalReference(row);
           let blob;try{blob=await(await request(route)).blob();}catch{throw Error('找不到這筆錄音對應的原唱分離音軌。請補建同版本歌曲音軌，或改選自選參考歌聲檔。');}
@@ -89,7 +98,7 @@ export function createSoulx({store,getSelected,getPosition,beforePlay,onSaved=as
   $('generate').addEventListener('click',async()=>{
     if(!enabled()||busy||externalBusy||!eligible())return;
     if(document.getElementById('mic-stop')&&!document.getElementById('mic-stop').disabled){say('請先停止收音，再生成 SoulX，避免影響錄製。');return;}
-    const rev=++revision,row=structuredClone(getSelected()),generatedDraft=draft();busy=true;clear();controls();
+    const rev=++revision,row=structuredClone(source()),generatedDraft=draft();busy=true;clear();controls();
     try{
       beforePlay();say('準備原始人聲與參考片段…');const input=await prepare(row,settings());if(rev!==revision)return;
       let state=await(await request('/soulx/jobs',{method:'POST',body:JSON.stringify(input.payload)})).json();active=state.id;controls();
@@ -107,7 +116,7 @@ export function createSoulx({store,getSelected,getPosition,beforePlay,onSaved=as
         if(original.length!==converted.length||converted.length!==state.result.outputSamples||Math.abs(converted.duration-(input.interval.end-input.interval.start))>1/24000)throw Error('輸出長度與選取範圍不符，未接受結果。');
         result={row,original,converted,report:state.result,interval:input.interval,delayMs:input.delayMs,tracks:null,draft:generatedDraft};}finally{await context.close();}
       $('result').hidden=false;$('blend').value=100;$('backing').checked=row.mode==='mix';labels();
-      const s=result.report.settings;$('result-info').textContent=`已生成：${soulxRangeLabel(input.interval,row.sourceSeconds??row.seconds)} · ${SOULX_REFERENCES[s.reference]} · ${s.steps} 步 · CFG ${s.guidance} · 種子 ${s.seed} · 沿用校正 ${input.delayMs} ms。輸入／輸出皆 ${result.converted.length} 個取樣；總長度一致不代表逐字對齊。`;
+      const s=result.report.settings;$('result-info').textContent=`已生成：${row.soulxSource==='original'?'原曲原唱':'我的錄音'} → ${SOULX_REFERENCES[s.reference]} · ${soulxRangeLabel(input.interval,row.sourceSeconds??row.seconds)} · ${s.steps} 步 · CFG ${s.guidance} · 種子 ${s.seed} · 校正 ${input.delayMs} ms。輸入／輸出皆 ${result.converted.length} 個取樣；總長度一致不代表逐字對齊。`;
       say('已完成。按「原聲／SoulX」同位置切換比較；原錄音與 A／B 設定保留。');
     }catch(e){if(rev===revision)say(e.message);if(active)await request('/soulx/jobs/'+active,{method:'DELETE'}).catch(()=>{});}
     finally{busy=false;active=null;controls();}
@@ -170,10 +179,12 @@ export function createSoulx({store,getSelected,getPosition,beforePlay,onSaved=as
     finally{saving=false;controls();}
   });
   window.addEventListener('pagehide',()=>{void cancel();clear();});
-  reset();controls();
-  return {pause:()=>player.pause(),sync(row,locked){
-    externalBusy=locked;
+  function syncSource(){
+    const row=source();
     if((row?.id??null)!==selectedId){selectedId=row?.id??null;void cancel();clear();$('start').value=0;$('end').value=Math.min(20,row?.sourceSeconds??row?.seconds??20);}
-    $('source-info').textContent=row?`來源：${row.title} · ${Number(row.sourceSeconds??row.seconds).toFixed(2)} 秒 · 校正 ${row.appliedDelayMs??row.recordingDelayMs??row.post?.offsetMs??0} ms`:'請在上方選擇保留原始人聲的錄音。';rangeLabel();controls();
-  }};
+    $('source-info').textContent=row?`待轉換：${row.soulxSource==='original'?'原曲原唱':'我的錄音'} · ${row.title} · ${Number(row.sourceSeconds??row.seconds).toFixed(2)} 秒 · 校正 ${row.appliedDelayMs??row.recordingDelayMs??row.post?.offsetMs??0} ms`:$('source').value==='original'?'請先從歌曲庫載入含分離音軌的歌曲，不需要先錄音。':'請在上方選擇保留原始人聲的錄音。';
+    $('now').textContent=row?.soulxSource==='original'?'從 SoulX 試聽位置取 20 秒':'從目前位置取 20 秒';rangeLabel();controls();
+  }
+  reset();syncSource();
+  return {pause:()=>player.pause(),sync(row,locked){externalBusy=locked;syncSource();}};
 }
