@@ -13,6 +13,12 @@ export function settingDifferences(a,b,{includeBacking=true}={}){
   add('歌聲柔化',a.softening??'off',b.softening??'off',strength);
   add('人聲情緒',recordingEmotionLabel(a),recordingEmotionLabel(b));
   const x=a.effects??{},y=b.effects??{};
+  for(const [key,label,fallback,suffix] of [['noise','降噪強度',0,'%'],['deess','齒音抑制',0,'%'],['deessHz','齒音偵測頻率',6000,' Hz'],['breath','呼吸聲降低',0,'%']])add(label,x.cleanup?.[key]??fallback,y.cleanup?.[key]??fallback,unit(suffix));
+  const p=x.pitchCorrection??{},q=y.pitchCorrection??{};
+  add('音準修正強度',p.amount??0,q.amount??0,unit('%'));
+  add('音準修正目標',p.target??'chromatic',q.target??'chromatic',v=>v==='reference'?'原唱基準（保留八度）':'最近半音');
+  add('音準修正速度',p.speedMs??120,q.speedMs??120,unit(' ms'));
+  add('保留顫音',p.preserveVibrato??true,q.preserveVibrato??true,v=>v?'開啟':'關閉');
   for(const [key,label] of [['low','低頻'],['mid','中頻'],['high','高頻']])add(`EQ ${label}`,x.eq?.[key]??0,y.eq?.[key]??0,signed(' dB'));
   add('動態壓縮',x.compression??'off',y.compression??'off',strength);
   add('殘響音量',x.reverb??0,y.reverb??0,unit('%'));
@@ -80,7 +86,7 @@ export function createRecordingAudition({read,defaults,apply,render,run,beforePl
     // Skip reading the draft: restoring must also recover incomplete/invalid fields.
     stop();delete cache[editor];slots[editor]=structuredClone(defaultSlots[editor]);
     apply(structuredClone(slots[editor]));describe(editor);showTab(editor);controls();
-    say(`已還原 ${editor.toUpperCase()} 系統預設：原音、大廳殘響 20%、回聲 10%、音量 100%、校正 ${slots[editor].delayMs} ms；另一組保留。按試聽即可重新比較。`);
+    say(`已還原 ${editor.toUpperCase()} 系統預設：原音、大廳殘響 20%、回聲 10%、音量 100%、校正 ${slots[editor].delayMs} ms，清理與音準修正關閉；另一組保留。按試聽即可重新比較。`);
   }
   function range(){const start=$('start').value===''?NaN:Number($('start').value),end=$('end').value===''?NaN:Number($('end').value);
     if(!Number.isFinite(start)||!Number.isFinite(end)||start<0||end<=start||end>3600||end-start>30)throw Error('試聽需設定有效起訖，每段最多 30 秒。');return {start,end};}

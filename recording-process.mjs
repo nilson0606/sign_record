@@ -1,6 +1,7 @@
 import { softenedVoice, vocalEffects, processedVoice, effectsDuration } from './recording-soften.mjs';
 import { ScoringTake, validateReference } from './scoring.mjs';
 import { balanceGains, createRecordingMix, recordingVolume } from './recording-mix.mjs';
+import {repairAudio} from './recording-repair-client.mjs';
 // Describe the audio that was actually rendered, never a pending score correction.
 export function recordingDelaySuffix(meta) {
   const ms=meta.appliedDelayMs ?? (meta.parentId ? meta.delayMs : undefined);
@@ -86,13 +87,15 @@ function fixedRecordingMix(context,voice,meta,volume){
   voice.connect(v);input.connect(b);v.connect(ceiling);b.connect(ceiling);ceiling.connect(context.destination);
   return {input,disconnect(){for(const node of [input,v,b,ceiling])node.disconnect();}};
 }
-export async function remixRecording(raw, tracks, meta, ms, {softening='off',volume,effects,edit=meta.postEdit}={}) {
+export async function remixRecording(raw, tracks, meta, ms, {softening='off',volume,effects,edit=meta.postEdit,progress}={}) {
   const shift=delaySeconds(ms), rate=raw.sampleRate;
   const sourceDuration=Math.max(raw.duration+Math.max(0,-shift),meta.sourceSeconds??meta.seconds);
   const recipe=vocalEffects(effects,sourceDuration),duration=sourceDuration+effectsDuration(recipe);
   const cuts=recordingEdit(edit,duration);
   if(duration>3600)throw new Error('後處理一次最多一小時。');
-  const context=new OfflineAudioContext(2,Math.ceil(duration*rate),rate), voice=context.createBufferSource();voice.buffer=raw;
+  // Analyze dry samples against raw time; placement and backing remain on their clocks.
+  const repaired=await repairAudio(raw,recipe,meta,shift,progress);
+  const context=new OfflineAudioContext(2,Math.ceil(duration*rate),rate), voice=context.createBufferSource();voice.buffer=repaired;
   const p=voicePlacement(raw.duration,ms);
   const singer=await softenedVoice(context,voice,voice.buffer,p,softening);
   const processed=processedVoice(context,singer,recipe);

@@ -201,3 +201,8 @@ header{gap:18px;flex-wrap:wrap}
 .soulx-pitch .button-row { margin: 14px 0; }
 .soulx-pitch input[type=number] { max-width: 180px; }
 .soulx-pitch button[aria-pressed=true] { background: var(--soulx-accent); color: #102726; }
+.post-repair-panel { border: 1px solid currentColor; border-radius: 12px; padding: 18px 20px; margin: 18px 0 24px; }
+.post-repair-panel > summary { cursor: pointer; padding: 8px 0; }
+.post-repair-panel > summary strong { font-size: 19px; margin-right: 20px; }
+.post-repair-panel > summary span { font-size: 13px; }
+.post-repair-panel .post-eq-grid { align-items: start; }

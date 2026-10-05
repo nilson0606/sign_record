@@ -294,6 +294,19 @@
     <details id="post-effects-panel" class="post-effects"><summary><span class="post-effects-heading"><strong>人聲進階後製</strong><span>局部音量 · EQ · 動態壓縮 · 殘響</span></span><span class="post-effects-toggle"><span class="when-closed">點此展開</span><span class="when-open">收合設定</span></span></summary>
       <fieldset id="post-effects-fields" disabled><legend>只處理歌唱者</legend>
         <p class="help">新版錄製的音檔，A／B 後製起始設定皆為大廳殘響 20%＋回聲 10%；舊錄音沿用原有設定。可先用片段試聽比較，滿意後按「重新合成」另存；每次從原始歌聲重算，效果不會疊加。配樂／和音不套用這些效果。</p>
+        <details id="post-repair-panel" class="post-repair-panel"><summary><strong>人聲清理與音準修正</strong><span id="post-repair-summary">降噪 · 齒音 · 呼吸聲 · 音準（全部關閉）</span></summary>
+          <p class="help">只處理原始歌聲，A／B 各自保存；情緒和空間情境不會更動這些設定。0% 關閉。先用同一小段比較，滿意再重新合成另存；處理時會顯示階段與進度。</p>
+          <div class="post-eq-grid">
+            <div><label for="post-noise">降噪強度 <output id="post-noise-value">0%（關閉）</output></label><input id="post-noise" type="range" min="0" max="100" step="5" value="0"><p class="help">自動從較安靜、無人聲的空檔估計底噪，降低風扇、冷氣等持續雜音。可先試 25～40%；太強可能出現水聲。若全段沒有可用空檔，會略過降噪。</p></div>
+            <div><label for="post-deess">齒音抑制 <output id="post-deess-value">0%（關閉）</output></label><input id="post-deess" type="range" min="0" max="100" step="5" value="0"><p class="help">在高頻齒音突出時動態降低該頻段，保留低頻歌聲。可先試 30%；太強會讓咬字變鈍。</p><label for="post-deess-hz">齒音偵測頻率 <output id="post-deess-hz-value">6000 Hz</output></label><input id="post-deess-hz" type="range" min="3000" max="10000" step="250" value="6000"><p class="help">3～10 kHz；數字降低會處理較低的刺耳音，升高偏向細尖的「ㄙ」聲。強度 0% 時不處理。</p></div>
+            <div><label for="post-breath">呼吸聲降低 <output id="post-breath-value">0%（關閉）</output></label><input id="post-breath" type="range" min="0" max="100" step="5" value="0"><p class="help">自動找演唱附近較短、無音高的換氣聲並降低音量，保留自然氣息。可先試 30%。屬聲學偵測，可能漏判或誤判氣音、子音；必要時用局部音量微調。</p></div>
+          </div>
+          <h3>音準修正 · 保持時間位置</h3><div class="post-eq-grid">
+            <div><label for="post-pitch-correction">修正強度 <output id="post-pitch-correction-value">0%（關閉）</output></label><input id="post-pitch-correction" type="range" min="0" max="100" step="5" value="0"><p class="help">只修正可辨識的有音高歌聲，不移動整首時間或配樂。先試 30～50%；100% 較貼近目標音高，仍受偵測、平滑與修正範圍限制。</p></div>
+            <div><label for="post-pitch-target">修正目標</label><select id="post-pitch-target"><option value="chromatic">最近半音（預設）</option><option value="reference">原唱基準（保留演唱八度）</option></select><p class="help">最近半音修正小幅偏音，不知道歌曲旋律。原唱基準使用這次錄音保存的旋律及時間資料，保留高／低八度；休息、不計分區間和偏離超過 2 個半音的地方不強拉。</p></div>
+            <div><label for="post-pitch-speed">修正速度 <output id="post-pitch-speed-value">120 ms</output></label><input id="post-pitch-speed" type="range" min="20" max="500" step="10" value="120"><p class="help">20～500 ms 是靠近目標音高的速度，不是播放延遲。小值修正更快，大值較緩。第一次可用 120 ms。</p><label for="post-pitch-vibrato">保留顫音</label><select id="post-pitch-vibrato"><option value="on">開啟（預設，保留自然起伏）</option><option value="off">關閉（較貼近目標）</option></select><p class="help">開啟時主要修正平均偏音，保留較快的音高起伏。滑音、氣音與複雜唱法仍需試聽；這是音訊修正，不會改寫原始演唱或評分。</p></div>
+          </div>
+        </details>
         <div class="post-emotion-card">
           <label for="post-emotion">人聲情緒 · 選取即套用目前組別</label>
           <select id="post-emotion" aria-describedby="post-emotion-help post-emotion-status"><option value="custom" disabled>自訂音色</option></select>

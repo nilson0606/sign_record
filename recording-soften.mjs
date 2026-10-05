@@ -1,4 +1,5 @@
 import {recordingSceneSuffix,recordingEmotionSuffix} from './recording-scenes.mjs';
+import {savedRepairSettings,repairSettings} from './recording-repair.mjs';
 // Graded timbre effect on the singer bus: shelf + presence dip + high cut.
 // This softens bright/breathy texture; it does not isolate or remove breath sounds.
 const presets={off:{label:'關閉',maxDb:0},light:{label:'輕度',baseDb:2,maxDb:5,shelf:3500,presence:1,cutoff:12000},medium:{label:'中度',baseDb:5,maxDb:11,shelf:2800,presence:3,cutoff:7500},strong:{label:'強烈',baseDb:10,maxDb:18,shelf:2000,presence:6,cutoff:4500}};
@@ -26,6 +27,9 @@ export function recordingEffectsSuffix(meta) {
   if(eq)parts.push('EQ'+eq);
   const compression={light:'輕度',medium:'中度'}[effects.compression];
   if(compression)parts.push('壓縮'+compression);
+  const repair=repairSettings(effects);
+  for(const [key,label] of [['noise','降噪'],['deess','齒音'],['breath','呼吸降低']])if(repair.cleanup[key])parts.push(`${label}${repair.cleanup[key]}%`);
+  if(repair.pitchCorrection.amount)parts.push(`音準修正${repair.pitchCorrection.amount}%_${repair.pitchCorrection.target==='reference'?'原唱基準':'最近半音'}`);
   if(Number.isFinite(effects.reverb)&&effects.reverb>0)parts.push(`殘響${effects.reverb}%`);
   if(effects.reverb>0&&effects.reverbOptions){const r=reverbProfile(effects.reverbOptions);parts.push(`${reverbSpaces[r.space]}${r.decay}s`, `預延遲${r.preDelayMs}ms`);}
   if(effects.reverbTone?.brightness)parts.push(`殘響明亮${signed(effects.reverbTone.brightness)}`);
@@ -66,7 +70,7 @@ export function vocalEffects(value={},duration=3600) {
   if(!Array.isArray(value.effectRegions??[])||(value.effectRegions?.length??0)>20)throw Error('局部效果最多 20 個區段。');
   const effectRegions=(value.effectRegions??[]).map(r=>({start:number(r.start,NaN,0,duration,'效果開始秒數'),end:number(r.end,NaN,0,duration,'效果結束秒數'),reverb:number(r.reverb,reverb,0,100,'區段殘響（%）'),echo:number(r.echo,echo.amount,0,100,'區段回聲（%）'),decay:number(r.decay,profile.decay,.2,10,'區段尾音（秒）')})).sort((a,b)=>a.start-b.start);
   for(let i=0;i<effectRegions.length;i++)if(effectRegions[i].end<=effectRegions[i].start||(i&&effectRegions[i].start<effectRegions[i-1].end))throw Error('局部效果結束需晚於開始，且區段不可重疊。');
-  return {version:1,eq,compression,reverb,regions,...(custom?{reverbOptions:profile}:{}),...(tone.brightness||tone.width!==100?{reverbTone:tone}:{}),...(value.echo||effectRegions.some(r=>r.echo)?{echo}:{}),...(effectRegions.length?{effectRegions}:{})};
+  return {version:1,eq,compression,reverb,regions,...savedRepairSettings(value),...(custom?{reverbOptions:profile}:{}),...(tone.brightness||tone.width!==100?{reverbTone:tone}:{}),...(value.echo||effectRegions.some(r=>r.echo)?{echo}:{}),...(effectRegions.length?{effectRegions}:{})};
 }
 
 export const vocalReverbTail=.8;

@@ -34,7 +34,7 @@ try{
  const $=id=>page.locator('#'+id),selected=()=>$('post-recording').inputValue();
  // Legacy audio/edit cases explicitly reload the saved file; session cases keep it open.
  async function remix({keepComparison=false}={}){const before=await selected();await $('post-remix').click();await page.waitForFunction(id=>document.querySelector('#post-recording').value!==id,before);await page.waitForFunction(()=>!document.querySelector('#post-remix').disabled);const id=await selected();if(!keepComparison)await page.evaluate(id=>fixturePost.select(id,{scroll:false}),id);return id;}
- await $('post-effects-panel').locator('summary').click();await $('post-edit-panel').locator('summary').click();await $('post-audition-panel').locator(':scope > summary').click();
+ await $('post-effects-panel').locator(':scope > summary').click();await $('post-edit-panel').locator('summary').click();await $('post-audition-panel').locator(':scope > summary').click();
  // Saving B must not turn A or either original snapshot into the saved B recipe.
  await $('post-scene').selectOption('dream');await $('post-emotion').selectOption('intimate');await $('post-voice-level').fill('85');await $('remix-delay').fill('200');
  await $('post-audition-start').fill('0.4');await $('post-audition-end').fill('1.4');
