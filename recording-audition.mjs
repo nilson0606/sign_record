@@ -36,10 +36,10 @@ export function comparisonLevels(buffers,matched=true){
   const audible=rms.filter(x=>x>1e-6),target=audible.length?Math.min(...audible):0;
   return rms.map(x=>matched&&x>1e-6&&target?Math.min(1,target/x):1);
 }
-export function createRecordingAudition({read,apply,render,run,beforePlay,onEditor=()=>{},getPosition=()=>0}){
-  let row=null,slots={},initial={},cache={},editor='b',busy=false,context=null,active=null,origin=0,source=null,gain=null,timer=null,generation=0,loading=null;
+export function createRecordingAudition({read,defaults,apply,render,run,beforePlay,onEditor=()=>{},getPosition=()=>0}){
+  let row=null,slots={},defaultSlots={},cache={},editor='b',busy=false,context=null,active=null,origin=0,source=null,gain=null,timer=null,generation=0,loading=null;
   const say=text=>$('status').textContent=text;
-  function showTab(name){editor=name;for(const key of ['a','b']){const current=key===name;$(key+'-tab').setAttribute('aria-selected',String(current));$(key+'-tab').tabIndex=current?0:-1;$(key+'-pane').hidden=!current;$(key+'-edit').setAttribute('aria-pressed',String(current));}$('reset').textContent=`還原 ${name.toUpperCase()} 初始設定`;onEditor(name);refreshDifferences();}
+  function showTab(name){editor=name;for(const key of ['a','b']){const current=key===name;$(key+'-tab').setAttribute('aria-selected',String(current));$(key+'-tab').tabIndex=current?0:-1;$(key+'-pane').hidden=!current;$(key+'-edit').setAttribute('aria-pressed',String(current));}$('reset').textContent=`還原 ${name.toUpperCase()} 預設設定`;onEditor(name);refreshDifferences();}
   function refreshDifferences(){
     $('differences-body').replaceChildren();$('differences-table').hidden=true;
     if(!slots.a||!slots.b){$('differences-count').textContent='選取錄音後顯示差異。';return;}
@@ -65,13 +65,22 @@ export function createRecordingAudition({read,apply,render,run,beforePlay,onEdit
     $('stop').disabled=!active&&!busy;$('mode').disabled=busy||!enabled||row?.mode==='voice';
   }
   function describe(name){const s=slots[name];$(name+'-info').textContent=s?`情緒 ${recordingEmotionLabel(s)} · 殘響 ${s.effects.reverb}% · 明亮 ${s.effects.reverbTone?.brightness??0} · 寬度 ${s.effects.reverbTone?.width??100}% · 回聲 ${s.effects.echo?.amount??0}% · ${s.effects.effectRegions?.length??0} 段局部效果 · 校正 ${s.delayMs} ms`:'尚未記住設定';}
-  function reset(value){invalidate();row=value;const settings=value?read():null;slots=value?{a:structuredClone(settings),b:structuredClone(settings)}:{};initial=structuredClone(slots);for(const name of ['a','b'])describe(name);showTab('b');$('start').value=0;$('end').value=Math.min(10,value?.sourceSeconds??value?.seconds??10).toFixed(2);$('mode').value=value?.mode==='voice'?'voice':'mix';say(value?'A、B 已帶入相同的初始設定，可各自調整後比較。預設調整 B；點標籤即可切換整組數值。':'選取錄音後即可比較。');controls();}
+  function reset(value,{preserve=false}={}){
+    // A remix retains the same raw source and timeline: keep the editing session.
+    const continuing=preserve&&value?.parentId===row?.id&&slots.a&&slots.b;
+    invalidate();row=value;
+    if(continuing){apply(structuredClone(slots[editor]));showTab(editor);say('已另存成品，A／B 設定與比較片段保留；還原會回到系統預設。');controls();return;}
+    const settings=value?read():null,base=value?defaults(value):null;
+    slots=value?{a:structuredClone(settings),b:structuredClone(settings)}:{};
+    defaultSlots=value?{a:structuredClone(base),b:structuredClone(base)}:{};
+    for(const name of ['a','b'])describe(name);showTab('b');$('start').value=0;$('end').value=Math.min(10,value?.sourceSeconds??value?.seconds??10).toFixed(2);$('mode').value=value?.mode==='voice'?'voice':'mix';say(value?'A、B 已帶入相同的錄音設定，可各自調整後比較。預設調整 B；還原按鈕回到系統預設。':'選取錄音後即可比較。');controls();
+  }
   function restoreEditor(){
-    if(busy||!initial[editor])return;
+    if(busy||!defaultSlots[editor])return;
     // Skip reading the draft: restoring must also recover incomplete/invalid fields.
-    stop();delete cache[editor];slots[editor]=structuredClone(initial[editor]);
+    stop();delete cache[editor];slots[editor]=structuredClone(defaultSlots[editor]);
     apply(structuredClone(slots[editor]));describe(editor);showTab(editor);controls();
-    say(`已還原 ${editor.toUpperCase()} 本次載入的音量、延時與效果設定；另一組保留。按試聽即可重新比較。`);
+    say(`已還原 ${editor.toUpperCase()} 系統預設：原音、大廳殘響 20%、回聲 10%、音量 100%、校正 ${slots[editor].delayMs} ms；另一組保留。按試聽即可重新比較。`);
   }
   function range(){const start=$('start').value===''?NaN:Number($('start').value),end=$('end').value===''?NaN:Number($('end').value);
     if(!Number.isFinite(start)||!Number.isFinite(end)||start<0||end<=start||end>3600||end-start>30)throw Error('試聽需設定有效起訖，每段最多 30 秒。');return {start,end};}
@@ -108,5 +117,5 @@ export function createRecordingAudition({read,apply,render,run,beforePlay,onEdit
   for(const event of ['input','change','click'])document.getElementById('post-ab-editor').addEventListener(event,refreshDifferences);
   document.getElementById('post-delay').addEventListener('input',refreshDifferences);
   window.addEventListener('pagehide',stop);
-  return {reset,stop,controls,playCurrent:()=>play(editor),playing:()=>!!active,position:()=>active?Number($('start').value)+(context.currentTime-origin)%cache[active].duration:null};
+  return {reset,remember,stop,controls,playCurrent:()=>play(editor),playing:()=>!!active,position:()=>active?Number($('start').value)+(context.currentTime-origin)%cache[active].duration:null};
 }

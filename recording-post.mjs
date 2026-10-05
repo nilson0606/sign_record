@@ -141,7 +141,8 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     $('post-rescore').disabled=busy||!editable||!!referenceError;$('post-remix').disabled=busy||!editable;$('post-mp3').disabled=busy||!selected;
     $('post-audition-quick').disabled=busy||!editable;
   }
-  function choose(){
+  function choose({preserveComparison=false}={}){
+    if(preserveComparison)audition?.remember();
     clearAudio();previewSources=null;selected=rows.find(x=>x.id===$('post-recording').value)||null;
     $('score-recording').value=$('post-recording').value;
     $('rescore-status').textContent=selected?'已選取錄音，可調整設定後重新評分。':'請先保存一段演唱錄音。';
@@ -159,7 +160,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     $('remix-delay').value=$('post-delay').value;
     $('post-info').textContent=selected?(selected.post&&selected.rawBytes?'已保存乾淨歌聲、播放位置與當次基準，可重評／重合成。':'此錄音未保存後處理來源，可轉 MP3 下載。'): '請先保存一段演唱錄音。';
     if(selected?.soulx)$('post-info').textContent=`SoulX 成品已保留獨立人聲，可繼續後製。來源 ${selected.soulx.range.start.toFixed(2)}～${selected.soulx.range.end.toFixed(2)} 秒；原校正 ${selected.soulx.sourceDelayMs} ms 已套用，不需再填一次。`;
-    audition?.reset(selected);
+    audition?.reset(selected,{preserve:preserveComparison});
     showScore();controls();
   }
   function showScore(){const r=selected?.postResult;$('post-score').textContent=r?`${r.source==='decoded-voice-v1'?'音檔重評':'舊版即時資料重評'} · ${r.referenceSource==='current'?'改用已載入基準':'錄音當時基準'} ${(r.reference?.pitchMethod||selected.post?.reference?.pitchMethod||'yin').toUpperCase()} · ${scoringProfile(r.scoring?.difficulty??selected.post?.scoring?.difficulty).label} · 校正 ${r.delayMs} ms · 總分 ${r.score??'—'} · 音準 ${r.pitch} · 進拍 ${r.rhythm} · 完整度 ${r.coverage} · 可計分旋律 ${r.referenceSeconds} 秒${r.baseline ? ` · 同音檔 0 ms 進拍 ${r.baseline.rhythm}` : ''}`:'';}
@@ -288,7 +289,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
       if(row.soulx)result.soulx=structuredClone(row.soulx);
       if(row.arrangement)result.arrangement=structuredClone(row.arrangement);
       result.sourceSeconds=row.sourceSeconds??row.seconds;
-      await store.saveRemix(result,blob,rawBlob);refresh(await store.list());$('post-recording').value=result.id;choose();clearAudio();url=URL.createObjectURL(blob);$('post-audio').src=url;$('post-audio').hidden=false;
+      await store.saveRemix(result,blob,rawBlob);refresh(await store.list());$('post-recording').value=result.id;choose({preserveComparison:true});clearAudio();url=URL.createObjectURL(blob);$('post-audio').src=url;$('post-audio').hidden=false;
       status(`已另存校正後錄音${softening.id==='off'?'':`（歌聲柔化：${softening.label}）`} · 歌唱者 ${volume.voice}%${row.mode==='mix'?` · 配樂／和音 ${volume.backing}%`:''}，請按播放器試聽；可轉 MP3。原錄音保留，這筆成品也可繼續後製。`);
       window.dispatchEvent(new Event('recording-post-saved'));
     }finally{await context.close();}
@@ -313,6 +314,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     const href=URL.createObjectURL(mp3),a=document.createElement('a');a.href=href;a.download=row.title.replace(/[\\/:*?"<>|]/g,'_').slice(0,100)+recordingEffectsSuffix(row)+recordingSofteningSuffix(row)+recordingTuningSuffix(row)+recordingDelaySuffix(row)+'.mp3';a.click();setTimeout(()=>URL.revokeObjectURL(href),60000);status(savedPath?'MP3 已轉換並開始下載，同時保存至 '+savedPath+'。':'MP3 已轉換並開始下載，但尚未存入錄音目錄：'+saveError);
   }));
   audition=createRecordingAudition({run,getPosition:originalPlayhead,beforePlay:()=>{soulx?.pause();arrangement?.pause();$('post-audio').pause();pause();},
+    defaults:row=>({delayMs:row.soulx?0:200,softening:'off',volume:recordingVolume(),effects:vocalEffects(recordingScenes.hall.effects)}),
     onEditor:name=>{const panel=$('post-ab-editor'),label=name.toUpperCase();panel.dataset.slot=name;panel.className='audition-slot-'+name;$('post-ab-editor-heading').textContent=`正在調整 ${label} 組`;$('post-audition-quick').textContent=`片段試聽目前 ${label} 設定`;$('post-remix').textContent=`重新合成 ${label}（音量／延時／音色／剪輯）`;},
     read:()=>{const delayMs=Number($('remix-delay').value);delaySeconds(delayMs);return {delayMs,softening:$('post-softening').value,volume:recordingVolume({voice:Number($('post-voice-level').value),backing:Number($('post-backing-level').value)}),effects:readEffects()};},
     apply:s=>{$('post-softening').value=s.softening;setEffects(s.effects);$('remix-delay').value=s.delayMs;$('post-delay').value=s.delayMs;$('post-voice-level').value=s.volume.voice;$('post-backing-level').value=s.volume.backing;volumeLabels();},
