@@ -148,7 +148,7 @@
     <audio id="post-audio" controls hidden></audio>
     <details id="soulx-panel" class="post-effects soulx-panel">
       <summary><span class="post-effects-heading"><strong>SoulX 獨立實驗室</strong><span>歌聲／音色轉換 · 預設關閉 · 與 A／B 分開</span></span><span class="post-effects-toggle"><span class="when-closed">點此展開</span><span class="when-open">收合設定</span></span></summary>
-      <label class="soulx-enable"><input id="soulx-enable" type="checkbox"> 啟用 SoulX 實驗選項</label>
+      <label class="soulx-enable"><input id="soulx-enable" type="checkbox" autocomplete="off"> 啟用 SoulX 實驗選項</label>
       <p class="help">先選「待轉換的歌」，再選「要換成誰的聲音」。原曲原唱提供歌詞、旋律與演唱節奏，自選短段歌聲提供音色參考；不需要自己先唱完整首。尚未保證逐字對齊或完全重現本人聲音。速度固定，自動移調關閉。</p>
       <p id="soulx-status" class="status" role="status">SoulX 已關閉；展開不會載入模型。</p>
       <section id="soulx-progress" class="soulx-progress" hidden aria-label="SoulX 轉換進度">
@@ -204,8 +204,8 @@
       </div>
     </details>
     <details id="arrangement-panel" class="post-effects arrangement-panel">
-      <summary><span class="post-effects-heading"><strong>MIDI-SAG 配樂編曲實驗室</strong><span>依原唱旋律編曲 · 和弦／段落設定 · 原唱搭配試聽</span></span></summary>
-      <label><input id="arrangement-enable" type="checkbox"> 啟用本機配樂編曲（預設關閉）</label>
+      <summary><span class="post-effects-heading"><strong>MIDI-SAG 配樂編曲實驗室</strong><span>依原唱旋律編曲 · 預設關閉 · 原唱搭配試聽</span></span></summary>
+      <label><input id="arrangement-enable" type="checkbox" autocomplete="off"> 啟用本機配樂編曲（預設關閉）</label>
       <p id="arrangement-status" role="status">先載入歌曲庫中的歌曲，再啟用。</p>
       <div id="arrangement-content" hidden>
         <p id="arrangement-source"></p>

@@ -19,6 +19,8 @@ export async function arrangementMixes(original,generated,voice,{solo=false,matc
   return audio;
 }
 export function createArrangement({getReference,beforePlay}){
+  // Start disabled even if the browser restored controls from the previous visit.
+  $('panel').open=false;$('enable').checked=false;
   let sourceId=null,modelReady=false,busy=false,saving=false,locked=false,revision=0,active=null,result=null,library=[],urls=[],mixes=null,renderVersion=0,playVersion=0,timer=null;
   const player=$('audio'),say=t=>{$('status').textContent=t;},enabled=()=>$('enable').checked;
   const source=()=>{const r=getReference();return r?.hasPreview&&r.cacheId?r:null;};

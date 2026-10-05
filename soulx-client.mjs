@@ -26,6 +26,8 @@ function automaticReference(buffer,seconds){
   return best;
 }
 export function createSoulx({store,getSelected,getPosition,getReference=()=>null,beforePlay,onSaved=async()=>{}}){
+  // Start disabled even if the browser restored controls from the previous visit.
+  $('panel').open=false;$('enable').checked=false;
   let savedBackings=[];
   let selectedId=null,externalBusy=false,busy=false,saving=false,revision=0,active=null,result=null,urls=[],mixes=null,rendering=0,side='ai';
   const say=text=>{$('status').textContent=text;};
