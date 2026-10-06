@@ -60,6 +60,44 @@
     <p id="take-difficulty" class="help" aria-live="polite">尚未開始演唱；每輪開始後固定難度。</p>
     <p id="score-status" class="status" role="status">準備歌曲並開啟麥克風後，按播放就開始評分。</p>
       </section>
+      <section id="segment-section" class="segment-section" aria-labelledby="segment-heading">
+        <div class="section-top"><h3 id="segment-heading">分段錄音／補唱</h3><span id="segment-mode-label" class="badge">整首評分模式</span></div>
+        <div class="button-row"><button id="segment-open" type="button" class="secondary" disabled>開啟分段模式</button><button id="segment-whole" type="button" class="secondary" hidden>回整首評分</button></div>
+        <p class="help">「從頭開始唱」保留原本錄音與整首評分。分段模式可邊播放邊加分界，不寫入整首分數。</p>
+        <div id="segment-tools" hidden>
+          <p id="segment-song" class="preview-source"></p>
+          <div class="button-row"><button id="segment-play" type="button" class="secondary">播放／暫停影片</button><button id="segment-split" type="button">在此分段</button><button id="segment-undo" type="button" class="secondary">復原分界</button></div>
+          <label for="segment-seek">歌曲位置 <output id="segment-position">00:00.000</output></label><input id="segment-seek" type="range" min="0" max="1" step="0.01" value="0">
+          <div id="segment-timeline" class="segment-timeline" aria-label="歌曲段落與可拖曳分界"></div>
+          <label for="segment-part">要錄製或補唱的段落</label><select id="segment-part"></select>
+          <details id="segment-boundary-panel"><summary>調整分界時間／段落名稱</summary>
+          <div class="segment-fields"><label>段落名稱<input id="segment-name" maxlength="80" type="text"></label><label>分界微調<select id="segment-boundary"></select></label></div>
+          <div class="segment-fields"><label>分界時間（mm:ss.sss）<input id="segment-boundary-time" type="text" inputmode="decimal" value="00:00.000"></label><label>調整步距<select id="segment-step"><option value="0.1">0.1 秒</option><option value="1">1 秒</option></select></label></div>
+          <div class="button-row"><button id="segment-earlier" type="button" class="secondary">提前</button><button id="segment-later" type="button" class="secondary">延後</button><button id="segment-boundary-play" type="button" class="secondary">試聽分界 ±3 秒</button><button id="segment-merge" type="button" class="secondary">移除分界</button></div>
+          <p class="help">拖曳時間軸的分界線或輸入精確時間；相鄰兩段會一起更新。更改分界不會裁掉原始錄音。</p>
+          </details>
+          <details id="segment-record-settings"><summary>起唱與尾音設定 · 預設提前 5 秒／尾音 2 秒</summary>
+          <div class="segment-fields"><label>提前播放<select id="segment-preroll"><option value="3">3 秒</option><option value="5" selected>5 秒</option><option value="8">8 秒</option></select></label><label>尾音餘量<select id="segment-tail"><option value="1">1 秒</option><option value="2" selected>2 秒</option><option value="3">3 秒</option></select></label></div>
+          </details>
+          <div class="button-row"><button id="segment-loop" type="button" class="secondary" aria-pressed="false">循環練唱本段</button><button id="segment-record" type="button">錄這一段</button><button id="segment-stop" type="button" class="secondary" disabled>停止／保存本段</button></div>
+          <p class="help">錄製時影片靜音，由已保存的伴奏／和音帶唱，不播放原唱。請戴耳機；每次錄製都獨立保存。</p>
+          <details id="segment-versions-panel"><summary>挑選演唱版本／整首底稿</summary>
+          <label for="segment-base">整首底稿（未補唱處沿用）</label><select id="segment-base"><option value="">從空白開始分段錄</option></select>
+          <div class="button-row"><button id="segment-refresh" type="button" class="secondary">重新讀取錄音版本</button><button id="segment-save" type="button" class="secondary">保存草稿</button></div>
+          <label for="segment-take">本段採用的演唱版本</label><select id="segment-take"></select>
+          </details>
+          <p id="segment-coverage" class="help"></p>
+          <details id="segment-output-panel"><summary>試合完整一版／另存成品 · 預設人聲＋伴樂，200 ms</summary>
+          <div class="segment-fields"><label>試合內容<select id="segment-output"><option value="mix" selected>人聲＋伴樂／和音</option><option value="voice">純人聲</option></select></label><label>歌聲校正（ms）<input id="segment-delay" type="number" min="-2000" max="2000" step="10" value="200"></label></div>
+          <label class="check-option"><input id="segment-allow-gaps" type="checkbox">允許未錄範圍保留靜音</label>
+          <div class="button-row"><button id="segment-compose" type="button">試合完整一版</button><button id="segment-join" type="button" class="secondary">試合並聽本段接合</button></div>
+          <audio id="segment-audio" controls hidden preload="metadata"></audio>
+          <div class="button-row"><button id="segment-export" type="button" class="secondary" disabled>另存完整成品</button><button id="segment-download" type="button" class="secondary" disabled>下載試合 WAV</button></div>
+          <p class="help">試合以整首時間軸接合乾淨人聲，可加伴樂，校正預設 200 ms。另存成品後可繼續人聲後製及 A/B；原始版本保留。分界草稿記在目前瀏覽器，錄音沿用歌曲庫保存。</p>
+          </details>
+        </div>
+        <p id="segment-status" class="status" role="status">載入歌曲後，可開啟分段模式。</p>
+      </section>
     </section>
     <section id="voice-section" tabindex="-1" class="card voice-card">
       <div class="section-top"><h2><span class="step">03</span> 即時音高與收音</h2><span id="mic-badge" class="badge">麥克風未開啟</span></div>

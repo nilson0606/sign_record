@@ -83,11 +83,11 @@ export function createSingerRecorder(options) {
     }
     a.anchorTime = time; a.anchorContext = when;
   }
-  async function prepare(reference, loadStem, scoring = {}) {
+  async function prepare(reference, loadStem, scoring = {}, capture = {}) {
     await stop(); clearPreview();
-    const mode = $('recording-mode').value;
+    const mode = capture.mode ?? $('recording-mode').value;
     if (mode === 'off') { status('本輪不保存錄音。'); return; }
-    const recordingDelayMs=Number($('recording-delay').value);delaySeconds(recordingDelayMs);
+    const recordingDelayMs=capture.delayMs ?? Number($('recording-delay').value);delaySeconds(recordingDelayMs);
     const request = ++operation;
     if (!window.AudioWorkletNode) throw new Error('瀏覽器不支援同步錄音，請使用桌機 Chrome／Edge，或選不保存錄音。');
     status(mode === 'mix' ? '正在準備錄音配樂／和音…' : '正在準備演唱錄音…');
@@ -118,6 +118,7 @@ export function createSingerRecorder(options) {
     const meta = { id: crypto.randomUUID(), title: reference.title, videoId: reference.videoId, mode, mime: recorder.mimeType, rawMime:rawRecorder.mimeType, appliedDelayMs:0, recordingDelayMs, created: Date.now(), seconds: 0, bytes: 0, complete: false, balance: mix.settings, stems, rawBytes:0, post:{version:1, reference:structuredClone(reference), scoring, offsetMs:recordingDelayMs, liveOffsetMs:Number($('offset').value), segments:[], samples:[]} };
     // Only new recordings opt into the new editing defaults; saved audio stays dry.
     meta.postDefaults=recordingSceneDefaultsVersion;
+    if(capture.segmentTake)meta.segmentTake=structuredClone(capture.segmentTake);
     meta.captureClock={version:1,source:'audio-worklet-pcm',sampleRate:context.sampleRate,input:direct?'native-worklet-v2':'browser-media-stream'};
     const a = { recorder, rawRecorder, rawCount:0, segment:null, context, mic, mix, destination, buffers, meta, chunks: [], queue: Promise.resolve(), count: 0, backing: [], error: null };
     active = a; controls();
@@ -208,6 +209,8 @@ export function createSingerRecorder(options) {
         status(retained?'收音中斷，已保留錄音片段，可下載備份：'+error.message:'錄音未完整保存，請先按「下載未保存錄音」備份：'+error.message);
       }
       await render(savedId).catch(error=>status('無法讀取錄音清單：'+error.message));
+      if(a.meta.segmentTake)window.dispatchEvent(new CustomEvent('segment-capture-stopped',{detail:{captureId:a.meta.segmentTake.captureId}}));
+      return savedId ? a.meta : null;
     })();
     return stopping;
   }
@@ -236,5 +239,5 @@ export function createSingerRecorder(options) {
   controls();
   window.addEventListener('pagehide',()=>{stop();clearInterval(timer);clearPreview();});
   render().catch(error=>status('瀏覽器錄音儲存不可用：'+error.message));
-  return { prepare, stop, playerState, clearPreview, sample, referenceChanged:post.controls };
+  return { prepare, stop, playerState, clearPreview, sample, referenceChanged:post.controls, store, refresh:render };
 }
