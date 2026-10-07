@@ -53,12 +53,6 @@
       <div class="clock-row"><span>播放器時間 <b id="player-time">—</b></span><span>補償後位置 <b id="aligned-time">—</b></span></div>
       <div id="segment-player-tools" hidden>
         <div id="segment-transport" class="button-row" role="group" aria-label="影片播放與分段"><button id="segment-play" type="button" class="secondary">播放／暫停影片</button><button id="segment-split" type="button">在此分段</button><button id="segment-undo" type="button" class="secondary">復原分界</button></div>
-        <label for="segment-guide-mode-player">錄音時帶唱</label><select id="segment-guide-mode-player"><option value="original" selected>原唱＋伴樂（預設）</option><option value="backing">只有伴樂／和音</option></select>
-        <label for="segment-take-mode-player">試聽內容</label><select id="segment-take-mode-player"><option value="mix" selected>人聲＋伴樂／和音</option><option value="voice">純人聲</option></select>
-        <div class="button-row"><button id="segment-stop-player" type="button" class="secondary" disabled>停止／保存本段</button><button id="segment-listen-player" type="button" disabled>試聽本段錄音</button><button id="segment-delete-player" type="button" class="secondary" disabled>刪除此版錄音</button></div>
-        <p id="segment-take-info" class="help"></p>
-        <audio id="segment-take-audio" controls hidden aria-label="本段錄音試聽"></audio>
-        <p id="segment-player-status" class="status" role="status"></p>
       </div>
       <section id="score-section" class="player-session" tabindex="-1" aria-label="演唱控制與分數">
     <p id="result-title" class="score-title">尚未選定歌曲</p>
@@ -115,6 +109,8 @@
           <p id="segment-take-count" class="help" aria-live="polite">只列出本段錄音，可重錄多次，沒有三次上限。</p>
           <label for="segment-take-mode-selected">試聽內容</label><select id="segment-take-mode-selected"><option value="mix" selected>人聲＋伴樂／和音</option><option value="voice">純人聲</option></select>
           <div class="button-row"><button id="segment-listen-selected" type="button" class="secondary" disabled>試聽選用版本</button><button id="segment-delete-selected" type="button" class="secondary" disabled>刪除此版錄音</button></div>
+          <p id="segment-take-info" class="help"></p>
+          <audio id="segment-take-audio" controls hidden aria-label="本段錄音試聽"></audio>
           </details>
           <p id="segment-coverage" class="help"></p>
           <details id="segment-output-panel" open><summary>試合完整一版／滿意後保存 · 預設人聲＋伴樂，200 ms</summary>

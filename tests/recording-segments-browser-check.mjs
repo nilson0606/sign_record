@@ -46,11 +46,11 @@ try{
  }
  await page.goto(site);await initialize();const $=id=>page.locator('#'+id);
  await $('segment-open').click();assert.equal(await $('segment-delay').inputValue(),'200');
- for(const id of ['segment-guide-mode','segment-guide-mode-player','sing-guide-mode'])assert.equal(await $(id).inputValue(),'original');
+ for(const id of ['segment-guide-mode','sing-guide-mode'])assert.equal(await $(id).inputValue(),'original');
  assert.equal(await $('sing-guide-mode').isHidden(),true);
- for(const id of ['segment-take-mode-player','segment-take-mode-selected'])assert.equal(await $(id).inputValue(),'mix');
+ for(const id of ['segment-take-mode-selected'])assert.equal(await $(id).inputValue(),'mix');
  assert.equal(await $('sing-start').isHidden(),true);assert.equal(await $('segment-side').isVisible(),true);
- assert.equal(await $('voice-section').isHidden(),true);assert.equal(await $('segment-player-tools').isVisible(),true);assert.equal(await $('segment-listen-player').isDisabled(),true);
+ assert.equal(await $('voice-section').isHidden(),true);assert.equal(await $('segment-player-tools').isVisible(),true);assert.equal(await $('segment-listen-selected').isDisabled(),true);
  const layout=await page.evaluate(()=>{const rect=id=>document.getElementById(id).getBoundingClientRect(),player=rect('player-section'),left=rect('segment-section'),right=rect('segment-side'),video=document.querySelector('#player-section .video-shell').getBoundingClientRect();return{equal:Math.abs(left.width-right.width)<1,aligned:Math.abs(left.top-right.top)<1,right:right.left>=left.right,playerFull:Math.abs(player.left-left.left)<1&&Math.abs(player.right-right.right)<1,videoFull:Math.abs(video.width-(player.width-50))<1,videoAbove:player.bottom<=left.top};});assert.deepEqual(layout,{equal:true,aligned:true,right:true,playerFull:true,videoFull:true,videoAbove:true});
  await page.setViewportSize({width:390,height:844});const mobile=await page.evaluate(()=>{const rect=id=>document.getElementById(id).getBoundingClientRect();return {stacked:rect('player-section').bottom<=rect('segment-section').top&&rect('segment-section').bottom<=rect('segment-side').top,width:innerWidth,scroll:document.documentElement.scrollWidth,panels:['player-section','segment-section','segment-side'].map(id=>({id,width:rect(id).width,scroll:document.getElementById(id).scrollWidth}))};});assert.ok(mobile.stacked&&mobile.panels.every(p=>p.scroll<=p.width),JSON.stringify(mobile));await page.setViewportSize({width:1440,height:1100});
  // Every split can be undone to one section, including after a page reload.
@@ -85,10 +85,10 @@ try{
  // Dragging changes both adjacent sections; undo restores exact original timing.
  const marker=page.locator('.segment-marker').first();await marker.scrollIntoViewIfNeeded();const rect=await marker.boundingBox();await page.mouse.move(rect.x+rect.width/2,rect.y+rect.height/2);await page.mouse.down();await page.mouse.move(rect.x+rect.width/2+20,rect.y+rect.height/2);await page.mouse.up();assert.notEqual(await $('segment-boundary-time').inputValue(),'00:04.000');await $('segment-undo').click();assert.equal(await $('segment-boundary-time').inputValue(),'00:04.000');
  // Cancellation during slow stem preparation cannot adopt an old take or start later.
- await $('segment-guide-mode-player').selectOption('backing');assert.equal(await $('segment-guide-mode').inputValue(),'backing');
+ await $('segment-guide-mode').selectOption('backing');assert.equal(await $('segment-guide-mode').inputValue(),'backing');
  stemDelay=700;await $('segment-record').click();
  assert.ok(await page.evaluate(()=>{const r=document.querySelector('#player-section .video-shell').getBoundingClientRect(),nav=document.querySelector('.section-nav').getBoundingClientRect();return r.top>=nav.bottom&&r.bottom<innerHeight;}),'record button brings the video into view');
- assert.equal(await $('segment-listen-player').isDisabled(),true);await $('segment-stop-player').click();await page.waitForFunction(()=>!document.getElementById('segment-record').disabled);await page.waitForTimeout(800);assert.equal((await page.evaluate(()=>fixtureStore.list())).length,0);assert.equal(await page.evaluate(()=>fixturePlayer.isMuted()),false);stemDelay=0;
+ assert.equal(await $('segment-listen-selected').isDisabled(),true);await $('segment-stop').click();await page.waitForFunction(()=>!document.getElementById('segment-record').disabled);await page.waitForTimeout(800);assert.equal((await page.evaluate(()=>fixtureStore.list())).length,0);assert.equal(await page.evaluate(()=>fixturePlayer.isMuted()),false);stemDelay=0;
  const beforeScore=await page.evaluate(()=>localStorage.getItem('karaoke.scores.v1'));
  await $('segment-record-settings').locator('summary').click();await $('segment-tail').selectOption('1');await $('segment-preroll').selectOption('3');await $('segment-part').selectOption('0');
  await $('segment-record').click();await page.waitForFunction(()=>fixturePlayer.isMuted()&&fixturePlayer.getPlayerState()===1);await page.evaluate(()=>fixturePlayer.pauseVideo());await page.waitForTimeout(250);await page.evaluate(()=>fixturePlayer.playVideo());await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('本段已保存'),{},{timeout:20000});
@@ -97,11 +97,11 @@ try{
  assert.equal(await $('post-recording').locator('option').count(),0,'single segments stay outside post processing');assert.equal(await $('recording-list').locator('button').count(),0);
  const firstHash=await page.evaluate(async row=>hash(await fixtureStore.blob(row,'voice')),first);
  // A single recorded take is immediately playable even while another section is unrecorded.
- await $('segment-listen-player').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);
+ await $('segment-listen-selected').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);
  assert.equal(await page.evaluate(()=>fixturePlayer.getPlayerState()),2);
  await page.evaluate(async()=>{const c=new AudioContext({sinkId:{type:'none'}});window.previewMixBuffer=await c.decodeAudioData(await(await fetch(document.getElementById('segment-take-audio').src)).arrayBuffer());await c.close();});
  await $('segment-take-mode-selected').selectOption('voice');assert.equal(await $('segment-take-audio').isHidden(),true);
- for(const id of ['segment-take-mode-player','segment-take-mode-selected'])assert.equal(await $(id).inputValue(),'voice');
+ for(const id of ['segment-take-mode-selected'])assert.equal(await $(id).inputValue(),'voice');
  await $('segment-listen-selected').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);
  const takeAlignment=await page.evaluate(async row=>{
    const c=new AudioContext({sinkId:{type:'none'}}),voice=await c.decodeAudioData(await(await fetch(document.getElementById('segment-take-audio').src)).arrayBuffer()),raw=await c.decodeAudioData(await(await fixtureStore.blob(row,'voice')).arrayBuffer());
@@ -114,10 +114,10 @@ try{
  await page.evaluate(()=>fixturePlayer.playVideo());assert.equal(await $('segment-take-audio').evaluate(el=>el.paused),true);await page.evaluate(()=>fixturePlayer.pauseVideo());
  // Leaving a section during a slow read must not play its recording later.
  await page.evaluate(async()=>{const {BrowserRecordingStore}=await import('/recording-store.mjs');window.originalBlob=BrowserRecordingStore.prototype.blob;BrowserRecordingStore.prototype.blob=async function(...args){await new Promise(resolve=>window.releaseTakeRead=resolve);return originalBlob.apply(this,args);};});
- await $('segment-listen-player').click();await page.waitForFunction(()=>!!window.releaseTakeRead);await $('segment-part').selectOption('1');
+ await $('segment-listen-selected').click();await page.waitForFunction(()=>!!window.releaseTakeRead);await $('segment-part').selectOption('1');
  await page.evaluate(async()=>{const {BrowserRecordingStore}=await import('/recording-store.mjs');BrowserRecordingStore.prototype.blob=originalBlob;releaseTakeRead();});
- await page.waitForTimeout(100);assert.equal(await $('segment-take-audio').isHidden(),true);assert.equal(await $('segment-listen-player').isDisabled(),true);
- await $('segment-guide-mode').selectOption('original');assert.equal(await $('segment-guide-mode-player').inputValue(),'original');
+ await page.waitForTimeout(100);assert.equal(await $('segment-take-audio').isHidden(),true);assert.equal(await $('segment-listen-selected').isDisabled(),true);
+ await $('segment-guide-mode').selectOption('original');assert.equal(await $('segment-guide-mode').inputValue(),'original');
  const segmentGuideStarts=await page.evaluate(()=>guideEvents.filter(e=>e.action==='start').length);
  await page.evaluate(()=>fixturePlayer.mute());
  await $('segment-part').selectOption('1');await $('segment-record').click();await page.waitForFunction(()=>fixturePlayer.getPlayerState()===1&&!fixturePlayer.isMuted());
@@ -125,7 +125,7 @@ try{
  assert.equal(await page.evaluate(()=>guideEvents.filter(e=>e.action==='start').length),segmentGuideStarts,'original guide does not add a second accompaniment');
  assert.equal(await page.evaluate(()=>fixturePlayer.isMuted()),true,'restore previously muted player');await page.evaluate(()=>fixturePlayer.unMute());
  // A later section uses its saved song position, not accompaniment from time zero.
- await $('segment-take-mode-player').selectOption('mix');await $('segment-listen-player').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);
+ await $('segment-take-mode-selected').selectOption('mix');await $('segment-listen-selected').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);
  const laterTake=await page.evaluate(async()=>{const id=document.getElementById('segment-take').value,row=(await fixtureStore.list()).find(r=>r.id===id),c=new AudioContext({sinkId:{type:'none'}}),mix=await c.decodeAudioData(await(await fetch(document.getElementById('segment-take-audio').src)).arrayBuffer()),raw=await c.decodeAudioData(await(await fixtureStore.blob(row,'voice')).arrayBuffer()),m=mix.getChannelData(0),v=raw.getChannelData(0);let error=0;for(let i=100;i<m.length-10000;i++){const t=i/mix.sampleRate,s=row.post.segments.find(s=>t>=s.offset&&t<s.offset+s.duration),expected=s ? .06*Math.sin(2*Math.PI*660.37*(s.songTime+t-s.offset)) : 0;error=Math.max(error,Math.abs(m[i]-v[i+9600]-expected));}await c.close();return {start:row.post.segments[0].songTime,error};});assert.ok(laterTake.start>.8);assert.ok(laterTake.error<.012,JSON.stringify(laterTake));
  assert.equal(await page.evaluate(()=>localStorage.getItem('karaoke.scores.v1')),beforeScore,'segment mode never writes whole-song scores');
  assert.match(await $('segment-coverage').textContent(),/所有段落/);
@@ -161,7 +161,7 @@ try{
  await $('segment-boundary-panel').locator('summary').click();await $('segment-name').fill('副歌');await $('segment-name').dispatchEvent('change');
  await $('segment-part').selectOption('0');assert.equal(await $('segment-name').inputValue(),'第 1 段');await $('segment-part').selectOption('1');assert.equal(await $('segment-name').inputValue(),'副歌');
  await $('segment-undo').click();assert.equal(await $('segment-name').inputValue(),'第 2 段');await $('segment-save').click();await $('segment-part').selectOption('0');
- await $('segment-listen-player').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);assert.equal(await $('segment-take-audio').isVisible(),true);
+ await $('segment-listen-selected').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);assert.equal(await $('segment-take-audio').isVisible(),true);
  const savedParts=await page.evaluate(()=>JSON.parse(localStorage.getItem('karaoke.segment-draft.v1.segment-fixture')).parts);
  await $('segment-merge-all').click();assert.equal(await $('segment-part').locator('option').count(),1);
  await $('segment-undo').click();assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('karaoke.segment-draft.v1.segment-fixture')).parts),savedParts,'undo restores all take selections');
@@ -184,14 +184,14 @@ try{
  await page.evaluate(async()=>{const {RecordingStore}=await import('/recording-store.mjs');window.originalDelete=RecordingStore.prototype.delete;RecordingStore.prototype.delete=async()=>{throw Error('fixture delete failure');};});
  page.once('dialog',d=>d.accept());await $('segment-delete-selected').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('fixture delete failure'));assert.equal(await $('segment-take').inputValue(),duplicate.id);
  await page.evaluate(async()=>{const {RecordingStore}=await import('/recording-store.mjs');RecordingStore.prototype.delete=originalDelete;});
- page.once('dialog',d=>d.accept());await $('segment-delete-player').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.startsWith('已刪除此版錄音'));
- assert.ok(!(await page.evaluate(()=>fixtureStore.list())).some(r=>r.id===duplicate.id));assert.equal(await $('segment-listen-player').isDisabled(),true);
+ page.once('dialog',d=>d.accept());await $('segment-delete-selected').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.startsWith('已刪除此版錄音'));
+ assert.ok(!(await page.evaluate(()=>fixtureStore.list())).some(r=>r.id===duplicate.id));assert.equal(await $('segment-listen-selected').isDisabled(),true);
  await $('segment-undo').click();assert.ok(await page.evaluate(id=>{const d=JSON.parse(localStorage.getItem('karaoke.segment-draft.v1.segment-fixture'));return [d,...d.undoHistory].every(p=>p.parts.every(s=>s.takeId!==id));},duplicate.id),'undo cannot revive deleted source choices');
  assert.equal(await page.evaluate(async row=>hash(await fixtureStore.blob(row,'voice')),first),firstHash);
  assert.ok((await page.evaluate(()=>fixtureStore.list())).some(r=>r.id===mix.id),'saved composition survives source deletion');
  await page.reload();await initialize();await $('segment-open').click();assert.ok(!(await $('segment-take').locator('option').evaluateAll(options=>options.map(o=>o.value))).includes(duplicate.id));
  for(let i=0;i<savedParts.length;i++){await $('segment-part').selectOption(String(i));await $('segment-take').selectOption(savedParts[i].takeId);}
- await $('segment-part').selectOption('0');await $('segment-listen-player').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);
+ await $('segment-part').selectOption('0');await $('segment-listen-selected').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);
  await mkdir('test-results',{recursive:true});await page.evaluate(()=>{document.querySelector('.section-nav').style.position='static';document.getElementById('theme-select').value='warm';document.documentElement.dataset.theme='warm';document.getElementById('player-section').scrollIntoView({behavior:'instant',block:'start'});});await page.screenshot({path:'test-results/recording-segments-layout.png'});for(const id of ['player-section','segment-side'])assert.ok(await $(id).evaluate(el=>el.scrollWidth<=el.clientWidth+1));
  // Whole-song start still records and scores through the existing path.
  await $('segment-whole').click();assert.equal(await $('segment-section').evaluate(el=>el.parentElement.id),'player-section');assert.equal(await $('voice-section').isVisible(),true);assert.equal(await $('segment-player-tools').isHidden(),true);assert.equal(await $('segment-take-audio').evaluate(el=>el.paused),true);assert.equal(await $('sing-start').isVisible(),true);assert.equal(await $('segment-side').isHidden(),true);await $('recording-settings').locator('summary').click();// Backing guide also works when no recording is saved; cancellation cannot start stale audio.
@@ -216,7 +216,7 @@ try{
  assert.equal(await page.evaluate(()=>fixturePlayer.isMuted()),true);
  assert.ok(await page.evaluate(()=>JSON.parse(localStorage.getItem('karaoke.scores.v1')).length));
  await page.waitForFunction(()=>!document.getElementById('recording-review').hidden);
- await page.waitForFunction(()=>!document.getElementById('recording-review-save').disabled);
+ try{await page.waitForFunction(()=>!document.getElementById('recording-review-save').disabled);}catch(e){throw Error(JSON.stringify(await page.evaluate(async()=>({status:document.getElementById('recording-status').textContent,selected:document.getElementById('recording-review-take').value,rows:(await fixtureStore.list()).filter(r=>r.postPending&&!r.segmentTake)}))));}
  const pendingRows=await page.evaluate(()=>fixtureStore.list()),pendingId=await $('recording-review-take').inputValue(),pending=pendingRows.find(r=>r.id===pendingId);assert.ok(pending?.complete,JSON.stringify({rows:pendingRows.map(r=>({id:r.id,pending:r.postPending,complete:r.complete,segment:r.segmentTake?.name,created:r.created,seconds:r.seconds,error:r.captureError})),status:await $('recording-status').textContent()}));
  const pendingHash=await page.evaluate(async row=>hash(await fixtureStore.blob(row,'voice')),pending);
  assert.ok(!(await $('post-recording').locator('option').evaluateAll(nodes=>nodes.map(n=>n.value))).includes(pending.id),'whole-song take waits for approval');

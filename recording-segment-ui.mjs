@@ -8,11 +8,11 @@ export function createSegmentRecording(options) {
   let enabled=false,draft=null,key=null,rows=[],selected=0,boundary=1,history=[],savedText=null;
   let work=false,capture=null,serial=0,loading=0,ending=Promise.resolve(),loop=false,previewEnd=null,audioEnd=null,trial=null,trialURL=null,conflict=false;
   let takeURL=null,takeRequest=0,takeLoading=false,takeSourceId=null,takeMode='mix';
-  const takeModeIds=['take-mode-player','take-mode-selected'];
+  const takeModeIds=['take-mode-selected'];
   const takeModeLabel=()=>takeMode==='mix'?'人聲＋伴樂／和音':'純人聲';
   let guideMode='original';
-  const guideModeIds=['guide-mode','guide-mode-player'];
-  const status=text=>{$('status').textContent=$('player-status').textContent=text;},busy=()=>work||!!capture,reference=()=>options.reference(),part=()=>draft?.parts[selected];
+  const guideModeIds=['guide-mode'];
+  const status=text=>{$('status').textContent=text;},busy=()=>work||!!capture,reference=()=>options.reference(),part=()=>draft?.parts[selected];
   const storageKey=()=>`karaoke.segment-draft.v1.${key}`;
   const takeName=row=>{
     const name=row.segmentTake?.name;
@@ -45,7 +45,7 @@ export function createSegmentRecording(options) {
     const mode=takeMode,delay=Number($('delay').value),ref=structuredClone(row.post.reference);delaySeconds(delay);
     if(mode==='mix'&&!reference()?.hasPreview)throw Error('加入伴樂需要已保存的伴奏音軌，請先補建音軌，或改選「純人聲」。');
     clearTakePreview();loop=false;previewEnd=null;options.player()?.pauseVideo?.();options.pauseOther();$('audio').pause();
-    const request=takeRequest,cancelled=()=>request!==takeRequest||!enabled||busy();takeSourceId=row.id;takeLoading=true;render();showPlayer();status(`正在準備本段試聽：${takeModeLabel()}…`);
+    const request=takeRequest,cancelled=()=>request!==takeRequest||!enabled||busy();takeSourceId=row.id;takeLoading=true;render();status(`正在準備本段試聽：${takeModeLabel()}…`);
     let decoder;
     try{
       const blob=await store.blob(row,'voice');
@@ -124,7 +124,6 @@ export function createSegmentRecording(options) {
     const ref=reference(),locked=busy()||conflict;
     $('open').disabled=!ref||busy();$('open').hidden=enabled;$('whole').hidden=!enabled;$('whole').disabled=busy();$('tools').hidden=!enabled;
     $('mode-label').textContent=enabled?'分段模式 · 不計整首分數':'整首評分模式';
-    $('status').hidden=enabled;
     const playerSection=document.getElementById('player-section');
     playerSection.classList.toggle('segment-active',enabled);playerSection.parentElement.classList.toggle('segment-layout',enabled);$('side').hidden=$('player-tools').hidden=!enabled;
     // Move controls only; reparenting the YouTube iframe would interrupt playback.
@@ -132,14 +131,14 @@ export function createSegmentRecording(options) {
     else if(!enabled&&$('section').parentElement!==playerSection)sectionHome.after($('section'));
     $('section').classList.toggle('card',enabled);
     for(const panel of [$('tools'),$('side'),$('transport')])for(const node of panel.querySelectorAll('button,input,select'))node.disabled=locked||!draft;
-    $('stop').disabled=$('stop-player').disabled=!capture;$('download').disabled=locked||!trial;$('export').disabled=locked||!trial||!!trial.saved;
+    $('stop').disabled=!capture;$('download').disabled=locked||!trial;$('export').disabled=locked||!trial||!!trial.saved;
     $('delete-song-takes').disabled=locked||!draft||!songTakes().length;
     $('export').textContent=trial?.saved?'已存到錄音後處理':'存到錄音後處理';
     if(draft){selected=Math.max(0,Math.min(selected,draft.parts.length-1));boundary=Math.max(1,Math.min(boundary,draft.parts.length-1));}
     if(takeSourceId&&takeSourceId!==part()?.takeId)clearTakePreview();
     const take=validRows().find(r=>r.id===part()?.takeId&&r.segmentTake);
-    for(const id of ['listen-player','listen-selected'])$(id).disabled=locked||takeLoading||!take;
-    for(const id of ['delete-player','delete-selected'])$(id).disabled=locked||!take;
+    $('listen-selected').disabled=locked||takeLoading||!take;
+    $('delete-selected').disabled=locked||!take;
     for(const id of takeModeIds){$(id).value=takeMode;$(id).disabled=locked||!draft;}
     for(const id of guideModeIds){$(id).value=guideMode;$(id).disabled=locked||!draft;}
     $('take-info').textContent=take?`本段錄音：${takeName(take)} · ${new Date(take.created).toLocaleTimeString()} · ${takeModeLabel()} · 歌聲校正 ${$('delay').value} ms（含起唱與尾音餘量）`:'本段尚未選用錄音；錄完保存後即可試聽，也可在右側挑選已錄版本。';
@@ -282,9 +281,8 @@ export function createSegmentRecording(options) {
   action('boundary-play',async()=>{loop=false;const t=draft.parts[boundary].start;previewEnd=Math.min(draft.duration,t+3);await seek(Math.max(0,t-3));options.player().playVideo();});
   action('loop',async()=>{loop=!loop;previewEnd=null;render();if(loop){$('audio').pause();await seek(part().start);options.player().playVideo();}else options.player()?.pauseVideo?.();});
   action('record',record);action('stop',()=>stop());action('compose',()=>compose());action('join',()=>compose(true));
-  action('stop-player',()=>stop());
-  for(const id of ['listen-player','listen-selected'])action(id,listenTake);
-  for(const id of ['delete-player','delete-selected'])action(id,deleteTake);
+  action('listen-selected',listenTake);
+  action('delete-selected',deleteTake);
   action('delete-song-takes',deleteSongTakes);
   for(const id of takeModeIds)$(id).onchange=()=>{takeMode=$(id).value==='voice'?'voice':'mix';clearTakePreview();render();status(`已切換為${takeModeLabel()}，請按「試聽本段錄音」。`);};
   for(const id of guideModeIds)$(id).onchange=()=>{guideMode=$(id).value==='backing'?'backing':'original';render();status(guideMode==='backing'?'下次分段錄音只用伴樂／和音帶唱。':'下次分段錄音播放原唱＋伴樂帶唱。');};

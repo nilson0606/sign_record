@@ -170,7 +170,7 @@ header{gap:18px;flex-wrap:wrap}
 #segment-player-tools #segment-transport{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:18px}
 #segment-transport button{min-height:48px;min-width:0;padding-inline:8px;white-space:normal}
 .segment-active>.section-top,.segment-active>#song-form,.segment-active>#player-status,
-.segment-active #score-section>.score-title,.segment-active #score-section>.score-actions,.segment-active .whole-guide-control{display:none}
+.segment-active #score-section>.score-title,.segment-active #score-section>.score-actions,.segment-active .whole-guide-control,.segment-active #recording-status{display:none}
 .segment-active .player-session{border:0;margin-top:8px;padding:0}
 .segment-active .video-shell{aspect-ratio:16/9;min-height:0;max-height:none;max-width:none}
 .segment-active .clock-row{max-width:none}
