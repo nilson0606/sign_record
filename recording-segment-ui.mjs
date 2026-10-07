@@ -6,7 +6,9 @@ export function createSegmentRecording(options) {
   const $=id=>document.getElementById('segment-'+id),store=options.recording.store;
   let enabled=false,draft=null,key=null,rows=[],selected=0,boundary=1,history=[],savedText=null;
   let work=false,capture=null,serial=0,loading=0,ending=Promise.resolve(),loop=false,previewEnd=null,audioEnd=null,trial=null,trialURL=null,conflict=false;
-  let takeURL=null,takeRequest=0,takeLoading=false,takeSourceId=null;
+  let takeURL=null,takeRequest=0,takeLoading=false,takeSourceId=null,takeMode='mix';
+  const takeModeIds=['take-mode','take-mode-player','take-mode-selected'];
+  const takeModeLabel=()=>takeMode==='mix'?'人聲＋伴樂／和音':'純人聲';
   const status=text=>{$('status').textContent=$('player-status').textContent=text;},busy=()=>work||!!capture,reference=()=>options.reference(),part=()=>draft?.parts[selected];
   const storageKey=()=>`karaoke.segment-draft.v1.${key}`;
   function persist(undoHistory=history){
@@ -33,17 +35,37 @@ export function createSegmentRecording(options) {
     if(busy()||takeLoading||!enabled)return;
     const row=validRows().find(r=>r.id===part()?.takeId&&r.segmentTake);
     if(!row)throw Error('本段尚未選用錄音，請先錄這一段，或在右側挑選演唱版本。');
+    const mode=takeMode,delay=Number($('delay').value),ref=structuredClone(row.post.reference);delaySeconds(delay);
+    if(mode==='mix'&&!reference()?.hasPreview)throw Error('加入伴樂需要已保存的伴奏音軌，請先補建音軌，或改選「純人聲」。');
     clearTakePreview();loop=false;previewEnd=null;options.player()?.pauseVideo?.();options.pauseOther();$('audio').pause();
-    const request=takeRequest;takeSourceId=row.id;takeLoading=true;render();showPlayer();status('正在讀取本段錄音…');
+    const request=takeRequest,cancelled=()=>request!==takeRequest||!enabled||busy();takeSourceId=row.id;takeLoading=true;render();showPlayer();status(`正在準備本段試聽：${takeModeLabel()}…`);
+    let decoder;
     try{
       const blob=await store.blob(row,'voice');
-      if(request!==takeRequest||!enabled||busy())return;
+      if(cancelled())return;
       if(!blob.size)throw Error('無法讀取本段人聲錄音，請確認歌曲庫。');
-      takeURL=URL.createObjectURL(blob);$('take-audio').src=takeURL;$('take-audio').hidden=false;
+      decoder=new AudioContext({sampleRate:48000,sinkId:{type:'none'}});
+      const raw=await decoder.decodeAudioData(await blob.arrayBuffer()),tracks=[];
+      if(cancelled())return;
+      if(mode==='mix'){
+        if(!row.post.segments?.length)throw Error('此錄音缺少歌曲時間資訊，請改選「純人聲」。');
+        const requiredEnd=Math.max(...row.post.segments.map(s=>s.songTime+s.duration));
+        for(const stem of ['accompaniment',...(ref.vocalMode==='lead'?['backing']:[])]){
+          const bytes=await options.loadStem(ref,stem);if(cancelled())return;
+          const buffer=await decoder.decodeAudioData(bytes);if(cancelled())return;
+          if(buffer.duration<requiredEnd-.15)throw Error('伴樂長度不足，請補建完整音軌，或改選「純人聲」。');
+          tracks.push(buffer);
+        }
+      }
+      // Keep this take's recording-to-song map so accompaniment starts at the
+      // recorded section, including any pauses; correction moves only the voice.
+      const meta={...row,mode,seconds:raw.duration,sourceSeconds:raw.duration,fixedMixGains:{version:1,voice:1,backing:1},postEdit:{version:1,start:0,end:raw.duration,fadeIn:0,fadeOut:0}};
+      const preview=wavBlob(await remixRecording(raw,tracks,meta,delay));if(cancelled())return;
+      takeURL=URL.createObjectURL(preview);$('take-audio').src=takeURL;$('take-audio').hidden=false;
       await $('take-audio').play();
-      if(request===takeRequest)status('正在試聽本段錄音：純人聲，含錄製時的起唱與尾音餘量。');
+      if(request===takeRequest)status(`正在試聽本段錄音：${takeModeLabel()} · 歌聲校正 ${delay} ms，含起唱與尾音餘量。`);
     }catch(e){if(request===takeRequest){clearTakePreview();throw e;}}
-    finally{if(request===takeRequest)takeLoading=false;render();}
+    finally{if(decoder)await decoder.close().catch(()=>{});if(request===takeRequest)takeLoading=false;render();}
   }
   async function deleteTake(){
     if(busy()||conflict||!enabled)return;
@@ -82,7 +104,8 @@ export function createSegmentRecording(options) {
     const take=validRows().find(r=>r.id===part()?.takeId&&r.segmentTake);
     for(const id of ['listen','listen-player','listen-selected'])$(id).disabled=locked||takeLoading||!take;
     for(const id of ['delete','delete-player','delete-selected'])$(id).disabled=locked||!take;
-    $('take-info').textContent=take?`本段錄音：${take.segmentTake.name} · ${new Date(take.created).toLocaleTimeString()} · 純人聲（含起唱與尾音餘量）`:'本段尚未選用錄音；錄完保存後即可試聽，也可在右側挑選已錄版本。';
+    for(const id of takeModeIds){$(id).value=takeMode;$(id).disabled=locked||!draft;}
+    $('take-info').textContent=take?`本段錄音：${take.segmentTake.name} · ${new Date(take.created).toLocaleTimeString()} · ${takeModeLabel()} · 歌聲校正 ${$('delay').value} ms（含起唱與尾音餘量）`:'本段尚未選用錄音；錄完保存後即可試聽，也可在右側挑選已錄版本。';
     if(!draft)return;
     const p=part();$('song').textContent=ref?.title||'';$('seek').max=draft.duration;
     $('selected-summary').textContent=`${p.name} · ${fmt(p.start)}–${fmt(p.end)}`;
@@ -217,6 +240,7 @@ export function createSegmentRecording(options) {
   action('stop-player',()=>stop());
   for(const id of ['listen','listen-player','listen-selected'])action(id,listenTake);
   for(const id of ['delete','delete-player','delete-selected'])action(id,deleteTake);
+  for(const id of takeModeIds)$(id).onchange=()=>{takeMode=$(id).value==='voice'?'voice':'mix';clearTakePreview();render();status(`已切換為${takeModeLabel()}，請按「試聽本段錄音」。`);};
   action('export',async()=>{if(!trial||busy())return;work=true;render();options.changed();try{await store.saveRemix(trial.meta,trial.mix,trial.voice);await options.recording.refresh(trial.meta.id);status('已另存完整成品，可到「錄音後處理」繼續調整與 A/B 比較。');}finally{work=false;render();options.changed();}});
   action('download',()=>{if(!trial)return;const a=document.createElement('a');a.href=trialURL;a.download=trial.meta.title.replace(/[\\/:*?"<>|]/g,'_')+`-${trial.meta.mode}-${trial.meta.appliedDelayMs}ms.wav`;a.click();});
   $('part').onchange=()=>{selected=Number($('part').value);loop=false;render();};$('boundary').onchange=()=>{boundary=Number($('boundary').value);render();};

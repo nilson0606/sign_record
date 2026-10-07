@@ -7,7 +7,7 @@ const port='4391',site='http://localhost:'+port;
 const server=spawn(process.execPath,['server.mjs'],{cwd:new URL('../',import.meta.url),env:{...process.env,PORT:port},windowsHide:true,stdio:['ignore','pipe','pipe']});
 let browser,stemDelay=0;
 const ref={version:1,videoId:'M7lc1UVf-VE',title:'分段錄音隔離測試',duration:8,step:.1,frames:Array(80).fill(440),beats:[],cacheId:'segment-fixture',hasPreview:true,separationModel:'demucs',pitchMethod:'rmvpe',separationMethod:'single',vocalMode:'all',rangeSeconds:0};
-function wav(){const rate=48000,n=rate*8,b=Buffer.alloc(44+n*2);b.write('RIFF');b.writeUInt32LE(b.length-8,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(rate,24);b.writeUInt32LE(rate*2,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(n*2,40);for(let i=0;i<n;i++)b.writeInt16LE(Math.round(.06*Math.sin(2*Math.PI*660*i/rate)*32767),44+i*2);return b;}
+function wav(){const rate=48000,n=rate*8,b=Buffer.alloc(44+n*2);b.write('RIFF');b.writeUInt32LE(b.length-8,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(rate,24);b.writeUInt32LE(rate*2,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(n*2,40);for(let i=0;i<n;i++)b.writeInt16LE(Math.round(.06*Math.sin(2*Math.PI*660.37*i/rate)*32767),44+i*2);return b;}
 try{
  await new Promise((ok,no)=>{server.stdout.once('data',ok);server.stderr.once('data',x=>no(Error(x.toString())));server.once('error',no);});
  browser=await chromium.launch({channel:process.env.BROWSER_CHANNEL||'msedge',headless:true,args:['--mute-audio','--autoplay-policy=no-user-gesture-required']});
@@ -33,7 +33,7 @@ try{
   window.fixturePlayer={getCurrentTime:()=>state===1?Math.min(8,time+(performance.now()-anchor)/1000):time,getPlayerState:()=>state,seekTo(t){time=t;anchor=performance.now();},pauseVideo(){time=this.getCurrentTime();state=2;fixtureSession?.playerState(2);},playVideo(){if(time>=8)time=0;anchor=performance.now();state=1;fixtureSession?.playerState(1);},isMuted:()=>muted,mute(){muted=true;},unMute(){muted=false;},setPlaybackRate(){},getPlaybackRate:()=>1};
   setInterval(()=>{if(state===1&&fixturePlayer.getCurrentTime()>=8){time=8;state=0;fixtureSession.playerState(0);}},20);
   window.fixtureSession=createKaraokeSession({reference:()=>null,voiced:()=>true,context:()=>fixtureMic?.context,stream:()=>fixtureMic?.stream,inputSource:()=>fixtureMic?.gain,player:()=>fixturePlayer,micReady:()=>!!fixtureMic,stopBeats(){},loadVideo:async()=>true,cancelCalibration(){},
-   async startMic(){if(fixtureMic)return;const context=new AudioContext({sampleRate:48000,sinkId:{type:'none'}}),osc=context.createOscillator(),gain=context.createGain(),dest=context.createMediaStreamDestination();osc.frequency.value=440;gain.gain.value=.15;osc.connect(gain);gain.connect(dest);osc.start();await context.resume();fixtureMic={context,osc,gain,stream:dest.stream};fixtureSession.micStarted();},
+   async startMic(){if(fixtureMic)return;const context=new AudioContext({sampleRate:48000,sinkId:{type:'none'}}),osc=context.createOscillator(),gain=context.createGain(),dest=context.createMediaStreamDestination();osc.frequency.value=443.27;gain.gain.value=.15;osc.connect(gain);gain.connect(dest);osc.start();await context.resume();fixtureMic={context,osc,gain,stream:dest.stream};fixtureSession.micStarted();},
    async stopMic(){await fixtureSession.stopRecording();if(fixtureMic){await fixtureMic.context.close();fixtureMic=null;}fixtureSession.micStopped();}
   });
   const {BrowserRecordingStore}=await import('/recording-store.mjs');window.fixtureStore=new BrowserRecordingStore();
@@ -43,6 +43,7 @@ try{
  }
  await page.goto(site);await initialize();const $=id=>page.locator('#'+id);
  await $('segment-open').click();assert.equal(await $('segment-delay').inputValue(),'200');
+ for(const id of ['segment-take-mode','segment-take-mode-player','segment-take-mode-selected'])assert.equal(await $(id).inputValue(),'mix');
  assert.equal(await $('sing-start').isHidden(),true);assert.equal(await $('segment-side').isVisible(),true);
  assert.equal(await $('voice-section').isHidden(),true);assert.equal(await $('segment-player-tools').isVisible(),true);assert.equal(await $('segment-listen').isDisabled(),true);
  const layout=await page.evaluate(()=>{const rect=id=>document.getElementById(id).getBoundingClientRect(),left=rect('player-section'),right=rect('segment-side'),video=document.querySelector('#player-section .video-shell').getBoundingClientRect(),controls=rect('segment-section');return{equal:Math.abs(left.width-right.width)<1,aligned:Math.abs(left.top-right.top)<1,right:right.left>=left.right,videoAbove:video.bottom<=controls.top};});assert.deepEqual(layout,{equal:true,aligned:true,right:true,videoAbove:true});
@@ -90,7 +91,18 @@ try{
  // A single recorded take is immediately playable even while another section is unrecorded.
  await $('segment-listen').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);
  assert.equal(await page.evaluate(()=>fixturePlayer.getPlayerState()),2);
- assert.equal(await page.evaluate(async()=>hash(await(await fetch(document.getElementById('segment-take-audio').src)).blob())),firstHash);
+ await page.evaluate(async()=>{const c=new AudioContext({sinkId:{type:'none'}});window.previewMixBuffer=await c.decodeAudioData(await(await fetch(document.getElementById('segment-take-audio').src)).arrayBuffer());await c.close();});
+ await $('segment-take-mode-selected').selectOption('voice');assert.equal(await $('segment-take-audio').isHidden(),true);
+ for(const id of ['segment-take-mode','segment-take-mode-player','segment-take-mode-selected'])assert.equal(await $(id).inputValue(),'voice');
+ await $('segment-listen-selected').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);
+ const takeAlignment=await page.evaluate(async row=>{
+   const c=new AudioContext({sinkId:{type:'none'}}),voice=await c.decodeAudioData(await(await fetch(document.getElementById('segment-take-audio').src)).arrayBuffer()),raw=await c.decodeAudioData(await(await fixtureStore.blob(row,'voice')).arrayBuffer());
+   const v=voice.getChannelData(0),m=previewMixBuffer.getChannelData(0),r=raw.getChannelData(0),rate=voice.sampleRate;let delayError=0,backError=0,backEnergy=0;
+   for(let i=100;i<v.length-10000;i++){const t=i/rate,s=row.post.segments.find(s=>t>=s.offset&&t<s.offset+s.duration),b=s?s.songTime+t-s.offset:0,expected=s&&b<8 ? .06*Math.sin(2*Math.PI*660.37*b) : 0;delayError=Math.max(delayError,Math.abs(v[i]-r[i+Math.round(.2*rate)]));backError=Math.max(backError,Math.abs(m[i]-v[i]-expected));backEnergy+=Math.abs(m[i]-v[i]);}
+   await c.close();return {delayError,backError,backEnergy,length:voice.length,mixLength:previewMixBuffer.length,rawLength:raw.length};
+ },first);
+ assert.ok(takeAlignment.delayError<.00012,JSON.stringify(takeAlignment));assert.ok(takeAlignment.backError<.012,JSON.stringify(takeAlignment));assert.ok(takeAlignment.backEnergy>100);assert.equal(takeAlignment.length,takeAlignment.rawLength);assert.equal(takeAlignment.mixLength,takeAlignment.length);
+ assert.equal(await page.evaluate(async row=>hash(await fixtureStore.blob(row,'voice')),first),firstHash,'preview modes preserve the source');
  await page.evaluate(()=>fixturePlayer.playVideo());assert.equal(await $('segment-take-audio').evaluate(el=>el.paused),true);await page.evaluate(()=>fixturePlayer.pauseVideo());
  // Leaving a section during a slow read must not play its recording later.
  await page.evaluate(async()=>{const {BrowserRecordingStore}=await import('/recording-store.mjs');window.originalBlob=BrowserRecordingStore.prototype.blob;BrowserRecordingStore.prototype.blob=async function(...args){await new Promise(resolve=>window.releaseTakeRead=resolve);return originalBlob.apply(this,args);};});
@@ -98,6 +110,9 @@ try{
  await page.evaluate(async()=>{const {BrowserRecordingStore}=await import('/recording-store.mjs');BrowserRecordingStore.prototype.blob=originalBlob;releaseTakeRead();});
  await page.waitForTimeout(100);assert.equal(await $('segment-take-audio').isHidden(),true);assert.equal(await $('segment-listen').isDisabled(),true);
  await $('segment-part').selectOption('1');await $('segment-record').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('本段已保存'),{},{timeout:20000});
+ // A later section uses its saved song position, not accompaniment from time zero.
+ await $('segment-take-mode-player').selectOption('mix');await $('segment-listen-player').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);
+ const laterTake=await page.evaluate(async()=>{const id=document.getElementById('segment-take').value,row=(await fixtureStore.list()).find(r=>r.id===id),c=new AudioContext({sinkId:{type:'none'}}),mix=await c.decodeAudioData(await(await fetch(document.getElementById('segment-take-audio').src)).arrayBuffer()),raw=await c.decodeAudioData(await(await fixtureStore.blob(row,'voice')).arrayBuffer()),m=mix.getChannelData(0),v=raw.getChannelData(0);let error=0;for(let i=100;i<m.length-10000;i++){const t=i/mix.sampleRate,s=row.post.segments.find(s=>t>=s.offset&&t<s.offset+s.duration),expected=s ? .06*Math.sin(2*Math.PI*660.37*(s.songTime+t-s.offset)) : 0;error=Math.max(error,Math.abs(m[i]-v[i+9600]-expected));}await c.close();return {start:row.post.segments[0].songTime,error};});assert.ok(laterTake.start>.8);assert.ok(laterTake.error<.012,JSON.stringify(laterTake));
  assert.equal(await page.evaluate(()=>localStorage.getItem('karaoke.scores.v1')),beforeScore,'segment mode never writes whole-song scores');
  assert.match(await $('segment-coverage').textContent(),/所有段落/);
  // Default mix uses +200 once, has exact song length, and saves clean source for post.
@@ -115,7 +130,7 @@ try{
  const alignment=await page.evaluate(async({voice,mix})=>{
   const c=new AudioContext({sampleRate:48000,sinkId:{type:'none'}}),decode=async(r,track)=>c.decodeAudioData(await(await fixtureStore.blob(r,track)).arrayBuffer());
   const v=await decode(voice),m=await decode(mix),raw=await decode(voice,'voice'),a=v.getChannelData(0),b=m.getChannelData(0),r=raw.getChannelData(0);let delayError=0,backError=0;
-  for(let i=100;i<a.length-10000;i++){delayError=Math.max(delayError,Math.abs(a[i]-r[i+9600]));backError=Math.max(backError,Math.abs(b[i]-a[i]-.06*Math.sin(2*Math.PI*660*i/48000)));}
+  for(let i=100;i<a.length-10000;i++){delayError=Math.max(delayError,Math.abs(a[i]-r[i+9600]));backError=Math.max(backError,Math.abs(b[i]-a[i]-.06*Math.sin(2*Math.PI*660.37*i/48000)));}
   await c.close();return {delayError,backError};
  },{voice,mix});assert.ok(alignment.delayError<.00012,JSON.stringify(alignment));assert.ok(alignment.backError<.00012,JSON.stringify(alignment));
  // A moved cut beyond a take's handles is rejected until explicitly allowing gaps.
