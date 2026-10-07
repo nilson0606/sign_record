@@ -138,6 +138,7 @@ try {
   assert.equal((await records()).length,1,'manual scoring after stopping must not duplicate recording');
   assert.equal(voice.appliedDelayMs,200,await page.locator('#recording-status').textContent());assert.equal(voice.post.offsetMs,200);assert.equal(voice.mime,'audio/wav');assert.equal(voice.rawMime,'audio/wav');assert.equal(voice.captureClock.source,'audio-worklet-pcm');
   await page.locator('#recording-mode').selectOption('mix');
+  await page.locator('#recording-balance summary').click();
   await page.locator('#recording-manual').check();
   await page.locator('#recording-voice-level').fill('60');await page.locator('#recording-backing-level').fill('80');
   assert.match(await page.locator('#recording-balance-help').textContent(),/±3 dB/);
