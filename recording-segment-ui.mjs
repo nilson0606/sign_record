@@ -131,7 +131,7 @@ export function createSegmentRecording(options) {
     if(enabled&&$('section').parentElement===playerSection)playerSection.after($('section'));
     else if(!enabled&&$('section').parentElement!==playerSection)sectionHome.after($('section'));
     $('section').classList.toggle('card',enabled);
-    for(const panel of [$('tools'),$('side')])for(const node of panel.querySelectorAll('button,input,select'))node.disabled=locked||!draft;
+    for(const panel of [$('tools'),$('side'),$('transport')])for(const node of panel.querySelectorAll('button,input,select'))node.disabled=locked||!draft;
     $('stop').disabled=$('stop-player').disabled=!capture;$('download').disabled=locked||!trial;$('export').disabled=locked||!trial||!!trial.saved;
     $('delete-song-takes').disabled=locked||!draft||!songTakes().length;
     $('export').textContent=trial?.saved?'已存到錄音後處理':'存到錄音後處理';

@@ -167,6 +167,8 @@ header{gap:18px;flex-wrap:wrap}
 #recording-review .button-row{flex-wrap:wrap;margin-top:14px}
 #recording-review label{margin-top:12px}
 #segment-player-tools .button-row{flex-wrap:wrap;margin-top:12px}
+#segment-player-tools #segment-transport{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:18px}
+#segment-transport button{min-height:48px;min-width:0;padding-inline:8px;white-space:normal}
 .segment-active>.section-top,.segment-active>#song-form,.segment-active>#player-status,
 .segment-active #score-section>.score-title,.segment-active #score-section>.score-actions,.segment-active .whole-guide-control{display:none}
 .segment-active .player-session{border:0;margin-top:8px;padding:0}

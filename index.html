@@ -52,6 +52,7 @@
       <div class="video-shell"><div id="video-placeholder"><span>▶</span><p>你的下一首歌</p><small>播放器與麥克風分別啟動</small></div><div id="player"></div></div>
       <div class="clock-row"><span>播放器時間 <b id="player-time">—</b></span><span>補償後位置 <b id="aligned-time">—</b></span></div>
       <div id="segment-player-tools" hidden>
+        <div id="segment-transport" class="button-row" role="group" aria-label="影片播放與分段"><button id="segment-play" type="button" class="secondary">播放／暫停影片</button><button id="segment-split" type="button">在此分段</button><button id="segment-undo" type="button" class="secondary">復原分界</button></div>
         <label for="segment-guide-mode-player">錄音時帶唱</label><select id="segment-guide-mode-player"><option value="original" selected>原唱＋伴樂（預設）</option><option value="backing">只有伴樂／和音</option></select>
         <label for="segment-take-mode-player">試聽內容</label><select id="segment-take-mode-player"><option value="mix" selected>人聲＋伴樂／和音</option><option value="voice">純人聲</option></select>
         <div class="button-row"><button id="segment-stop-player" type="button" class="secondary" disabled>停止／保存本段</button><button id="segment-listen-player" type="button" disabled>試聽本段錄音</button><button id="segment-delete-player" type="button" class="secondary" disabled>刪除此版錄音</button></div>
@@ -84,7 +85,6 @@
         <p class="help">「從頭開始唱」保留原本錄音與整首評分。分段模式可邊播放邊加分界，不寫入整首分數。</p>
         <div id="segment-tools" hidden>
           <p id="segment-song" class="preview-source"></p>
-          <div class="button-row"><button id="segment-play" type="button" class="secondary">播放／暫停影片</button><button id="segment-split" type="button">在此分段</button><button id="segment-undo" type="button" class="secondary">復原分界</button></div>
           <div class="button-row"><button id="segment-merge-all" type="button" class="secondary">合併為一段</button></div>
           <p class="help">復原保留最近 40 次調整；沒有更早紀錄時，繼續按會從最後一道分界往前移除，直到剩一整段。原始錄音保留；合併不同演唱版本後需重新挑選。</p>
           <label for="segment-seek">歌曲位置 <output id="segment-position">00:00.000</output></label><input id="segment-seek" type="range" min="0" max="1" step="0.01" value="0">
