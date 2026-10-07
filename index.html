@@ -81,13 +81,20 @@
           </details>
           <div class="button-row"><button id="segment-loop" type="button" class="secondary" aria-pressed="false">循環練唱本段</button><button id="segment-record" type="button">錄這一段</button><button id="segment-stop" type="button" class="secondary" disabled>停止／保存本段</button></div>
           <p class="help">錄製時影片靜音，由已保存的伴奏／和音帶唱，不播放原唱。請戴耳機；每次錄製都獨立保存。</p>
-          <details id="segment-versions-panel"><summary>挑選演唱版本／整首底稿</summary>
+        </div>
+        <p id="segment-status" class="status" role="status">載入歌曲後，可開啟分段模式。</p>
+      </section>
+    </section>
+    <aside id="segment-side" class="card segment-section" aria-labelledby="segment-side-heading" hidden>
+          <div class="section-top"><h2 id="segment-side-heading">挑選版本與試合</h2><span class="badge">分段成品</span></div>
+          <p id="segment-selected-summary" class="preview-source" aria-live="polite"></p>
+          <details id="segment-versions-panel" open><summary>挑選演唱版本／整首底稿</summary>
           <label for="segment-base">整首底稿（未補唱處沿用）</label><select id="segment-base"><option value="">從空白開始分段錄</option></select>
           <div class="button-row"><button id="segment-refresh" type="button" class="secondary">重新讀取錄音版本</button><button id="segment-save" type="button" class="secondary">保存草稿</button></div>
           <label for="segment-take">本段採用的演唱版本</label><select id="segment-take"></select>
           </details>
           <p id="segment-coverage" class="help"></p>
-          <details id="segment-output-panel"><summary>試合完整一版／另存成品 · 預設人聲＋伴樂，200 ms</summary>
+          <details id="segment-output-panel" open><summary>試合完整一版／另存成品 · 預設人聲＋伴樂，200 ms</summary>
           <div class="segment-fields"><label>試合內容<select id="segment-output"><option value="mix" selected>人聲＋伴樂／和音</option><option value="voice">純人聲</option></select></label><label>歌聲校正（ms）<input id="segment-delay" type="number" min="-2000" max="2000" step="10" value="200"></label></div>
           <label class="check-option"><input id="segment-allow-gaps" type="checkbox">允許未錄範圍保留靜音</label>
           <div class="button-row"><button id="segment-compose" type="button">試合完整一版</button><button id="segment-join" type="button" class="secondary">試合並聽本段接合</button></div>
@@ -95,10 +102,7 @@
           <div class="button-row"><button id="segment-export" type="button" class="secondary" disabled>另存完整成品</button><button id="segment-download" type="button" class="secondary" disabled>下載試合 WAV</button></div>
           <p class="help">試合以整首時間軸接合乾淨人聲，可加伴樂，校正預設 200 ms。另存成品後可繼續人聲後製及 A/B；原始版本保留。分界草稿記在目前瀏覽器，錄音沿用歌曲庫保存。</p>
           </details>
-        </div>
-        <p id="segment-status" class="status" role="status">載入歌曲後，可開啟分段模式。</p>
-      </section>
-    </section>
+    </aside>
     <section id="voice-section" tabindex="-1" class="card voice-card">
       <div class="section-top"><h2><span class="step">03</span> 即時音高與收音</h2><span id="mic-badge" class="badge">麥克風未開啟</span></div>
       <div class="pitch-value"><span id="note">—</span><div><strong id="frequency">等待收音</strong><small id="cents">單音音高 · 65–1000 Hz</small></div></div>

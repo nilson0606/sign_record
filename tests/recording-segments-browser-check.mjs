@@ -43,6 +43,8 @@ try{
  }
  await page.goto(site);await initialize();const $=id=>page.locator('#'+id);
  await $('segment-open').click();assert.equal(await $('segment-delay').inputValue(),'200');
+ assert.equal(await $('sing-start').isHidden(),true);assert.equal(await $('segment-side').isVisible(),true);
+ const layout=await page.evaluate(()=>{const rect=id=>document.getElementById(id).getBoundingClientRect(),left=rect('player-section'),right=rect('segment-side'),video=document.querySelector('#player-section .video-shell').getBoundingClientRect(),controls=rect('segment-section');return{equal:Math.abs(left.width-right.width)<1,aligned:Math.abs(left.top-right.top)<1,right:right.left>=left.right,videoAbove:video.bottom<=controls.top};});assert.deepEqual(layout,{equal:true,aligned:true,right:true,videoAbove:true});
  // Split without interrupting playback; precise edits and undo retain one boundary.
  await page.evaluate(()=>{fixturePlayer.seekTo(3.6);fixturePlayer.playVideo();});await $('segment-split').click();assert.equal(await page.evaluate(()=>fixturePlayer.getPlayerState()),1);
  await page.evaluate(()=>fixturePlayer.pauseVideo());await $('segment-boundary-panel').locator('summary').click();await $('segment-boundary-time').fill('00:04.000');await $('segment-boundary-time').dispatchEvent('change');assert.equal(await $('segment-part').locator('option').count(),2);
@@ -61,7 +63,7 @@ try{
  assert.equal(await page.evaluate(()=>localStorage.getItem('karaoke.scores.v1')),beforeScore,'segment mode never writes whole-song scores');
  assert.match(await $('segment-coverage').textContent(),/所有段落/);
  // Default mix uses +200 once, has exact song length, and saves clean source for post.
- await $('segment-output-panel').locator('summary').click();await $('segment-compose').click();await page.waitForFunction(()=>!document.getElementById('segment-export').disabled);
+ await $('segment-compose').click();await page.waitForFunction(()=>!document.getElementById('segment-export').disabled);
  assert.match(await $('segment-status').textContent(),/200 ms/);await $('segment-export').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('已另存完整成品'));
  await page.evaluate(async()=>{await document.getElementById('segment-audio').play();fixturePlayer.playVideo();});assert.equal(await $('segment-audio').evaluate(el=>el.paused),true,'video playback stops composed preview');await page.evaluate(()=>fixturePlayer.pauseVideo());
  const mix=(await page.evaluate(()=>fixtureStore.list())).find(r=>r.segmentComposition);assert.ok(mix);assert.equal(mix.mode,'mix');assert.equal(mix.appliedDelayMs,200);assert.equal(mix.seconds,8);assert.deepEqual(mix.stems,['accompaniment']);
@@ -84,9 +86,9 @@ try{
  await page.evaluate(()=>{fixturePlayer.seekTo(7.2);fixturePlayer.playVideo();});await page.waitForTimeout(120);assert.equal(await page.evaluate(()=>fixturePlayer.getPlayerState()),1,'audio audition endpoint does not stop later video playback');await page.evaluate(()=>fixturePlayer.pauseVideo());
  // Persisted decisions reopen. No real user library or profile is touched.
  await page.reload();await initialize();await $('segment-open').click();assert.equal(await $('segment-part').locator('option').count(),2);assert.match(await $('segment-coverage').textContent(),/所有段落/);
- await mkdir('test-results',{recursive:true});await $('player-section').screenshot({path:'test-results/recording-segments.png'});assert.ok(await $('player-section').evaluate(el=>el.scrollWidth<=el.clientWidth+1));
+ await mkdir('test-results',{recursive:true});await page.evaluate(()=>{document.querySelector('.section-nav').style.position='static';document.getElementById('theme-select').value='warm';document.documentElement.dataset.theme='warm';document.getElementById('player-section').scrollIntoView({behavior:'instant',block:'start'});});await page.screenshot({path:'test-results/recording-segments-layout.png'});for(const id of ['player-section','segment-side'])assert.ok(await $(id).evaluate(el=>el.scrollWidth<=el.clientWidth+1));
  // Whole-song start still records and scores through the existing path.
- await $('recording-settings').locator('summary').click();await $('recording-mode').selectOption('voice');await $('sing-start').click();await page.waitForFunction(()=>document.getElementById('score-status').textContent.includes('演唱中'));
+ await $('segment-whole').click();assert.equal(await $('sing-start').isVisible(),true);assert.equal(await $('segment-side').isHidden(),true);await $('recording-settings').locator('summary').click();await $('recording-mode').selectOption('voice');await $('sing-start').click();await page.waitForFunction(()=>document.getElementById('score-status').textContent.includes('演唱中'));
  assert.equal(await $('segment-tools').isHidden(),true);assert.equal(await $('segment-open').isVisible(),true);
  await page.evaluate(()=>{for(let t=0;t<7;t+=.1)fixtureSession.sample(t,440);fixturePlayer.seekTo(7);});await $('finish-song').click();await page.waitForFunction(()=>document.getElementById('score-status').textContent.includes('已結算'));
  assert.ok(await page.evaluate(()=>JSON.parse(localStorage.getItem('karaoke.scores.v1')).length));

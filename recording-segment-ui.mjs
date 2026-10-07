@@ -30,12 +30,14 @@ export function createSegmentRecording(options) {
     const ref=reference(),locked=busy()||conflict;
     $('open').disabled=!ref||busy();$('open').hidden=enabled;$('whole').hidden=!enabled;$('whole').disabled=busy();$('tools').hidden=!enabled;
     $('mode-label').textContent=enabled?'分段模式 · 不計整首分數':'整首評分模式';
-    document.getElementById('player-section').classList.toggle('segment-active',enabled);
-    for(const node of $('tools').querySelectorAll('button,input,select'))node.disabled=locked||!draft;
+    const playerSection=document.getElementById('player-section');
+    playerSection.classList.toggle('segment-active',enabled);playerSection.parentElement.classList.toggle('segment-layout',enabled);$('side').hidden=!enabled;
+    for(const panel of [$('tools'),$('side')])for(const node of panel.querySelectorAll('button,input,select'))node.disabled=locked||!draft;
     $('stop').disabled=!capture;$('export').disabled=$('download').disabled=locked||!trial;
     if(!draft)return;
     selected=Math.max(0,Math.min(selected,draft.parts.length-1));boundary=Math.max(1,Math.min(boundary,draft.parts.length-1));
     const p=part();$('song').textContent=ref?.title||'';$('seek').max=draft.duration;
+    $('selected-summary').textContent=`${p.name} · ${fmt(p.start)}–${fmt(p.end)}`;
     $('part').replaceChildren();draft.parts.forEach((p,i)=>option($('part'),String(i),`${p.name} · ${fmt(p.start)}–${fmt(p.end)}`));$('part').value=String(selected);
     $('name').value=p.name;$('boundary').replaceChildren();draft.parts.slice(1).forEach((p,i)=>option($('boundary'),String(i+1),`${i+1}｜${fmt(p.start)}`));$('boundary').value=String(boundary);
     const hasBoundary=draft.parts.length>1;

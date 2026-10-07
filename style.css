@@ -154,6 +154,21 @@ header{gap:18px;flex-wrap:wrap}
 
 .layout>#recording-post,.layout>.score-card{margin:0}
 
+/* Segmented singing: video and capture on the left, choices and composition on the right. */
+.layout.segment-layout{grid-template-columns:repeat(2,minmax(0,1fr))}
+.layout.segment-layout>#player-section{grid-column:1;grid-row:1;align-self:start}
+.layout.segment-layout>#segment-side{grid-column:2;grid-row:1;align-self:start;margin:0;padding:24px}
+.layout.segment-layout>#voice-section{grid-column:1/-1}
+#segment-side[hidden]{display:none}
+.segment-active>.section-top,.segment-active>#song-form,.segment-active>#player-status,
+.segment-active #score-section>.score-title,.segment-active #score-section>.score-actions{display:none}
+.segment-active .player-session{border:0;margin-top:8px;padding:0}
+.segment-active .video-shell{aspect-ratio:16/9;min-height:0;max-height:none}
+.segment-active #segment-section{margin-top:12px;padding-top:12px}
+#segment-side .preview-source{font-size:15px;line-height:1.6}
+#segment-side details:first-of-type{margin-top:0}
+@media(max-width:760px){.layout.segment-layout{grid-template-columns:minmax(0,1fr)}.layout.segment-layout>#segment-side{grid-column:1;grid-row:2}}
+
 #voice-output{min-width:0;border:1px solid var(--line);border-radius:10px;padding:14px;margin:18px 0}
 #voice-output legend{color:var(--accent);font-size:14px}
 #voice-output .input-row{margin-bottom:16px;flex-wrap:wrap}
