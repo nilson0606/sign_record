@@ -173,6 +173,10 @@ header{gap:18px;flex-wrap:wrap}
 .segment-active #segment-section{margin-top:12px;padding-top:12px}
 #segment-side .preview-source{font-size:15px;line-height:1.6}
 #segment-side details:first-of-type{margin-top:0}
+#segment-output-panel{--accent:#d6afff;--soft:#d4c4e5;--text:#f6edff;--button-text:#29163c;--input-bg:#241b30;--input-border:#756086;--secondary-border:#9c7ebb;margin-top:22px;padding:16px;border:1px solid #9273ae;border-left:4px solid var(--accent);border-radius:12px;background:#302239;color:var(--soft)}
+#segment-output-panel>summary{color:var(--accent);font-size:13px;font-weight:700;line-height:1.6}
+#segment-output-panel .help{margin-bottom:0}
+#segment-output-panel input[type=checkbox]{accent-color:var(--accent)}
 @media(max-width:760px){.layout.segment-layout{grid-template-columns:minmax(0,1fr)}.layout.segment-layout>#segment-side{grid-column:1;grid-row:2}}
 
 #voice-output{min-width:0;border:1px solid var(--line);border-radius:10px;padding:14px;margin:18px 0}
