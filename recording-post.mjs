@@ -23,7 +23,7 @@ async function localRequest(path,body) {
   if(!response.ok){const error=await response.json().catch(()=>({}));throw new Error(error.error||'所需音軌不存在，請還原相同版本的歌曲音軌。');}
   return response;
 }
-async function recordedAnalysis(blob, progress) {
+async function recordedAnalysis(blob, progress, pitchShift=0) {
   const context=new AudioContext({sampleRate:16000,sinkId:{type:'none'}});
   let audio,sampleRate;
   try {
@@ -37,7 +37,7 @@ async function recordedAnalysis(blob, progress) {
     const done=(error,value)=>{clearTimeout(timer);worker.terminate();error?reject(error):resolve(value);};
     worker.onerror=()=>done(new Error('歌聲分析無法啟動，請更新頁面後重試。'));
     worker.onmessage=({data})=>{if(data.error)done(new Error(data.error));else if(data.result)done(null,data.result);else progress(data.progress);};
-    worker.postMessage({audio,sampleRate},[audio.buffer]);
+    worker.postMessage({audio,sampleRate,pitchShift},[audio.buffer]);
   });
 }
 export function createRecordingPost({store,stop,pause,download,onDelete,reference=()=>null}) {
@@ -265,9 +265,9 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     const referenceSource=$('post-reference-source').value;
     const scoringReference=referenceSource==='current'?referenceForRescore(row.post,reference()):structuredClone(row.post.reference);
     status(`正在以 ${referenceName(scoringReference)} 重新評分…`);
-    if(row.post.audioAnalysis?.source!=='decoded-voice-v1'||row.post.audioAnalysis.detectorVersion!==PITCH_DETECTOR_VERSION) {
+    if(row.post.audioAnalysis?.source!=='decoded-voice-v1'||row.post.audioAnalysis.detectorVersion!==PITCH_DETECTOR_VERSION||(row.post.audioAnalysis.pitchShift||0)!==(row.post.reference.pitchShift||0)) {
       status('正在從保存的乾淨歌聲重新擷取音高…');
-      row.post.audioAnalysis=await recordedAnalysis(await store.blob(row,'voice'),percent=>status(`正在分析乾淨歌聲 ${percent}%…`));
+      row.post.audioAnalysis=await recordedAnalysis(await store.blob(row,'voice'),percent=>status(`正在分析乾淨歌聲 ${percent}%…`),row.post.reference.pitchShift || 0);
     }
     const scoring={...row.post.scoring,difficulty:scoringProfile($('post-difficulty').value).id};
     const scoringPost={...row.post,reference:scoringReference,scoring};

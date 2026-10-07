@@ -1,11 +1,13 @@
+import {keyShift} from './song-key.mjs';
 import { mkdir, readFile, writeFile, rename, copyFile, readdir, stat, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { validateReference, normalizeMasks } from './scoring.mjs';
 
-export function cacheKey(videoId, seconds, vocalMode = 'all', separationModel = 'demucs', pitchMethod = 'yin', separationMethod = 'single') {
+export function cacheKey(videoId, seconds, vocalMode = 'all', separationModel = 'demucs', pitchMethod = 'yin', separationMethod = 'single', pitchShift = 0) {
+  keyShift(pitchShift);
   if (!/^[\w-]{11}$/.test(videoId) || ![0, 15, 30, 60].includes(seconds) || !['all','lead'].includes(vocalMode) || !['demucs','bs-roformer','mel-roformer'].includes(separationModel) || !['yin','rmvpe'].includes(pitchMethod) || !['single','residual'].includes(separationMethod)) throw new Error('Invalid cache key');
-  return `${videoId}_${seconds}${vocalMode === 'lead' ? '_lead' : ''}${separationModel !== 'demucs' ? `_${separationModel}` : ''}${pitchMethod === 'rmvpe' ? '_rmvpe' : ''}${separationMethod === 'residual' ? '_residual' : ''}_v1`;
+  return `${videoId}_${seconds}${vocalMode === 'lead' ? '_lead' : ''}${separationModel !== 'demucs' ? `_${separationModel}` : ''}${pitchMethod === 'rmvpe' ? '_rmvpe' : ''}${separationMethod === 'residual' ? '_residual' : ''}_v1${pitchShift ? '_key_' + (pitchShift < 0 ? 'm' : 'p') + Math.abs(pitchShift) : ''}`;
 }
 
 export const previewStems = mode => mode === 'lead' ? ['vocals','accompaniment','lead','backing'] : ['vocals','accompaniment'];
@@ -13,7 +15,7 @@ export const previewStems = mode => mode === 'lead' ? ['vocals','accompaniment',
 export class LocalLibrary {
   constructor(root) { this.root = path.resolve(root); }
   directory(id) {
-    if (!/^[\w-]{11}_(0|15|30|60)(?:_lead)?(?:_(?:bs-roformer|mel-roformer))?(?:_rmvpe)?(?:_residual)?_v1$/.test(id)) throw new Error('Invalid library ID');
+    if (!/^[\w-]{11}_(0|15|30|60)(?:_lead)?(?:_(?:bs-roformer|mel-roformer))?(?:_rmvpe)?(?:_residual)?_v1(?:_key_[mp](?:[1-9]|1[0-2]))?$/.test(id)) throw new Error('Invalid library ID');
     const dir = path.resolve(this.root, id);
     if (path.dirname(dir) !== this.root) throw new Error('Invalid library path');
     return dir;
@@ -23,7 +25,7 @@ export class LocalLibrary {
     try {
       const value = JSON.parse(await readFile(path.join(dir, 'reference.json'), 'utf8'));
       const reference = validateReference(value);
-      if (cacheKey(reference.videoId, value.rangeSeconds, value.vocalMode || 'all', value.separationModel || 'demucs', value.pitchMethod || 'yin', value.separationMethod || 'single') !== id || value.cacheVersion !== 1 || !Number.isFinite(value.duration) || value.duration <= 0 || value.duration > 905) return null;
+      if (cacheKey(reference.videoId, value.rangeSeconds, value.vocalMode || 'all', value.separationModel || 'demucs', value.pitchMethod || 'yin', value.separationMethod || 'single', value.pitchShift || 0) !== id || value.cacheVersion !== 1 || !Number.isFinite(value.duration) || value.duration <= 0 || value.duration > 905) return null;
       let preview = !!value.hasPreview;
       if (preview) {
         for (const name of previewStems(value.vocalMode)) preview &&= (await stat(path.join(dir, name + '.mp3')).catch(() => null))?.size > 0;
@@ -34,7 +36,7 @@ export class LocalLibrary {
   async save(id, reference, source, preview, { cancelled = () => false, replace = false } = {}) {
     const dir = this.directory(id);
     validateReference(reference);
-    if (cacheKey(reference.videoId, reference.rangeSeconds, reference.vocalMode || 'all', reference.separationModel || 'demucs', reference.pitchMethod || 'yin', reference.separationMethod || 'single') !== id) throw new Error('Reference does not match library ID');
+    if (cacheKey(reference.videoId, reference.rangeSeconds, reference.vocalMode || 'all', reference.separationModel || 'demucs', reference.pitchMethod || 'yin', reference.separationMethod || 'single', reference.pitchShift || 0) !== id) throw new Error('Reference does not match library ID');
     await mkdir(this.root, { recursive: true });
     const existing = await this.get(id);
     const suffix = randomUUID();
@@ -114,11 +116,11 @@ export class LocalLibrary {
     await mkdir(this.root, { recursive: true });
     const rows = [];
     for (const id of await readdir(this.root)) {
-      if (!/^[\w-]{11}_(0|15|30|60)(?:_lead)?(?:_(?:bs-roformer|mel-roformer))?(?:_rmvpe)?(?:_residual)?_v1$/.test(id)) continue;
+      if (!/^[\w-]{11}_(0|15|30|60)(?:_lead)?(?:_(?:bs-roformer|mel-roformer))?(?:_rmvpe)?(?:_residual)?_v1(?:_key_[mp](?:[1-9]|1[0-2]))?$/.test(id)) continue;
       const ref = await this.get(id); if (!ref) continue;
       let bytes = 0;
       for (const name of ['reference.json', ...previewStems(ref.vocalMode).map(stem => stem + '.mp3')]) bytes += (await stat(path.join(this.directory(id), name)).catch(() => null))?.size || 0;
-      rows.push({ id, videoId: ref.videoId, title: ref.title, seconds: ref.rangeSeconds, duration: ref.duration, hasPreview: ref.hasPreview, vocalMode: ref.vocalMode || 'all', separationModel: ref.separationModel || 'demucs', pitchMethod: ref.pitchMethod || 'yin', separationMethod: ref.separationMethod || 'single', savedAt: ref.savedAt, bytes });
+      rows.push({ id, videoId: ref.videoId, title: ref.title, baseTitle:ref.baseTitle || ref.title, pitchShift:ref.pitchShift || 0, sourceCacheId:ref.sourceCacheId, seconds: ref.rangeSeconds, duration: ref.duration, hasPreview: ref.hasPreview, vocalMode: ref.vocalMode || 'all', separationModel: ref.separationModel || 'demucs', pitchMethod: ref.pitchMethod || 'yin', separationMethod: ref.separationMethod || 'single', savedAt: ref.savedAt, bytes });
     }
     return rows.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
   }

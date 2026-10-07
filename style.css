@@ -252,3 +252,5 @@ header{gap:18px;flex-wrap:wrap}
 .post-repair-panel > summary strong { font-size: 19px; margin-right: 20px; }
 .post-repair-panel > summary span { font-size: 13px; }
 .post-repair-panel .post-eq-grid { align-items: start; }
+
+.song-key-control{margin:18px 0}.song-key-control select{min-width:0}.song-key-group>details{width:100%;min-width:0}.key-versions{margin:8px 0 0;padding-left:12px;border-left:2px solid var(--line)}

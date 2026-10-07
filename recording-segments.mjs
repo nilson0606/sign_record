@@ -4,11 +4,13 @@ import {mixSettings} from './recording-mix.mjs';
 export async function segmentMixMetadata(raw,meta,balance) {
   // Old segment takes did not collect pitch samples. Analyze only for gain gating;
   // this never creates a score or changes the saved source recording.
+  const factor=2 ** ((meta.post?.reference?.pitchShift || 0)/12);
   const samples=[],data=raw.getChannelData(0),rate=raw.sampleRate,size=Math.round(rate*.128),window=new Float32Array(size);
   for(let i=0;i<raw.length;i+=Math.round(rate*.1)){
     window.fill(0);const start=i-Math.floor(size/2),from=Math.max(0,start),end=Math.min(data.length,start+size);
     window.set(data.subarray(from,end),from-start);
-    samples.push({offset:i/rate,hz:detectPitch(window,rate).hz});
+    const hz=detectPitch(window,rate/factor).hz;
+    samples.push({offset:i/rate,hz:hz===null?null:hz*factor});
     if(samples.length%50===0)await new Promise(resolve=>setTimeout(resolve,0));
   }
   const result={...meta,balance:mixSettings(balance),post:{...meta.post,samples}};

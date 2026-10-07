@@ -1,3 +1,4 @@
+import {keyShift} from './song-key.mjs';
 // Experimental single-melody scoring. Raw audio never enters this module.
 export function normalizeMasks(value = [], duration) {
   if (!Array.isArray(value) || value.length > 100 || !Number.isFinite(duration) || duration <= 0) throw new Error('遮罩資料無效，最多 100 段。');
@@ -25,14 +26,15 @@ export function validateReference(value) {
   if (typeof value.title !== 'string' || value.title.length > 300) throw new Error('歌曲名稱無效。');
   if (!Number.isFinite(value.step) || value.step < .02 || value.step > .2) throw new Error('基準時間間隔必須介於 20–200 ms。');
   if (!Array.isArray(value.frames) || value.frames.length < 1 || value.frames.length > 90000) throw new Error('基準長度無效。');
+  const shift=keyShift(value.pitchShift ?? 0), factor=2 ** (shift/12);
   let voiced = 0;
   for (const hz of value.frames) {
     if (hz === null) continue;
-    if (!Number.isFinite(hz) || hz < 65 || hz > 1000) throw new Error('基準音高超出 65–1000 Hz。');
+    if (!Number.isFinite(hz) || hz < 65 * factor - 1e-8 || hz > 1000 * factor + 1e-8) throw new Error('基準音高超出 65–1000 Hz。');
     voiced++;
   }
   if (voiced * value.step < 3) throw new Error('至少需要 3 秒可辨識的參考旋律。');
-  return { version: 1, videoId: value.videoId, title: value.title, step: value.step, frames: [...value.frames], masks: normalizeMasks(value.masks, value.duration ?? value.frames.length * value.step) };
+  return { version: 1, videoId: value.videoId, title: value.title, step: value.step, frames: [...value.frames], ...(shift ? {pitchShift:shift} : {}), masks: normalizeMasks(value.masks, value.duration ?? value.frames.length * value.step) };
 }
 
 export function pitchDifference(actual, expected, allowOctave = false) {
@@ -97,6 +99,7 @@ export class ScoringTake {
     const validated = validateReference(reference);
     this.excluded = maskedCells(validated);
     this.reference = applyMasks(validated);
+    this.pitchFactor=2 ** ((validated.pitchShift || 0)/12);
     this.observations = new Map();
     this.sampleDistances = new Map(); this.lastSampleIndex = null;
   }
@@ -124,7 +127,7 @@ export class ScoringTake {
     const distance=Math.abs(time-index*step);
     if (distance>(this.sampleDistances.get(index)??Infinity)+1e-9) return;
     this.sampleDistances.set(index,distance);
-    this.observations.set(index, Number.isFinite(hz) && hz >= 65 && hz <= 1000 ? hz : null);
+    this.observations.set(index, Number.isFinite(hz) && hz >= 65*this.pitchFactor && hz <= 1000*this.pitchFactor ? hz : null);
   }
 
   result(includeRhythm = true) {
@@ -137,7 +140,7 @@ export class ScoringTake {
       if (target === null) continue;
       expected++;
       const actual = this.observations.get(i);
-      if (actual !== null && actual !== undefined) { voiced++; points += pitchCredit(actual, target, this.allowOctave, this.difficulty); }
+      if (actual !== null && actual !== undefined) { voiced++; points += pitchCredit(actual/this.pitchFactor, target/this.pitchFactor, this.allowOctave, this.difficulty); }
     }
     if (!expected) return { score: null, pitch: 0, rhythm: 0, coverage: 0, referenceSeconds: 0, sampledSeconds: 0 };
     const actual = frames.map((_, i) => this.observations.get(i + start) ?? null);

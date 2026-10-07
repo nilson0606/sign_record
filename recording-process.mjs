@@ -20,6 +20,7 @@ export function referenceForRescore(post, current) {
   const original=post.reference;
   validateReference(current);
   if(current.videoId!==original.videoId)throw new Error('目前載入的是另一支影片，不能用來重評這筆錄音。');
+  if((current.pitchShift||0)!==(original.pitchShift||0))throw new Error('請載入與這筆錄音相同 Key 的基準，避免用不同調重評。');
   const duration=ref=>ref.duration??ref.frames.length*ref.step;
   if((original.rangeSeconds!=null&&current.rangeSeconds!=null&&original.rangeSeconds!==current.rangeSeconds)||
     Math.abs(duration(current)-duration(original))>.15||Math.abs(current.frames.length*current.step-original.frames.length*original.step)>.15)

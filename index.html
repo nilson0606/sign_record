@@ -51,6 +51,11 @@
       <p id="player-status" class="status" role="status">貼上網址後，影片會在這裡播放。</p>
       <div class="video-shell"><div id="video-placeholder"><span>▶</span><p>你的下一首歌</p><small>播放器與麥克風分別啟動</small></div><div id="player"></div></div>
       <div class="clock-row"><span>播放器時間 <b id="player-time">—</b></span><span>補償後位置 <b id="aligned-time">—</b></span></div>
+      <div class="song-key-control">
+        <label for="song-key">歌曲 Key · 每格半音，速度不變</label>
+        <div class="input-row"><select id="song-key"><option value="-12">降 12 Key</option><option value="-11">降 11 Key</option><option value="-10">降 10 Key</option><option value="-9">降 9 Key</option><option value="-8">降 8 Key</option><option value="-7">降 7 Key</option><option value="-6">降 6 Key</option><option value="-5">降 5 Key</option><option value="-4">降 4 Key</option><option value="-3">降 3 Key</option><option value="-2">降 2 Key</option><option value="-1">降 1 Key</option><option value="0" selected>原調（0）</option><option value="1">升 1 Key</option><option value="2">升 2 Key</option><option value="3">升 3 Key</option><option value="4">升 4 Key</option><option value="5">升 5 Key</option><option value="6">升 6 Key</option><option value="7">升 7 Key</option><option value="8">升 8 Key</option><option value="9">升 9 Key</option><option value="10">升 10 Key</option><option value="11">升 11 Key</option><option value="12">升 12 Key</option></select><button id="song-key-apply" type="button" class="secondary" disabled>建立／載入此 Key</button></div>
+        <p id="song-key-status" class="help" role="status">預設原調。準備歌曲前可選 Key；不同 Key 版本會一起保存在歌曲庫，錄音與分段草稿各自保留。</p>
+      </div>
       <div id="segment-player-tools" hidden>
         <div id="segment-transport" class="button-row" role="group" aria-label="影片播放與分段"><button id="segment-play" type="button" class="secondary">播放／暫停影片</button><button id="segment-split" type="button">在此分段</button><button id="segment-undo" type="button" class="secondary">復原分界</button></div>
       </div>

@@ -228,7 +228,7 @@ export function createSegmentRecording(options) {
     showPlayer();
     try{
       player.pauseVideo();status(`正在準備本段${c.guideMode==='original'?'原唱＋伴樂':'伴樂'}帶唱與收音…`);
-      if(c.guideMode==='backing'){
+      if(c.guideMode==='backing'&&!ref.pitchShift){
         if(!ref.hasPreview)throw Error('只有伴樂帶唱需要已保存的伴奏音軌，請先補建音軌。');
         c.monitor=new AudioContext();await c.monitor.resume();
         const stems=['accompaniment',...(ref.vocalMode==='lead'?['backing']:[])];
@@ -238,7 +238,7 @@ export function createSegmentRecording(options) {
       if(!options.micReady())await options.startMic();if(cancelled())return;if(!options.micReady())throw Error('麥克風未就緒，請查看收音設定。');
       await options.recording.prepare(ref,()=>{}, {}, {mode:'voice',delayMs:0,segmentTake:{version:1,key,partId:p.id,captureId:c.captureId,name:p.name,start:p.start,end:p.end,guideMode:c.guideMode}});
       if(cancelled())return;await seek(c.start,cancelled);if(cancelled())return;
-      player.setPlaybackRate?.(1);if(c.guideMode==='backing')player.mute?.();else player.unMute?.();c.armed=true;player.playVideo();if(player.getPlayerState()===1)playerState(1);
+      player.setPlaybackRate?.(1);if(ref.pitchShift||c.guideMode==='backing')player.mute?.();else player.unMute?.();c.armed=true;player.playVideo();if(player.getPlayerState()===1)playerState(1);
       status(`準備起唱：${p.name}，${fmt(p.start)}–${fmt(p.end)} · ${c.guideMode==='original'?'原唱＋伴樂':'只有伴樂／和音'}帶唱；到尾音餘量後自動保存。`);
     }catch(e){if(!cancelled()){await stop(e);status('無法完成本段錄音：'+e.message);}}
   }

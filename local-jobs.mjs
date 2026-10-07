@@ -1,3 +1,4 @@
+import {keyShift,transposeReference,keyLabel} from './song-key.mjs';
 import {handleNativeMicrophone} from './native-microphone-server.mjs';
 import {handleSoulx,soulxBusy,stopSoulx} from './soulx-server.mjs';
 import {handleArrangements,arrangementBusy,stopArrangements} from './arrangement-server.mjs';
@@ -42,6 +43,7 @@ async function erase(job) {
   if (!job) return;
   job.deleted = true; clearTimeout(job.timeout);
   await stopChild(job.child);
+  if(job.sourceJobId)await erase(jobs.get(job.sourceJobId));
   await job.persisting?.catch(() => {});
   job.reference = null;
   const dir = path.resolve(jobsRoot, job.id);
@@ -64,7 +66,7 @@ function summary(job) {
     title: job.reference?.title, duration: job.reference?.duration, bpm: job.reference?.bpm,
     voicedSeconds: job.reference?.voicedSeconds, audioCleared: !!job.reference && !job.reference.hasPreview, cacheId: job.cacheId, cached: !!job.cached, hasPreview: !!job.reference?.hasPreview };
 }
-async function start(videoId, seconds, preview = false, force = false, vocalMode = 'all', separationModel = 'demucs', pitchMethod = 'yin', separationMethod = 'single') {
+async function startOriginal(videoId, seconds, preview = false, force = false, vocalMode = 'all', separationModel = 'demucs', pitchMethod = 'yin', separationMethod = 'single') {
   const id = randomUUID().replaceAll('-', '');
   const key = cacheKey(videoId, seconds, vocalMode, separationModel, pitchMethod, separationMethod);
   const job = { vocalMode, separationModel, pitchMethod, separationMethod, cacheId: key, id, stage: 'starting', message: '啟動本機工作…', updated: Date.now(), reference: null, deleted: false };
@@ -154,8 +156,60 @@ async function start(videoId, seconds, preview = false, force = false, vocalMode
   job.timeout.unref();
   return job;
 }
+async function start(videoId, seconds, preview, force, vocalMode, separationModel, pitchMethod, separationMethod, shift = 0) {
+  keyShift(shift);
+  if (!shift) return startOriginal(videoId, seconds, preview, force, vocalMode, separationModel, pitchMethod, separationMethod);
+  const args=[videoId,seconds,vocalMode,separationModel,pitchMethod,separationMethod];
+  const key=cacheKey(...args,shift), sourceKey=cacheKey(...args), lib=library;
+  const job={id:randomUUID().replaceAll('-',''),cacheId:key,sourceCacheId:sourceKey,pitchShift:shift,
+    vocalMode,separationModel,pitchMethod,separationMethod,stage:'starting',message:'正在準備 '+keyLabel(shift)+'…',updated:Date.now(),reference:null,deleted:false};
+  jobs.set(job.id,job);
+  const cached=await lib.get(key);
+  if(job.deleted)return job;
+  if(!force&&cached?.hasPreview){job.reference=cached;job.cached=true;job.stage='ready';job.message='已載入保存的 '+keyLabel(shift)+' 音軌與基準。';return job;}
+  job.persisting=(async()=>{
+    const directory=path.join(jobsRoot,job.id);
+    try{
+      let source=await lib.get(sourceKey);
+      if(job.deleted)return;
+      if(!source?.hasPreview){
+        const base=await startOriginal(videoId,seconds,true,false,vocalMode,separationModel,pitchMethod,separationMethod);
+        job.sourceJobId=base.id;
+        if(job.deleted){await erase(base);return;}
+        while(!base.reference){
+          if(job.deleted||base.deleted)throw Error('已取消建立 Key 版本。');
+          if(base.stage==='failed')throw Error(base.message);
+          for(const field of ['stage','message','progress','device','deviceName','fallback'])job[field]=base[field];
+          base.updated=job.updated=Date.now();await new Promise(resolve=>setTimeout(resolve,200));
+        }
+        source=base.reference;job.sourceJobId=null;await erase(base);
+      }
+      if(job.deleted)return;
+      job.stage='transposing';job.message='重用原調音軌，建立 '+keyLabel(shift)+'（速度不變）…';job.progress=0;
+      await mkdir(directory,{recursive:true});
+      if(job.deleted)return;
+      await new Promise((resolve,reject)=>{
+        const child=spawn(python,[path.join(root,'tools','key_shift_worker.py'),'--source',lib.directory(sourceKey),'--target',directory,'--semitones',String(shift)],{cwd:root,windowsHide:true,stdio:['ignore','pipe','pipe']});
+        job.child=child;let pending='',failure='';
+        const timeout=setTimeout(()=>{stopChild(child).catch(()=>{});reject(Error('變調處理逾時。'));},15*60000);
+        child.stdout.setEncoding('utf8');child.stdout.on('data',chunk=>{
+          pending+=chunk;const lines=pending.split(/\r?\n/);pending=lines.pop();
+          for(const line of lines){try{const event=JSON.parse(line);if(event.stage==='failed')failure=String(event.message);else{job.message=String(event.message);job.progress=event.progress;}job.updated=Date.now();}catch{}}
+        });
+        child.stderr.on('data',()=>{});
+        child.once('error',()=>{clearTimeout(timeout);reject(Error('無法啟動本機變調程式。'));});
+        child.once('close',code=>{clearTimeout(timeout);code===0?resolve():reject(Error(failure||'變調未完成，原調與既有版本已保留。'));});
+      });
+      if(job.deleted)return;
+      job.reference=await lib.save(key,transposeReference(source,shift),directory,true,{cancelled:()=>job.deleted,replace:true});
+      job.stage='ready';job.message=keyLabel(shift)+' 音軌與評分基準已保存到歌曲庫。';logJob(job,'key-version-saved');
+    }catch(error){if(!job.deleted){job.stage='failed';job.message=error.message;logJob(job,'key-version-failed',error.message);}}
+    finally{await rm(directory,{recursive:true,force:true,maxRetries:5}).catch(()=>{});}
+  })();
+  return job;
+}
 export async function handleLocalJobs(req, res) {
-  if (req.url === '/session' && req.method === 'GET') { json(res, 200, { token, playbackTraceActive: existsSync(path.join(root, '.runtime', 'playback-trace.enabled')), features: ['library', 'stem-preview', 'library-location', 'separation-progress', 'rebuild-song', 'lead-vocals', 'separation-models', 'score-masks', 'pitch-methods', 'residual-separation', 'mel-roformer', 'recording-mp3', 'recording-library', 'recording-raw-mime', 'playback-trace', 'native-microphone', 'native-speaker-output'] }); return true; }
+  if (req.url === '/session' && req.method === 'GET') { json(res, 200, { token, playbackTraceActive: existsSync(path.join(root, '.runtime', 'playback-trace.enabled')), features: ['library', 'stem-preview', 'library-location', 'separation-progress', 'rebuild-song', 'lead-vocals', 'separation-models', 'score-masks', 'pitch-methods', 'residual-separation', 'mel-roformer', 'recording-mp3', 'recording-library', 'recording-raw-mime', 'playback-trace', 'native-microphone', 'native-speaker-output', 'song-key-versions'] }); return true; }
   if (!req.url.startsWith('/arrangements') && !req.url.startsWith('/soulx') && !req.url.startsWith('/microphone/') && !req.url.startsWith('/jobs') && !req.url.startsWith('/library') && req.url !== '/shutdown' && req.url !== '/playback-trace' && !req.url.startsWith('/recordings')) return false;
   if (req.headers['x-karaoke-token'] !== token) { json(res, 403, { error: 'Session token required' }); return true; }
   if(req.url.startsWith('/arrangements')){await handleArrangements(req,res,{gpuBusy:()=>soulxBusy()||[...jobs.values()].some(j=>!['ready','failed'].includes(j.stage)),getLibrary:async()=>(await location.get()).path,getSource:async id=>{const lib=await currentLibrary();if(!lib)return null;return {reference:await lib.get(id),directory:lib.directory(id),library:lib.root};}});return true;}
@@ -204,7 +258,7 @@ export async function handleLocalJobs(req, res) {
   }
   if (req.url === '/library' && req.method === 'GET') { json(res, 200, { songs: await library.list() }); return true; }
   if (req.url.startsWith('/library/')) {
-    const match = /^\/library\/([\w-]{11}_(?:0|15|30|60)(?:_lead)?(?:_(?:bs-roformer|mel-roformer))?(?:_rmvpe)?(?:_residual)?_v1)(?:\/(reference|vocals|accompaniment|lead|backing|masks))?$/.exec(req.url);
+    const match = /^\/library\/([\w-]{11}_(?:0|15|30|60)(?:_lead)?(?:_(?:bs-roformer|mel-roformer))?(?:_rmvpe)?(?:_residual)?_v1(?:_key_[mp](?:[1-9]|1[0-2]))?)(?:\/(reference|vocals|accompaniment|lead|backing|masks))?$/.exec(req.url);
     if (!match) { json(res, 400, { error: '無效的本機歌曲。' }); return true; }
     const [, id, asset] = match;
     if (asset === 'masks' && req.method === 'POST') {
@@ -247,12 +301,13 @@ export async function handleLocalJobs(req, res) {
       const data = await body(req);
       if (!/^[\w-]{11}$/.test(data.videoId || '') || ![0, 15, 30, 60].includes(data.seconds)) { json(res, 400, { error: '影片網址或片段長度無效。' }); return true; }
       if (soulxBusy() || arrangementBusy() || [...jobs.values()].some(j => !['ready','failed'].includes(j.stage))) { json(res, 409, { error: '已有音訊正在處理，請先取消或等待完成。' }); return true; }
+      keyShift(data.pitchShift ?? 0);
       if (data.vocalMode !== undefined && !['all','lead'].includes(data.vocalMode)) { json(res, 400, { error: '無效的分離模式。' }); return true; }
       if (data.separationModel !== undefined && !['demucs','bs-roformer','mel-roformer'].includes(data.separationModel)) { json(res, 400, { error: '無效的分離模型。' }); return true; }
       if (data.pitchMethod !== undefined && !['yin','rmvpe'].includes(data.pitchMethod)) { json(res,400,{error:'無效的音高擷取方式。'}); return true; }
       if (data.separationMethod !== undefined && !['single','residual'].includes(data.separationMethod)) { json(res,400,{error:'無效的歌曲基準處理流程。'}); return true; }
       if (editingMasks.has(library.maskFile(cacheKey(data.videoId,data.seconds,data.vocalMode || 'all',data.separationModel || 'demucs',data.pitchMethod || 'yin',data.separationMethod || 'single')))) { json(res,409,{error:'遮罩保存中，請稍後準備歌曲。'}); return true; }
-      const job = await start(data.videoId, data.seconds, data.preview === true, data.force === true, data.vocalMode || 'all', data.separationModel || 'demucs', data.pitchMethod || 'yin', data.separationMethod || 'single'); json(res, 202, summary(job));
+      const job = await start(data.videoId, data.seconds, data.preview === true, data.force === true, data.vocalMode || 'all', data.separationModel || 'demucs', data.pitchMethod || 'yin', data.separationMethod || 'single', data.pitchShift ?? 0); json(res, 202, summary(job));
     } catch { json(res, 400, { error: '本機工作請求無效。' }); }
     return true;
   }

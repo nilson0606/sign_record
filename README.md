@@ -322,3 +322,14 @@ SoulX 保留輸入總樣本數，但這不保證每個字的節奏完全一致�
 音準合成採用 TD-PSOLA 的音高同步重疊相加思路（[Praat 官方方法說明](https://praat.org/manual/overlap-add.html)），輸出取樣率、取樣數、聲道數與原音完全相同；不以變速、裁切或補尾端來對齊。顫音保留是修正平均偏音，並不保證每種滑音／氣聲唱法都能自然修復。所有分析在瀏覽器 Worker 執行，不啟動 GPU 模型，不上傳歌聲；處理進度顯示於試聽或合成狀態欄。A／B 最多快取兩份清理後的人聲。評分仍分析原始演唱，不使用修正後音準。
 
 驗證：`tests/recording-repair.test.mjs` 量測底噪衰減、低頻保留、呼吸衰減、三種取樣率的音高、顫音及基準時間映射；`tests/recording-repair-browser-check.mjs` 驗證 Worker、A／B 各自參數、實際試聽、原音保存、IndexedDB 重開、檔名及初始化。
+
+
+## 歌曲 Key 版本
+
+播放器下方選原調或 −12～＋12 整數半音。新歌準備時一起建立，已載入歌曲按「建立／載入此 Key」。`local-library.mjs` 為非零 Key 使用原 cache ID 加 `_key_m2`／`_key_p1` 等後綴；原調 ID 相容既有歌曲。`pitchShift`、原曲名稱和來源 ID 存在 reference.json，原調分離音軌共用為製作來源，每個變調版本保存獨立音軌。錄音與分段草稿使用該版本 cache ID，原始歌聲、既有成品不追溯變調。刪除版本只刪該版本，原調與其他 Key 保留；同片同範圍的評分遮罩仍共用。
+
+`tools/key_shift_worker.py` 用 FFmpeg 的 Rubber Band 做 pitch-only 處理（tempo=1），保留時長並驗證完整解碼；不重跑聲曲分離。沒有原調音軌時先建立原調，再製作目標 Key。FFmpeg 須包含 rubberband filter，失敗不發布半成品。評分基準頻率乘以 `2 ** (pitchShift/12)`，旋律時間點、節拍與遮罩不移動。即時音高／重評支援對應音域，禁止跨 Key 更換重評基準。
+
+`key-playback.mjs` 為非零 Key 接管帶唱：YouTube 原聲靜音，影片速度保持 1，本機音軌跟隨播放、暫停、緩衝和跳轉。「原唱＋伴樂」播放變調 vocals＋accompaniment；「只有伴樂」播放變調 accompaniment，主唱模式另加 backing。整首、分段播放／循環／錄音共用此輸出，試聽與試合從錄音所屬版本取伴樂；卸載／回原調恢復進入前的靜音狀態。
+
+驗證：`node --test tests/song-key.test.mjs`、`node tests/key-browser-check.mjs`、`node tests/key-helper-check.mjs`（臨時歌曲庫、需 FFmpeg）、`python -m unittest discover -s tests -p test_key_shift.py`（合成聲音驗證升降音高、長度與起尾時間）。

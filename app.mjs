@@ -349,7 +349,8 @@ $('mic-stop').addEventListener('click', () => stopMic(undefined, true));
 function readMic() {
   if (!analyser || !samples || context?.state !== 'running') return;
   analyser.getFloatTimeDomainData(samples);
-  const result = stream.getAudioTracks()[0]?.muted ? { hz: null, rms: 0 } : detectPitch(samples, context.sampleRate);
+  const result = stream.getAudioTracks()[0]?.muted ? { hz: null, rms: 0 } : detectPitch(samples, context.sampleRate / (2 ** ((singing.reference()?.pitchShift || 0) / 12)));
+  if(result.hz!==null)result.hz*=2 ** ((singing.reference()?.pitchShift || 0) / 12);
   micPitch = result.hz;
   const note = noteOf(result.hz), now = performance.now() / 1000;
   history.push({ time: now, midi: note?.midi ?? null }); history = history.filter(p => now - p.time <= 8);
