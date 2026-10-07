@@ -63,6 +63,15 @@
     <div class="button-row score-actions"><button id="sing-start" disabled type="button">從頭開始唱</button><button id="finish-song" disabled type="button" class="secondary">結束並結算</button></div>
     <p id="recording-status" class="status" role="status">錄音停止後存入本機歌曲庫的「錄音」目錄；不會上傳雲端。</p>
     <div id="recording-rescue" hidden></div>
+    <section id="recording-review" hidden aria-labelledby="recording-review-heading">
+      <h3 id="recording-review-heading">整首錄音 · 待確認</h3>
+      <p class="help">錄音已自動保留，重新整理後仍在。先試聽，滿意再加入錄音後處理；不滿意可刪除此版。</p>
+      <label for="recording-review-take">待確認版本</label><select id="recording-review-take"></select>
+      <label for="recording-review-mode">試聽內容</label><select id="recording-review-mode"><option value="mix" selected>人聲＋伴樂／和音</option><option value="voice">純人聲</option></select>
+      <div class="button-row"><button id="recording-review-listen" type="button" class="secondary">試聽這一版</button><button id="recording-review-save" type="button">存到錄音後處理</button><button id="recording-review-delete" type="button" class="secondary">刪除此版</button></div>
+      <audio id="recording-review-audio" controls hidden aria-label="待確認整首錄音試聽"></audio>
+      <p id="recording-review-status" class="status" role="status">試聽滿意後，再存到錄音後處理。</p>
+    </section>
     <div class="score-grid"><div class="total"><strong id="total-score">—</strong><span>總分 / 100</span></div><div><strong id="pitch-score">—</strong><span>音準 · 60%</span></div><div><strong id="rhythm-score">—</strong><span>進拍 · 25%</span></div><div><strong id="coverage-score">—</strong><span>完整度 · 15%</span></div></div>
     <p id="take-difficulty" class="help" aria-live="polite">尚未開始演唱；每輪開始後固定難度。</p>
     <p id="score-status" class="status" role="status">準備歌曲並開啟麥克風後，按播放就開始評分。</p>
@@ -107,13 +116,13 @@
           <div class="button-row"><button id="segment-listen-selected" type="button" class="secondary" disabled>試聽選用版本</button><button id="segment-delete-selected" type="button" class="secondary" disabled>刪除此版錄音</button></div>
           </details>
           <p id="segment-coverage" class="help"></p>
-          <details id="segment-output-panel" open><summary>試合完整一版／另存成品 · 預設人聲＋伴樂，200 ms</summary>
+          <details id="segment-output-panel" open><summary>試合完整一版／滿意後保存 · 預設人聲＋伴樂，200 ms</summary>
           <div class="segment-fields"><label>試合內容<select id="segment-output"><option value="mix" selected>人聲＋伴樂／和音</option><option value="voice">純人聲</option></select></label><label>歌聲校正（ms）<input id="segment-delay" type="number" min="-2000" max="2000" step="10" value="200"></label></div>
           <label class="check-option"><input id="segment-allow-gaps" type="checkbox">允許未錄範圍保留靜音</label>
           <div class="button-row"><button id="segment-compose" type="button">試合完整一版</button><button id="segment-join" type="button" class="secondary">試合並聽本段接合</button></div>
           <audio id="segment-audio" controls hidden preload="metadata"></audio>
-          <div class="button-row"><button id="segment-export" type="button" class="secondary" disabled>另存完整成品</button><button id="segment-download" type="button" class="secondary" disabled>下載試合 WAV</button></div>
-          <p class="help">試合以整首時間軸接合乾淨人聲，可加伴樂，校正預設 200 ms。另存成品後可繼續人聲後製及 A/B；原始版本保留。分界草稿記在目前瀏覽器，錄音沿用歌曲庫保存。</p>
+          <div class="button-row"><button id="segment-export" type="button" class="secondary" disabled>存到錄音後處理</button><button id="segment-download" type="button" class="secondary" disabled>下載試合 WAV</button></div>
+          <p class="help">單段錄音保存在分段區，試合只供暫存試聽，兩者都不加入錄音後處理。滿意後按「存到錄音後處理」，才保存完整成品供後製及 A/B。試合可加伴樂，校正預設 200 ms；原始分段錄音保留。</p>
           </details>
     </aside>
     <section id="voice-section" tabindex="-1" class="card voice-card">
@@ -422,7 +431,7 @@
     </details>
     <div class="button-row"><button id="post-audition-quick" type="button" class="secondary" disabled>片段試聽目前設定</button><button id="post-remix" type="button" disabled>重新合成（音量／延時／音色／剪輯）</button><button id="post-mp3" type="button" class="secondary" disabled>轉 MP3 並下載</button></div>
     <p class="help">重新合成會另存一筆，並保存獨立的原始歌聲與後製資料，可再次編輯或轉 MP3；原錄音保留。配樂／和音需歌曲庫中的同版本音軌。舊成品或單獨匯出的 WAV／MP3 若沒有原始歌聲及時間資料，無法直接分軌後製。選「不保存錄音」時不保留後處理資料。</p>
-    <details id="recordings-panel"><summary>所有演唱錄音</summary><p class="help">停止錄音後自動保存於歌曲庫下的「錄音」目錄；Chrome 與 Edge 連到同一本機工具即可共用。既有瀏覽器錄音會自動搬存，成功確認後才清除舊副本；未搬存成功仍保留在瀏覽器。直接按 YouTube 播放只評分；要錄音請按「從頭開始唱」。</p><div class="button-row"><button id="recording-refresh" class="secondary" type="button">重新整理／搬存錄音</button><button id="recording-delete-all" class="secondary" type="button">全部刪除錄音</button></div><audio id="recording-audio" controls hidden></audio><ul id="recording-list" class="library-list"></ul></details>
+    <details id="recordings-panel"><summary>整首演唱與已保存成品</summary><p class="help">此清單顯示整首演唱與明確保存的完整成品；分段錄音請在分段區挑選、試聽或刪除。停止錄音後自動保存於歌曲庫下的「錄音」目錄；Chrome 與 Edge 連到同一本機工具即可共用。既有瀏覽器錄音會自動搬存，成功確認後才清除舊副本；未搬存成功仍保留在瀏覽器。直接按 YouTube 播放只評分；要錄音請按「從頭開始唱」。</p><div class="button-row"><button id="recording-refresh" class="secondary" type="button">重新整理／搬存錄音</button><button id="recording-delete-all" class="secondary" type="button">刪除此清單錄音</button></div><audio id="recording-audio" controls hidden></audio><ul id="recording-list" class="library-list"></ul></details>
   </section>
     <details id="timing-section" tabindex="-1" class="card timing-card section-fold">
       <summary><span class="step">04</span> 看節拍，調延遲 <span class="fold-caption">節拍燈 · 時間補償 · 五音測試</span></summary>

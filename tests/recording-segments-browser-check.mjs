@@ -87,6 +87,7 @@ try{
  await $('segment-record').click();await page.waitForFunction(()=>fixturePlayer.isMuted()&&fixturePlayer.getPlayerState()===1);await page.evaluate(()=>fixturePlayer.pauseVideo());await page.waitForTimeout(250);await page.evaluate(()=>fixturePlayer.playVideo());await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('本段已保存'),{},{timeout:20000});
  assert.equal(await page.evaluate(()=>fixturePlayer.isMuted()),false);assert.equal(await $('segment-take').locator('option').count(),2);
  const first=(await page.evaluate(()=>fixtureStore.list()))[0];assert.ok(first.segmentTake);assert.equal(first.appliedDelayMs,0);assert.ok(first.seconds>=4.9);
+ assert.equal(await $('post-recording').locator('option').count(),0,'single segments stay outside post processing');assert.equal(await $('recording-list').locator('button').count(),0);
  const firstHash=await page.evaluate(async row=>hash(await fixtureStore.blob(row,'voice')),first);
  // A single recorded take is immediately playable even while another section is unrecorded.
  await $('segment-listen').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);
@@ -117,15 +118,17 @@ try{
  assert.match(await $('segment-coverage').textContent(),/所有段落/);
  // Default mix uses +200 once, has exact song length, and saves clean source for post.
  await $('segment-compose').click();await page.waitForFunction(()=>!document.getElementById('segment-export').disabled);
- assert.match(await $('segment-status').textContent(),/200 ms/);await $('segment-export').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('已另存完整成品'));
+ assert.equal(await $('post-recording').locator('option').count(),0,'trial composition is not published');assert.equal((await page.evaluate(()=>fixtureStore.list())).filter(r=>r.segmentComposition).length,0);
+ assert.match(await $('segment-status').textContent(),/200 ms/);await $('segment-export').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('已存到錄音後處理'));assert.equal(await $('segment-export').isDisabled(),true);
  await page.evaluate(async()=>{await document.getElementById('segment-audio').play();fixturePlayer.playVideo();});assert.equal(await $('segment-audio').evaluate(el=>el.paused),true,'video playback stops composed preview');await page.evaluate(()=>fixturePlayer.pauseVideo());
  const mix=(await page.evaluate(()=>fixtureStore.list())).find(r=>r.segmentComposition);assert.ok(mix);assert.equal(mix.mode,'mix');assert.equal(mix.appliedDelayMs,200);assert.equal(mix.seconds,8);assert.deepEqual(mix.stems,['accompaniment']);
  const audio=await page.evaluate(async meta=>{const c=new AudioContext({sinkId:{type:'none'}}),buffer=await c.decodeAudioData(await(await fixtureStore.blob(meta)).arrayBuffer());await c.close();return {length:buffer.length,rate:buffer.sampleRate};},mix);assert.equal(audio.length/audio.rate,8);
  assert.equal(await page.evaluate(async row=>hash(await fixtureStore.blob(row,'voice')),first),firstHash);
  assert.equal(await $('post-recording').inputValue(),mix.id,'new composition integrates with post editing');
+ assert.equal(await $('post-recording').locator('option').count(),1);
  await $('post-remix').click();await page.waitForFunction(id=>document.getElementById('post-recording').value!==id,mix.id);await page.waitForFunction(()=>!document.getElementById('post-remix').disabled);
  const edited=(await page.evaluate(()=>fixtureStore.list())).find(r=>r.parentId===mix.id);assert.ok(edited);assert.equal(edited.appliedDelayMs,200);assert.equal(edited.seconds,8);assert.equal(await page.evaluate(async r=>hash(await fixtureStore.blob(r,'voice')),edited),await page.evaluate(async r=>hash(await fixtureStore.blob(r,'voice')),mix));
- await $('segment-output').selectOption('voice');assert.equal(await $('segment-export').isDisabled(),true);await $('segment-compose').click();await page.waitForFunction(()=>!document.getElementById('segment-export').disabled);await $('segment-export').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('已另存完整成品'));
+ await $('segment-output').selectOption('voice');assert.equal(await $('segment-export').isDisabled(),true);await $('segment-compose').click();await page.waitForFunction(()=>!document.getElementById('segment-export').disabled);assert.equal(await $('post-recording').locator('option').count(),2,'another trial does not enter post menu');await $('segment-export').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('已存到錄音後處理'));
  const voice=(await page.evaluate(()=>fixtureStore.list())).find(r=>r.segmentComposition&&r.mode==='voice');assert.ok(voice);assert.equal(voice.appliedDelayMs,200);assert.deepEqual(voice.stems,[]);
  const alignment=await page.evaluate(async({voice,mix})=>{
   const c=new AudioContext({sampleRate:48000,sinkId:{type:'none'}}),decode=async(r,track)=>c.decodeAudioData(await(await fixtureStore.blob(r,track)).arrayBuffer());
@@ -164,8 +167,37 @@ try{
  // Whole-song start still records and scores through the existing path.
  await $('segment-whole').click();assert.equal(await $('voice-section').isVisible(),true);assert.equal(await $('segment-player-tools').isHidden(),true);assert.equal(await $('segment-take-audio').evaluate(el=>el.paused),true);assert.equal(await $('sing-start').isVisible(),true);assert.equal(await $('segment-side').isHidden(),true);await $('recording-settings').locator('summary').click();await $('recording-mode').selectOption('voice');await $('sing-start').click();await page.waitForFunction(()=>document.getElementById('score-status').textContent.includes('演唱中'));
  assert.equal(await $('segment-tools').isHidden(),true);assert.equal(await $('segment-open').isVisible(),true);
- await page.evaluate(()=>{for(let t=0;t<7;t+=.1)fixtureSession.sample(t,440);fixturePlayer.seekTo(7);});await $('finish-song').click();await page.waitForFunction(()=>document.getElementById('score-status').textContent.includes('已結算'));
+ await page.waitForTimeout(700);await page.evaluate(()=>{for(let t=0;t<7;t+=.1)fixtureSession.sample(t,440);fixturePlayer.seekTo(7);});await $('finish-song').click();await page.waitForFunction(()=>document.getElementById('score-status').textContent.includes('已結算'));
  assert.ok(await page.evaluate(()=>JSON.parse(localStorage.getItem('karaoke.scores.v1')).length));
+ await page.waitForFunction(()=>!document.getElementById('recording-review').hidden);
+ await page.waitForFunction(()=>!document.getElementById('recording-review-save').disabled);
+ const pendingRows=await page.evaluate(()=>fixtureStore.list()),pendingId=await $('recording-review-take').inputValue(),pending=pendingRows.find(r=>r.id===pendingId);assert.ok(pending?.complete,JSON.stringify({rows:pendingRows.map(r=>({id:r.id,pending:r.postPending,complete:r.complete,segment:r.segmentTake?.name,created:r.created,seconds:r.seconds,error:r.captureError})),status:await $('recording-status').textContent()}));
+ const pendingHash=await page.evaluate(async row=>hash(await fixtureStore.blob(row,'voice')),pending);
+ assert.ok(!(await $('post-recording').locator('option').evaluateAll(nodes=>nodes.map(n=>n.value))).includes(pending.id),'whole-song take waits for approval');
+ await page.reload();await initialize();assert.equal(await $('recording-review-take').inputValue(),pending.id);assert.equal(await $('recording-review-mode').inputValue(),'mix');
+ await $('recording-review').scrollIntoViewIfNeeded();await page.screenshot({path:'test-results/recording-review-layout.png'});
+ await $('recording-review-listen').click();await page.waitForFunction(()=>!document.getElementById('recording-review-audio').paused);
+ await $('recording-review-mode').selectOption('voice');await $('recording-review-listen').click();await page.waitForFunction(()=>!document.getElementById('recording-review-audio').paused);
+ assert.equal(await page.evaluate(async row=>hash(await fixtureStore.blob(row,'voice')),pending),pendingHash);
+ // Failed approval cannot publish a pending take.
+ await page.evaluate(async()=>{const {RecordingStore}=await import('/recording-store.mjs');window.originalSave=RecordingStore.prototype.save;RecordingStore.prototype.save=async()=>{throw Error('fixture approval failure');};});
+ await $('recording-review-save').click();await page.waitForFunction(()=>document.getElementById('recording-review-status').textContent.includes('fixture approval failure'));
+ assert.ok(!(await $('post-recording').locator('option').evaluateAll(nodes=>nodes.map(n=>n.value))).includes(pending.id));
+ await page.evaluate(async()=>{const {RecordingStore}=await import('/recording-store.mjs');RecordingStore.prototype.save=originalSave;});
+ await $('recording-review-save').click();await page.waitForFunction(id=>document.getElementById('post-recording').value===id,pending.id);
+ assert.equal((await page.evaluate(()=>fixtureStore.list())).find(r=>r.id===pending.id).postPending,false);assert.equal(await $('recording-review').isHidden(),true);
+ // Both pending takes and legacy/saved recordings still support explicit deletion.
+ const pendingCopy=await page.evaluate(async row=>{const copy={...row,id:crypto.randomUUID(),created:Date.now(),postPending:true};await fixtureStore.saveRemix(copy,await fixtureStore.blob(row),await fixtureStore.blob(row,'voice'));return copy;},pending);
+ await $('recordings-panel').locator('summary').click();await $('recording-refresh').click();await page.waitForFunction(id=>document.getElementById('recording-review-take').value===id,pendingCopy.id);
+ page.once('dialog',d=>d.dismiss());await $('recording-review-delete').click();assert.ok((await page.evaluate(()=>fixtureStore.list())).some(r=>r.id===pendingCopy.id));
+ page.once('dialog',d=>d.accept());await $('recording-review-delete').click();await page.waitForFunction(()=>document.getElementById('recording-review').hidden);assert.ok(!(await page.evaluate(()=>fixtureStore.list())).some(r=>r.id===pendingCopy.id));
+ const legacy=await page.evaluate(async row=>{const copy={...row,id:crypto.randomUUID(),created:Date.now()};delete copy.postPending;await fixtureStore.saveRemix(copy,await fixtureStore.blob(row),await fixtureStore.blob(row,'voice'));return copy;},pending);
+ await $('recording-refresh').click();await page.waitForFunction(id=>[...document.getElementById('post-recording').options].some(o=>o.value===id),legacy.id);
+ for(const id of [legacy.id,mix.id]){await $('post-recording').selectOption(id);page.once('dialog',d=>d.accept());await $('selected-recording-delete').click();await page.waitForFunction(id=>![...document.getElementById('post-recording').options].some(o=>o.value===id),id);assert.ok(!(await page.evaluate(()=>fixtureStore.list())).some(r=>r.id===id));}
+ await page.evaluate(async row=>{await fixtureStore.saveRemix(row,await fixtureStore.blob((await fixtureStore.list()).find(r=>r.postPending===false)),await fixtureStore.blob((await fixtureStore.list()).find(r=>r.postPending===false),'voice'));},pendingCopy);
+ await $('recording-refresh').click();await page.waitForFunction(id=>document.getElementById('recording-review-take').value===id,pendingCopy.id);
+ page.once('dialog',d=>d.accept());await $('recording-delete-all').click();await page.waitForFunction(()=>document.querySelectorAll('#post-recording option').length===0);
+ const retained=await page.evaluate(()=>fixtureStore.list());assert.ok(retained.some(r=>r.id===pendingCopy.id));assert.ok(retained.some(r=>r.id===first.id));assert.ok(retained.every(r=>r.postPending||r.segmentTake));
  assert.deepEqual(errors,[]);assert.ok(!requests.some(r=>r.startsWith('DELETE /library')));
  console.log(JSON.stringify({undoToOne:true,persistedUndo:true,legacyMergeAll:true,mergePreservesRecordings:true,splitWhilePlaying:true,dragPreciseUndo:true,cancelPreparation:true,pauseResume:true,realPCM:true,twoSegmentCapture:true,default200ms:true,backingClockUnchanged:true,missingCoverageBlocked:true,fullLength:true,rawUnchanged:true,pureVoice:true,postEdit:true,reload:true,wholeSongScoring:true,errors}));
 }finally{await browser?.close();server.kill();}

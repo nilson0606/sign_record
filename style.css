@@ -161,6 +161,10 @@ header{gap:18px;flex-wrap:wrap}
 .layout.segment-layout>#voice-section{display:none}
 #segment-side[hidden]{display:none}
 #segment-player-tools[hidden],#segment-take-audio[hidden]{display:none}
+#recording-review[hidden],.segment-active #recording-review{display:none}
+#recording-review{margin:16px 0;padding:16px;border:1px solid var(--line);border-radius:10px}
+#recording-review .button-row{flex-wrap:wrap;margin-top:14px}
+#recording-review label{margin-top:12px}
 #segment-player-tools .button-row{flex-wrap:wrap;margin-top:12px}
 .segment-active>.section-top,.segment-active>#song-form,.segment-active>#player-status,
 .segment-active #score-section>.score-title,.segment-active #score-section>.score-actions{display:none}

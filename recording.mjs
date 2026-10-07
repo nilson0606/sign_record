@@ -3,7 +3,8 @@ import { recordingSofteningSuffix, recordingEffectsSuffix } from './recording-so
 import {remixRecording,wavBlob,delaySeconds,recordingDelaySuffix} from './recording-process.mjs';
 import { createRecordingPost } from './recording-post.mjs';
 import { createRecordingMix, mixSettings } from './recording-mix.mjs';
-import { RecordingStore } from './recording-store.mjs';
+import { RecordingStore, isPostRecording } from './recording-store.mjs';
+import {createRecordingReview} from './recording-review.mjs';
 import { createPCMRecorders } from './recording-pcm.mjs';
 import { recordingSceneDefaultsVersion } from './recording-scenes.mjs';
 const $ = id => document.getElementById(id);
@@ -17,8 +18,10 @@ export function createSingerRecorder(options) {
   } catch {}
   function balanceSettings() { return mixSettings({manual:$('recording-manual').checked,voice:Number($('recording-voice-level').value),backing:Number($('recording-backing-level').value)}); }
   const post = createRecordingPost({store, stop:()=>stop(), reference:options.reference, pause:()=>{options.pausePlayer();$('recording-audio').pause();}, download, onDelete:async()=>{clearPreview();await render();}});
+  const review=createRecordingReview({store,isRecording:()=>!!active,loadStem:options.loadStem,onChanged:render,pause:()=>{options.pausePlayer();post.clearAudio();$('recording-audio').pause();}});
   const status = text => { $('recording-status').textContent = text; };
   function controls() {
+    review.controls();
     const mode=$('recording-mode').value, manual=$('recording-manual').checked;
     $('recording-mode').disabled = !!active;
     $('recording-delay').disabled=!!active||mode==='off';
@@ -31,12 +34,13 @@ export function createSingerRecorder(options) {
     $('recording-balance-help').textContent = mode==='off' ? '已關閉錄音，音量平衡不啟動。' : manual ? '手動＋自動：依你的音量設定，兩路各自最多微調 ±3 dB。0% 保持靜音；每輪開始後固定設定。' : '自動平衡：依歌唱者及配樂／和音音量平滑調整，各自最多修正 ±6 dB。下方手動音量不參與；每輪開始後固定設定。';
   }
   function clearPreview() {
+    review.clear();review.controls();
     post.clearAudio();
     const audio = $('recording-audio'); audio.pause(); audio.removeAttribute('src'); audio.load(); audio.hidden = true;
     if (previewURL) URL.revokeObjectURL(previewURL); previewURL = null;
   }
   async function render(savedId = null) {
-    const rows = await store.list(), list = $('recording-list'); list.replaceChildren(); post.refresh(rows);
+    const all=await store.list(),rows=all.filter(isPostRecording), list = $('recording-list'); list.replaceChildren(); review.refresh(all,savedId);post.refresh(rows);
     if(savedId && rows.some(row=>row.id===savedId&&row.complete)){
       post.select(savedId,{scroll:false});
       $('post-status').textContent='已選取最新錄音，可試聽、下載或後處理。';
@@ -118,7 +122,7 @@ export function createSingerRecorder(options) {
     const meta = { id: crypto.randomUUID(), title: reference.title, videoId: reference.videoId, mode, mime: recorder.mimeType, rawMime:rawRecorder.mimeType, appliedDelayMs:0, recordingDelayMs, created: Date.now(), seconds: 0, bytes: 0, complete: false, balance: mix.settings, stems, rawBytes:0, post:{version:1, reference:structuredClone(reference), scoring, offsetMs:recordingDelayMs, liveOffsetMs:Number($('offset').value), segments:[], samples:[]} };
     // Only new recordings opt into the new editing defaults; saved audio stays dry.
     meta.postDefaults=recordingSceneDefaultsVersion;
-    if(capture.segmentTake)meta.segmentTake=structuredClone(capture.segmentTake);
+    if(capture.segmentTake)meta.segmentTake=structuredClone(capture.segmentTake);else meta.postPending=true;
     meta.captureClock={version:1,source:'audio-worklet-pcm',sampleRate:context.sampleRate,input:direct?'native-worklet-v2':'browser-media-stream'};
     const a = { recorder, rawRecorder, rawCount:0, segment:null, context, mic, mix, destination, buffers, meta, chunks: [], queue: Promise.resolve(), count: 0, backing: [], error: null };
     active = a; controls();
@@ -152,6 +156,7 @@ export function createSingerRecorder(options) {
   }
   function elapsed(a) { return a.recorder.clock.frames(a.context.currentTime)/a.context.sampleRate; }
   function playerState(state, time) {
+    if(state===1){review.clear();review.controls();}
     const a = active; if (!a) return;
     if (state === 1) {
       if (a.recorder.state === 'inactive') { a.recorder.start(1000); a.rawRecorder.start(1000); }
@@ -200,7 +205,7 @@ export function createSingerRecorder(options) {
           }catch(error){correctionError=error.message;}finally{await decoder.close().catch(()=>{});}
         }
         a.meta.complete=true;await store.save(a.meta);savedId=a.meta.id;
-        status(correctionError?'延時校正未完成，已保存未校正的原錄音，可到後處理重試：'+correctionError:`演唱錄音已保存 · 歌聲校正 ${a.meta.appliedDelayMs} ms，可在下方試聽或下載。`);
+        status(correctionError?'延時校正未完成，已保留待確認錄音：'+correctionError:a.meta.segmentTake?'分段錄音已保存於分段區。':`錄音已保留為待確認版本 · 歌聲校正 ${a.meta.appliedDelayMs} ms。請先試聽，滿意再存到錄音後處理。`);
       } catch (error) {
         const panel = $('recording-rescue'); panel.hidden = false;
         const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob(a.chunks,{type:a.recorder.mimeType})); link.download = '演唱錄音.wav';
@@ -226,9 +231,9 @@ export function createSingerRecorder(options) {
   window.addEventListener('recording-post-saved',()=>render().catch(error=>status(error.message)));
   $('recording-delete-all').addEventListener('click',async()=>{
     if(active){status('請先停止收音，再刪除全部錄音。');return;}
-    if(!confirm('刪除目前錄音清單的全部錄音、原始歌聲、重合成音檔及後處理資料？不會刪除歌曲基準或分離音軌。此操作無法復原。'))return;
+    if(!confirm('刪除此清單中的整首錄音、已保存成品及其後處理資料？待確認錄音、分段素材、歌曲基準與分離音軌保留。此操作無法復原。'))return;
     const button=$('recording-delete-all');button.disabled=true;
-    try{await stop();options.pausePlayer();clearPreview();post.clearAudio();const count=await store.deleteAll();await render();status(`已刪除 ${count} 筆錄音及其後處理資料。`);}catch(error){status('未全部刪除：'+error.message);}finally{button.disabled=false;}
+    try{await stop();options.pausePlayer();clearPreview();post.clearAudio();const rows=(await store.list()).filter(isPostRecording);for(const row of rows)await store.delete(row.id);await render();status(`已刪除 ${rows.length} 筆錄音及其後處理資料；待確認錄音與分段素材保留。`);}catch(error){status('未全部刪除：'+error.message);}finally{button.disabled=false;}
   });
   $('recording-refresh').addEventListener('click',()=>render().catch(error=>status(error.message)));
   $('recording-mode').addEventListener('change',()=>{ controls(); try { localStorage.setItem('karaoke.recording-mode.v1',$('recording-mode').value); } catch {} status($('recording-mode').value === 'off' ? '不保存錄音；從頭開始唱只收音評分。' : '按「從頭開始唱」後自動錄製；停止收音、結算或播完時保存。'); });

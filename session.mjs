@@ -28,15 +28,16 @@ export function createKaraokeSession(options) {
   let libraryLocation = null, locationBusy = false;
   const segmentLocks=new Map();
   let previewUrl = null, previewRequest = null, previewSerial = 0, restartToken = 0, segmented = null;
-  const recording = createSingerRecorder({reference:()=>phase==='preparing'?null:reference, voiced: options.voiced, context: options.context, stream: options.stream, inputSource:options.inputSource, player: options.player, pausePlayer: () => { options.player()?.pauseVideo?.(); stopPreview(); }});
+  async function loadRecordingStem(ref,stem){
+    if(!token)await ensureSession();
+    const response=await fetch(BASE+`/library/${ref.cacheId}/${stem}`,{headers:{'X-Karaoke-Token':token},credentials:'omit',cache:'no-store',signal:AbortSignal.timeout(30000)});
+    if(!response.ok)throw Error('無法讀取已保存的伴樂／和音，請確認本機工具與歌曲庫。');return response.arrayBuffer();
+  }
+  const recording = createSingerRecorder({reference:()=>phase==='preparing'?null:reference, voiced: options.voiced, context: options.context, stream: options.stream, inputSource:options.inputSource, player: options.player, loadStem:loadRecordingStem, pausePlayer: () => { options.player()?.pauseVideo?.(); stopPreview(); }});
   segmented = createSegmentRecording({recording, reference:()=>reference, player:options.player, micReady:options.micReady, startMic:options.startMic,
     canEnter:()=>!take&&!maskBusy&&!['preparing','finishing','restarting'].includes(phase), changed:()=>controls(),
     pauseOther:()=>{stopPreview();recording.clearPreview();options.cancelCalibration?.();},
-    async loadStem(ref,stem){
-      if(!token)await ensureSession();
-      const response=await fetch(BASE+`/library/${ref.cacheId}/${stem}`,{headers:{'X-Karaoke-Token':token},credentials:'omit',cache:'no-store',signal:AbortSignal.timeout(30000)});
-      if(!response.ok)throw Error('無法讀取已保存的伴樂／和音，請確認本機工具與歌曲庫。');return response.arrayBuffer();
-    },
+    loadStem:loadRecordingStem,
   });
   const message = text => { $('score-status').textContent = text; };
   function updateMaskView() { displayReference = reference ? applyMasks(reference) : null; excluded = reference ? maskedCells(reference) : []; }

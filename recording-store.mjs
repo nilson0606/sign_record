@@ -1,4 +1,5 @@
 // Audio stays in IndexedDB on this browser; each chunk commits separately.
+export const isPostRecording=row=>!row.segmentTake&&!row.postPending;
 export class BrowserRecordingStore {
   constructor() { this.db = null; }
   async open() {

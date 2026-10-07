@@ -98,7 +98,8 @@ export function createSegmentRecording(options) {
     const playerSection=document.getElementById('player-section');
     playerSection.classList.toggle('segment-active',enabled);playerSection.parentElement.classList.toggle('segment-layout',enabled);$('side').hidden=$('player-tools').hidden=!enabled;
     for(const panel of [$('tools'),$('side')])for(const node of panel.querySelectorAll('button,input,select'))node.disabled=locked||!draft;
-    $('stop').disabled=$('stop-player').disabled=!capture;$('export').disabled=$('download').disabled=locked||!trial;
+    $('stop').disabled=$('stop-player').disabled=!capture;$('download').disabled=locked||!trial;$('export').disabled=locked||!trial||!!trial.saved;
+    $('export').textContent=trial?.saved?'已存到錄音後處理':'存到錄音後處理';
     if(draft){selected=Math.max(0,Math.min(selected,draft.parts.length-1));boundary=Math.max(1,Math.min(boundary,draft.parts.length-1));}
     if(takeSourceId&&takeSourceId!==part()?.takeId)clearTakePreview();
     const take=validRows().find(r=>r.id===part()?.takeId&&r.segmentTake);
@@ -211,7 +212,7 @@ export function createSegmentRecording(options) {
       const mix=wavBlob(await remixRecording(raw,tracks,meta,delay,{edit:meta.postEdit}));meta.bytes=mix.size;if(request!==serial||key!==plan.key)return;
       trial={meta,mix,voice};trialURL=URL.createObjectURL(mix);$('audio').src=trialURL;$('audio').hidden=false;$('audio').load();
       if(join){$('audio').currentTime=Math.max(0,part().start-3);audioEnd=Math.min(plan.duration,part().end+3);await $('audio').play();}
-      status(`已試合完整 ${fmt(plan.duration)} · ${mode==='mix'?'人聲＋伴樂／和音':'純人聲'} · 歌聲校正 ${delay} ms。可播放、下載或另存新成品。`);
+      status(`已試合完整 ${fmt(plan.duration)} · ${mode==='mix'?'人聲＋伴樂／和音':'純人聲'} · 歌聲校正 ${delay} ms。目前為暫存試聽；滿意後按「存到錄音後處理」。`);
     }finally{await decoder.close().catch(()=>{});work=false;render();options.changed();}
   }
   function action(id,fn){$(id).addEventListener('click',()=>Promise.resolve().then(fn).catch(e=>status(e.message)));}
@@ -241,7 +242,7 @@ export function createSegmentRecording(options) {
   for(const id of ['listen','listen-player','listen-selected'])action(id,listenTake);
   for(const id of ['delete','delete-player','delete-selected'])action(id,deleteTake);
   for(const id of takeModeIds)$(id).onchange=()=>{takeMode=$(id).value==='voice'?'voice':'mix';clearTakePreview();render();status(`已切換為${takeModeLabel()}，請按「試聽本段錄音」。`);};
-  action('export',async()=>{if(!trial||busy())return;work=true;render();options.changed();try{await store.saveRemix(trial.meta,trial.mix,trial.voice);await options.recording.refresh(trial.meta.id);status('已另存完整成品，可到「錄音後處理」繼續調整與 A/B 比較。');}finally{work=false;render();options.changed();}});
+  action('export',async()=>{if(!trial||trial.saved||busy())return;work=true;render();options.changed();try{await store.saveRemix(trial.meta,trial.mix,trial.voice);trial.saved=true;await options.recording.refresh(trial.meta.id);status('已存到錄音後處理，可繼續調整與 A/B 比較。分段素材仍保留在分段區。');}finally{work=false;render();options.changed();}});
   action('download',()=>{if(!trial)return;const a=document.createElement('a');a.href=trialURL;a.download=trial.meta.title.replace(/[\\/:*?"<>|]/g,'_')+`-${trial.meta.mode}-${trial.meta.appliedDelayMs}ms.wav`;a.click();});
   $('part').onchange=()=>{selected=Number($('part').value);loop=false;render();};$('boundary').onchange=()=>{boundary=Number($('boundary').value);render();};
   $('name').onchange=()=>change(()=>{part().name=$('name').value.trim()||`第 ${selected+1} 段`;});$('boundary-time').onchange=()=>change(()=>moveBoundary(draft,boundary,parseSegmentTime($('boundary-time').value)));
