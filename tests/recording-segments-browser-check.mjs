@@ -45,6 +45,22 @@ try{
  await $('segment-open').click();assert.equal(await $('segment-delay').inputValue(),'200');
  assert.equal(await $('sing-start').isHidden(),true);assert.equal(await $('segment-side').isVisible(),true);
  const layout=await page.evaluate(()=>{const rect=id=>document.getElementById(id).getBoundingClientRect(),left=rect('player-section'),right=rect('segment-side'),video=document.querySelector('#player-section .video-shell').getBoundingClientRect(),controls=rect('segment-section');return{equal:Math.abs(left.width-right.width)<1,aligned:Math.abs(left.top-right.top)<1,right:right.left>=left.right,videoAbove:video.bottom<=controls.top};});assert.deepEqual(layout,{equal:true,aligned:true,right:true,videoAbove:true});
+ // Every split can be undone to one section, including after a page reload.
+ for(const t of [1,2,4,6]){await page.evaluate(t=>fixturePlayer.seekTo(t),t);await $('segment-split').click();}
+ for(const count of [4,3,2,1]){await $('segment-undo').click();assert.equal(await $('segment-part').locator('option').count(),count);}
+ assert.equal(await $('segment-undo').isDisabled(),true);
+ for(const t of [1,2,4,6]){await page.evaluate(t=>fixturePlayer.seekTo(t),t);await $('segment-split').click();}
+ await page.reload();await initialize();await $('segment-open').click();
+ assert.equal(await $('segment-undo').isEnabled(),true,'undo history survives reload');
+ for(const count of [4,3,2,1]){await $('segment-undo').click();assert.equal(await $('segment-part').locator('option').count(),count);}
+ await page.reload();await initialize();await $('segment-open').click();assert.equal(await $('segment-undo').isDisabled(),true,'popped history stays popped after reload');
+ // Existing drafts without undo history can merge all boundaries, then undo that merge.
+ for(const t of [2,4,6]){await page.evaluate(t=>fixturePlayer.seekTo(t),t);await $('segment-split').click();}
+ await page.evaluate(()=>{const key='karaoke.segment-draft.v1.segment-fixture',draft=JSON.parse(localStorage.getItem(key));delete draft.undoHistory;localStorage.setItem(key,JSON.stringify(draft));});
+ await page.reload();await initialize();await $('segment-open').click();assert.equal(await $('segment-undo').isDisabled(),true);
+ await $('segment-merge-all').click();assert.equal(await $('segment-part').locator('option').count(),1);
+ await page.reload();await initialize();await $('segment-open').click();await $('segment-undo').click();assert.equal(await $('segment-part').locator('option').count(),4);
+ await $('segment-merge-all').click();assert.equal(await $('segment-part').locator('option').count(),1);
  // Split without interrupting playback; precise edits and undo retain one boundary.
  await page.evaluate(()=>{fixturePlayer.seekTo(3.6);fixturePlayer.playVideo();});await $('segment-split').click();assert.equal(await page.evaluate(()=>fixturePlayer.getPlayerState()),1);
  await page.evaluate(()=>fixturePlayer.pauseVideo());await $('segment-boundary-panel').locator('summary').click();await $('segment-boundary-time').fill('00:04.000');await $('segment-boundary-time').dispatchEvent('change');assert.equal(await $('segment-part').locator('option').count(),2);
@@ -86,6 +102,10 @@ try{
  await page.evaluate(()=>{fixturePlayer.seekTo(7.2);fixturePlayer.playVideo();});await page.waitForTimeout(120);assert.equal(await page.evaluate(()=>fixturePlayer.getPlayerState()),1,'audio audition endpoint does not stop later video playback');await page.evaluate(()=>fixturePlayer.pauseVideo());
  // Persisted decisions reopen. No real user library or profile is touched.
  await page.reload();await initialize();await $('segment-open').click();assert.equal(await $('segment-part').locator('option').count(),2);assert.match(await $('segment-coverage').textContent(),/所有段落/);
+ const savedParts=await page.evaluate(()=>JSON.parse(localStorage.getItem('karaoke.segment-draft.v1.segment-fixture')).parts);
+ await $('segment-merge-all').click();assert.equal(await $('segment-part').locator('option').count(),1);
+ await $('segment-undo').click();assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('karaoke.segment-draft.v1.segment-fixture')).parts),savedParts,'undo restores all take selections');
+ assert.equal(await page.evaluate(async row=>hash(await fixtureStore.blob(row,'voice')),first),firstHash,'merging boundaries preserves recordings');
  await mkdir('test-results',{recursive:true});await page.evaluate(()=>{document.querySelector('.section-nav').style.position='static';document.getElementById('theme-select').value='warm';document.documentElement.dataset.theme='warm';document.getElementById('player-section').scrollIntoView({behavior:'instant',block:'start'});});await page.screenshot({path:'test-results/recording-segments-layout.png'});for(const id of ['player-section','segment-side'])assert.ok(await $(id).evaluate(el=>el.scrollWidth<=el.clientWidth+1));
  // Whole-song start still records and scores through the existing path.
  await $('segment-whole').click();assert.equal(await $('sing-start').isVisible(),true);assert.equal(await $('segment-side').isHidden(),true);await $('recording-settings').locator('summary').click();await $('recording-mode').selectOption('voice');await $('sing-start').click();await page.waitForFunction(()=>document.getElementById('score-status').textContent.includes('演唱中'));
@@ -93,5 +113,5 @@ try{
  await page.evaluate(()=>{for(let t=0;t<7;t+=.1)fixtureSession.sample(t,440);fixturePlayer.seekTo(7);});await $('finish-song').click();await page.waitForFunction(()=>document.getElementById('score-status').textContent.includes('已結算'));
  assert.ok(await page.evaluate(()=>JSON.parse(localStorage.getItem('karaoke.scores.v1')).length));
  assert.deepEqual(errors,[]);assert.ok(!requests.some(r=>r.startsWith('DELETE /library')));
- console.log(JSON.stringify({splitWhilePlaying:true,dragPreciseUndo:true,cancelPreparation:true,pauseResume:true,realPCM:true,twoSegmentCapture:true,default200ms:true,backingClockUnchanged:true,missingCoverageBlocked:true,fullLength:true,rawUnchanged:true,pureVoice:true,postEdit:true,reload:true,wholeSongScoring:true,errors}));
+ console.log(JSON.stringify({undoToOne:true,persistedUndo:true,legacyMergeAll:true,mergePreservesRecordings:true,splitWhilePlaying:true,dragPreciseUndo:true,cancelPreparation:true,pauseResume:true,realPCM:true,twoSegmentCapture:true,default200ms:true,backingClockUnchanged:true,missingCoverageBlocked:true,fullLength:true,rawUnchanged:true,pureVoice:true,postEdit:true,reload:true,wholeSongScoring:true,errors}));
 }finally{await browser?.close();server.kill();}

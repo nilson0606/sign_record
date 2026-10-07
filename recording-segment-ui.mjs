@@ -8,10 +8,10 @@ export function createSegmentRecording(options) {
   let work=false,capture=null,serial=0,loading=0,ending=Promise.resolve(),loop=false,previewEnd=null,audioEnd=null,trial=null,trialURL=null,conflict=false;
   const status=text=>{$('status').textContent=text;},busy=()=>work||!!capture,reference=()=>options.reference(),part=()=>draft?.parts[selected];
   const storageKey=()=>`karaoke.segment-draft.v1.${key}`;
-  function persist(){
+  function persist(undoHistory=history){
     if(!draft)return;
     if(conflict||localStorage.getItem(storageKey())!==savedText){conflict=true;throw Error('另一分頁已更新這份草稿，請重新整理頁面後繼續；錄音仍保留。');}
-    validateSegmentDraft(draft);const text=JSON.stringify(draft);localStorage.setItem(storageKey(),text);savedText=text;
+    validateSegmentDraft(draft);const text=JSON.stringify({...draft,undoHistory});localStorage.setItem(storageKey(),text);savedText=text;
   }
   function invalidate(){
     audioEnd=null;
@@ -20,7 +20,7 @@ export function createSegmentRecording(options) {
   }
   function change(fn){
     if(busy()||!draft)return;const old=structuredClone(draft);
-    try{fn();if(JSON.stringify(draft)===JSON.stringify(old)){render();return;}persist();history.push(old);if(history.length>40)history.shift();invalidate();render();status('分界與版本選擇已保存。原始錄音保留。');}
+    try{fn();if(JSON.stringify(draft)===JSON.stringify(old)){render();return;}const nextHistory=[...history,old].slice(-40);persist(nextHistory);history=nextHistory;invalidate();render();status('分界與版本選擇已保存。原始錄音保留。');}
     catch(e){draft=old;render();status(e.message);}
   }
   const currentTime=()=>Number(options.player()?.getCurrentTime?.())||0;
@@ -41,7 +41,7 @@ export function createSegmentRecording(options) {
     $('part').replaceChildren();draft.parts.forEach((p,i)=>option($('part'),String(i),`${p.name} · ${fmt(p.start)}–${fmt(p.end)}`));$('part').value=String(selected);
     $('name').value=p.name;$('boundary').replaceChildren();draft.parts.slice(1).forEach((p,i)=>option($('boundary'),String(i+1),`${i+1}｜${fmt(p.start)}`));$('boundary').value=String(boundary);
     const hasBoundary=draft.parts.length>1;
-    for(const id of ['boundary','boundary-time','step','earlier','later','boundary-play','merge'])$(id).disabled=locked||!hasBoundary;
+    for(const id of ['boundary','boundary-time','step','earlier','later','boundary-play','merge','merge-all'])$(id).disabled=locked||!hasBoundary;
     $('boundary-time').value=hasBoundary?fmt(draft.parts[boundary].start):'00:00.000';$('undo').disabled=locked||!history.length;
     $('timeline').replaceChildren();
     draft.parts.forEach((p,i)=>{
@@ -63,7 +63,19 @@ export function createSegmentRecording(options) {
   function referenceChanged(){
     const ref=reference(),next=ref?.cacheId||null;if(next===key){render();return;}
     serial++;loading++;enabled=false;loop=false;previewEnd=null;invalidate();key=next;draft=null;rows=[];history=[];selected=0;boundary=1;conflict=false;
-    if(next){try{savedText=localStorage.getItem(storageKey());draft=savedText?validateSegmentDraft(JSON.parse(savedText)):segmentDraft(ref);if(draft.key!==next||Math.abs(draft.duration-ref.duration)>.01)throw Error('歌曲範圍與草稿不同，請載入原先版本。');status(savedText?'已讀取分段草稿。':'可開啟分段模式，邊播放邊加入分界。');refresh().catch(e=>status(e.message));}catch(e){draft=null;status('無法開啟草稿：'+e.message);}}
+    if(next){try{
+      savedText=localStorage.getItem(storageKey());
+      const {undoHistory=[],...stored}=savedText?JSON.parse(savedText):segmentDraft(ref);
+      draft=validateSegmentDraft(stored);
+      if(draft.key!==next||Math.abs(draft.duration-ref.duration)>.01)throw Error('歌曲範圍與草稿不同，請載入原先版本。');
+      // Old drafts have no history. Invalid history must not prevent loading the saved draft.
+      try{history=Array.isArray(undoHistory)?undoHistory.slice(-40).map(item=>{
+        const {undoHistory:ignored,...snapshot}=item;validateSegmentDraft(snapshot);
+        if(snapshot.key!==next||Math.abs(snapshot.duration-draft.duration)>.01)throw Error('復原紀錄歌曲不同。');
+        return snapshot;
+      }):[];}catch{history=[];}
+      status(savedText?'已讀取分段草稿。':'可開啟分段模式，邊播放邊加入分界。');refresh().catch(e=>status(e.message));
+    }catch(e){draft=null;status('無法開啟草稿：'+e.message);}}
     else status('載入歌曲後，可開啟分段模式。');render();
   }
   function enter(){
@@ -132,7 +144,8 @@ export function createSegmentRecording(options) {
   }
   function action(id,fn){$(id).addEventListener('click',()=>Promise.resolve().then(fn).catch(e=>status(e.message)));}
   action('open',enter);action('whole',leave);action('split',()=>change(()=>{selected=splitSegment(draft,currentTime());boundary=selected;}));
-  action('undo',()=>{if(!history.length||busy())return;const prev=history.pop(),old=draft;try{draft=prev;persist();invalidate();render();status('已復原上一次分界／版本調整。');}catch(e){draft=old;history.push(prev);throw e;}});
+  action('undo',()=>{if(!history.length||busy())return;const old=draft,nextHistory=history.slice(0,-1);try{draft=structuredClone(history.at(-1));persist(nextHistory);history=nextHistory;invalidate();render();status('已復原上一次分界／版本調整。');}catch(e){draft=old;render();throw e;}});
+  action('merge-all',()=>change(()=>{while(draft.parts.length>1)mergeBoundary(draft,1);selected=0;}));
   action('save',()=>{persist();status('草稿已保存於目前瀏覽器；各次演唱錄音沿用歌曲庫保存。');});action('refresh',refresh);
   action('earlier',()=>change(()=>moveBoundary(draft,boundary,draft.parts[boundary].start-Number($('step').value))));action('later',()=>change(()=>moveBoundary(draft,boundary,draft.parts[boundary].start+Number($('step').value))));
   action('merge',()=>{const different=draft.parts[boundary-1].takeId!==draft.parts[boundary].takeId;change(()=>mergeBoundary(draft,boundary));if(different)status('已移除分界。兩段原先採用的版本不同，合併後請重新挑選版本；原始錄音都保留。');});
