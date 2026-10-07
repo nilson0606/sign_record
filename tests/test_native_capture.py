@@ -75,9 +75,8 @@ class CaptureTests(unittest.TestCase):
             stream.read(960)
         self.assertEqual(len([e for e in self.events if e['event'] == 'error']), 1)
 
-    def test_discontinuity_position_gap_and_bad_timestamp_stop_before_bad_packet(self):
+    def test_discontinuity_and_bad_timestamp_stop_before_bad_packet(self):
         for flags, position, code in [(DISCONTINUITY, 960, 'device-discontinuity'),
-                                       (0, 1000, 'device-position-gap'),
                                        (TIMESTAMP_ERROR, 960, 'device-timestamp-error')]:
             with self.subTest(code=code):
                 stream, _ = self.capture([(0, (960, DISCONTINUITY, 0, pcm(960))),
@@ -87,6 +86,19 @@ class CaptureTests(unittest.TestCase):
                     stream.read(960)
                 self.assertEqual(self.events[-1]['code'], code)
                 self.assertEqual(stream.frames, 960)
+
+    def test_usb_device_positions_do_not_reject_resampled_client_pcm(self):
+        # Observed JAZZ-UB036 packets: device position advances 444 frames,
+        # independently of the 48 kHz PCM count and initial resampler latency.
+        counts = [449, 483, 483, 484, 483]
+        chunks = [pcm(count, .125 + i * .01) for i, count in enumerate(counts)]
+        stream, _ = self.capture([(0, (count, DISCONTINUITY if i == 0 else 0,
+                                      444 * (i + 1), chunks[i]))
+                                  for i, count in enumerate(counts)])
+        self.assertEqual(stream.read(sum(counts)), b''.join(chunks))
+        self.assertEqual(stream.frames, sum(counts))
+        self.assertEqual(len([e for e in self.events if e['event'] == 'device-position-units']), 1)
+        self.assertFalse(any(e['event'] == 'error' for e in self.events))
 
     def test_explicit_device_silence_is_preserved_and_logged_without_gating(self):
         quiet = pcm(960, .00001)

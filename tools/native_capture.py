@@ -60,6 +60,7 @@ class ContinuousCapture:
         self.pending = bytearray()
         self.frames = 0
         self.expected_position = None
+        self.position_difference_reported = False
         self.started = False
         self.silent = False
         self.failed = None
@@ -93,8 +94,16 @@ class ContinuousCapture:
             self.fail("device-discontinuity", "Windows 回報收音資料不連續，已停止並保留已錄部分。",
                       devicePosition=position, flags=flags)
         if self.started and self.expected_position is not None and position != self.expected_position:
-            self.fail("device-position-gap", "Windows 收音取樣位置中斷，已停止並保留已錄部分。",
-                      expectedPosition=self.expected_position, devicePosition=position, flags=flags)
+            # Device positions need not advance by the client PCM frame count:
+            # shared-mode resampling can use different device/client rates.
+            # For example, JAZZ-UB036 advances 444 device frames while delivering
+            # 483/484 frames at 48 kHz (and a shorter first resampler packet).
+            # Use WASAPI's DISCONTINUITY flag for loss detection, not this sum.
+            if not self.position_difference_reported:
+                self.report({"capture": True, "event": "device-position-units",
+                             "frame": self.frames, "expectedPosition": self.expected_position,
+                             "devicePosition": position, "flags": flags})
+                self.position_difference_reported = True
         # A timestamp error makes position unreliable; never silently accept a
         # possibly shifted timeline after recording has started.
         if flags & TIMESTAMP_ERROR:
