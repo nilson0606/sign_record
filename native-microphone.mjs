@@ -39,6 +39,8 @@ export async function openNativeMicrophone(context,{deviceId='',signal,onError})
   worker.postMessage({type:'start',token:s.token,deviceId,port:channel.port1},[channel.port1]);
   const meta=await metadata;
   if(meta.sampleRate!==context.sampleRate||meta.channels!==1)throw Error('本機收音取樣率不相容。');
+  if(typeof meta.capturePolicy==='string')node.nativeCapturePolicy=meta.capturePolicy;
+  if(typeof meta.captureId==='string')node.nativeCaptureId=meta.captureId;
   await ready;clearTimeout(timer);if(controller.signal.aborted)throw new DOMException('已取消','AbortError');started=true;
   async function createMonitorSource(outputContext,onMonitorError){
    if(stopped)throw Error('本機收音已停止。');

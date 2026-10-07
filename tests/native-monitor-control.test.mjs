@@ -14,6 +14,16 @@ function fixture(){
 }
 const set=(sequence,enabled=true)=>({action:'set',sequence,enabled,deviceId:'speaker',volume:.3});
 
+test('capture diagnostics stay separate from speaker acknowledgements',async()=>{
+ const f=fixture(),events=[],control=monitorControl(f.child,event=>events.push(event));
+ try{
+  const pending=control.command(set(0));let settled=false;pending.then(()=>settled=true);
+  f.child.stderr.write(JSON.stringify({capture:true,event:'error',code:'device-discontinuity',frame:48000})+'\n');
+  await new Promise(r=>setImmediate(r));assert.equal(settled,false);assert.equal(events[0].code,'device-discontinuity');
+  f.reply(0,'running');assert.equal((await pending).state,'running');
+ }finally{control.close();f.control.close();}
+});
+
 test('monitor control waits for actual output readiness; heartbeat does not restart output',async()=>{
  const f=fixture();
  try{

@@ -3,6 +3,7 @@ import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
 import {randomUUID} from 'node:crypto';
 import {createInterface} from 'node:readline';
+import {appendFile,mkdir,stat,rename} from 'node:fs/promises';
 const root=fileURLToPath(new URL('./',import.meta.url));
 const python=fileURLToPath(new URL('./.runtime/venv/Scripts/python.exe',import.meta.url));
 const worker=fileURLToPath(new URL('./tools/native_microphone.py',import.meta.url));
@@ -10,9 +11,20 @@ const run=promisify(execFile);
 let active=null;
 const json=(res,code,data)=>{res.writeHead(code,{'Content-Type':'application/json'});res.end(JSON.stringify(data));};
 export function stopNativeMicrophone(){active?.stop();}
+let logQueue=Promise.resolve(),queuedLogs=0;
+function captureLog(captureId,event){
+ if(queuedLogs>=32)return;
+ queuedLogs++;
+ logQueue=logQueue.then(async()=>{
+  const directory=new URL('./.runtime/',import.meta.url),file=new URL('native-capture.jsonl',directory);
+  await mkdir(directory,{recursive:true});
+  if((await stat(file).catch(()=>null))?.size>1024*1024)await rename(file,new URL('native-capture.previous.jsonl',directory));
+  await appendFile(file,JSON.stringify({time:new Date().toISOString(),captureId,...event})+'\n');
+ }).catch(error=>console.error('Unable to save capture diagnostics:',error.message)).finally(()=>queuedLogs--);
+}
 
 // Commands and acknowledgements never share the recording PCM pipe.
-export function monitorControl(child){
+export function monitorControl(child,onCapture=()=>{}){
  let sequence=-1,closed=false,state={state:'off',sequence:-1};
  const pending=new Map(),lines=createInterface({input:child.stderr});
  function rejectAll(error){for(const p of pending.values()){clearTimeout(p.timer);p.reject(error);}pending.clear();}
@@ -20,6 +32,8 @@ export function monitorControl(child){
  lines.on('line',line=>{
   if(line.length>4096)return;
   let message;try{message=JSON.parse(line);}catch{return;}
+  if(!message||typeof message!=='object')return;
+  if(message.capture===true){onCapture(message);return;}
   if(message.monitor!==true||!Number.isSafeInteger(message.sequence)||message.sequence!==sequence)return;
   state={state:message.state,sequence,error:typeof message.error==='string'?message.error:''};
   if(state.state==='starting')return;
@@ -75,7 +89,8 @@ export async function handleNativeMicrophone(req,res,readBody){
  if(active){json(res,409,{error:'本機麥克風已被另一個分頁使用，請先停止該頁收音。'});return;}
  const child=spawn(python,['-X','utf8',worker,'--device',input.deviceId],{cwd:root,windowsHide:true,stdio:['pipe','pipe','pipe']});
  let header=Buffer.alloc(0),ended=false;
- const operation={id:randomUUID(),monitor:monitorControl(child),stop:()=>{if(ended)return;ended=true;clearTimeout(timer);operation.monitor.close();child.kill();if(!res.writableEnded)res.destroy();}};
+ const captureId=randomUUID();
+ const operation={id:captureId,monitor:monitorControl(child,event=>captureLog(captureId,event)),stop:()=>{if(ended)return;ended=true;clearTimeout(timer);operation.monitor.close();child.kill();if(!res.writableEnded)res.destroy();}};
  active=operation;
  const fail=message=>{if(ended)return;if(!res.headersSent)json(res,503,{error:message});operation.stop();};
  let timer=setTimeout(()=>fail('本機麥克風啟動逾時，請確認 Python 收音權限。'),25000);

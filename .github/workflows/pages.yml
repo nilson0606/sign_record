@@ -22,6 +22,8 @@ jobs:
         with:
           node-version: '22'
       - run: npm test
+      - name: Verify capture packet continuity without audio hardware
+        run: python3 -m unittest discover -s tests -p test_native_capture.py
       - name: Prepare static site only
         run: node build-site.mjs
       - uses: actions/configure-pages@v5

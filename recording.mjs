@@ -131,6 +131,8 @@ export function createSingerRecorder(options) {
     meta.postDefaults=recordingSceneDefaultsVersion;
     if(capture.segmentTake)meta.segmentTake=structuredClone(capture.segmentTake);else meta.postPending=true;
     meta.captureClock={version:1,source:'audio-worklet-pcm',sampleRate:context.sampleRate,input:direct?'native-worklet-v2':'browser-media-stream'};
+    if(direct?.nativeCapturePolicy)meta.captureClock.nativeCapturePolicy=direct.nativeCapturePolicy;
+    if(direct?.nativeCaptureId)meta.captureClock.nativeCaptureId=direct.nativeCaptureId;
     const a = { recorder, rawRecorder, rawCount:0, segment:null, context, mic, mix, destination, buffers, meta, chunks: [], queue: Promise.resolve(), count: 0, backing: [], error: null };
     active = a; controls();
     rawRecorder.ondataavailable = event => {

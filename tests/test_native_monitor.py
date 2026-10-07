@@ -12,6 +12,7 @@ from unittest.mock import patch
 import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from native_monitor import NativeMonitor, BoundedSpeakerPlayer
+import native_capture
 
 
 def until(predicate, timeout=2):
@@ -187,10 +188,18 @@ class MonitorTests(unittest.TestCase):
         class Source:
             def __enter__(self): return self
             def __exit__(self, *args): pass
-            def record(self, **kwargs):
-                calls.append(kwargs)
-                if not packets: raise EOFError("fixture complete")
-                return packets.pop(0)
+        class PacketSource:
+            channels = 2
+            sample_rate = 48000
+            def __init__(self, source):self.position = 0
+            def available(self):
+                if not packets:raise EOFError("fixture complete")
+                return True
+            def take(self):
+                packet = packets.pop(0)
+                position = self.position
+                self.position += len(packet)
+                return len(packet), 0, position, packet.tobytes()
         def recorder(**kwargs):
             calls.append(kwargs); return Source()
         mic = types.SimpleNamespace(id="usb", name="USB fixture", recorder=recorder)
@@ -202,13 +211,13 @@ class MonitorTests(unittest.TestCase):
             def feed(self, pcm): sent.append(pcm.copy())
         binary = io.BytesIO()
         stdout = types.SimpleNamespace(buffer=binary)
-        with patch.dict(sys.modules, {"soundcard": backend, "native_monitor": types.SimpleNamespace(NativeMonitor=Monitor)}), patch.object(sys, "argv", ["native_microphone.py"]), patch.object(sys, "stdin", io.StringIO("")), patch.object(sys, "stdout", stdout):
+        with patch.dict(sys.modules, {"soundcard": backend, "native_monitor": types.SimpleNamespace(NativeMonitor=Monitor)}), patch.object(native_capture, "WasapiPackets", PacketSource), patch.object(sys, "stderr", io.StringIO()), patch.object(sys, "argv", ["native_microphone.py"]), patch.object(sys, "stdin", io.StringIO("")), patch.object(sys, "stdout", stdout):
             with self.assertRaises(EOFError):
                 runpy.run_path(str(Path(__file__).resolve().parents[1] / "tools" / "native_microphone.py"), run_name="__main__")
         header, raw = binary.getvalue().split(b"\n", 1)
-        self.assertEqual(json.loads(header), dict(label="USB fixture", sampleRate=48000, channels=1))
+        self.assertEqual(json.loads(header), dict(label="USB fixture", sampleRate=48000, channels=1, capturePolicy="wasapi-packets-v1"))
         self.assertEqual(calls[0], dict(samplerate=48000, channels=2, blocksize=960))
-        self.assertTrue(all(c == dict(numframes=960) for c in calls[1:]))
+        self.assertEqual(len(calls), 1)  # SoundCard record() must never be called.
         expected = np.concatenate([np.mean(np.arange(1920, dtype=np.float32).reshape(960, 2)/1920, axis=1), np.full(960, -.25, dtype=np.float32)]).astype("<f4")
         self.assertEqual(raw, expected.tobytes())
         np.testing.assert_array_equal(np.concatenate(sent), expected)

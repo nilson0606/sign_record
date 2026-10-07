@@ -9,7 +9,7 @@ const clients=new Set();let base,stalled=false;
 const server=http.createServer(async(req,res)=>{
  if(req.url==='/session'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({token:'fixture',features:['native-microphone']}));return;}
  if(req.url==='/microphone/stream'){
-  res.setHeader('Content-Type','application/octet-stream');res.write(JSON.stringify({sampleRate:48000,channels:1,label:'Synthetic capture'})+'\n');
+  res.setHeader('Content-Type','application/octet-stream');res.write(JSON.stringify({sampleRate:48000,channels:1,label:'Synthetic capture',capturePolicy:'wasapi-packets-v1'})+'\n');
   const started=performance.now();let frames=0;
   const timer=setInterval(()=>{
    if(stalled)return;
@@ -62,7 +62,7 @@ try{
   const store=new BrowserRecordingStore();
   async function start(){capture=await openNativeMicrophone(context,{signal:new AbortController().signal,onError:error=>{errors.push(error.message);ended=recorder.stop(error);capture.stop();}});await recorder.prepare(ref,()=>{throw Error('Unexpected backing');});started=performance.now();recorder.playerState(1,0);}
   await start();await wait(1600);ended=recorder.stop();capture.stop();await ended;
-  const first=(await store.list())[0];
+  const first=(await store.list())[0];if(first.captureClock.nativeCapturePolicy!=='wasapi-packets-v1')throw Error('Capture policy was not saved');
   await start();await wait(1600);if(errors.length)throw Error('Capture failed before injected stall: '+errors.join('; '));await fetch('/stall');
   for(let i=0;i<100&&!errors.length;i++)await wait(50);
   if(!errors.length)throw Error('Underrun did not stop recording');await ended;
