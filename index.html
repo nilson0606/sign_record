@@ -68,7 +68,7 @@
           <p id="segment-song" class="preview-source"></p>
           <div class="button-row"><button id="segment-play" type="button" class="secondary">播放／暫停影片</button><button id="segment-split" type="button">在此分段</button><button id="segment-undo" type="button" class="secondary">復原分界</button></div>
           <div class="button-row"><button id="segment-merge-all" type="button" class="secondary">合併為一段</button></div>
-          <p class="help">復原保留最近 40 次調整，重新整理後仍可使用。合併為一段可重新分段，原始錄音保留；各段若使用不同版本，合併後需重新挑選。</p>
+          <p class="help">復原保留最近 40 次調整；沒有更早紀錄時，繼續按會從最後一道分界往前移除，直到剩一整段。原始錄音保留；合併不同演唱版本後需重新挑選。</p>
           <label for="segment-seek">歌曲位置 <output id="segment-position">00:00.000</output></label><input id="segment-seek" type="range" min="0" max="1" step="0.01" value="0">
           <div id="segment-timeline" class="segment-timeline" aria-label="歌曲段落與可拖曳分界"></div>
           <label for="segment-part">要錄製或補唱的段落</label><select id="segment-part"></select>

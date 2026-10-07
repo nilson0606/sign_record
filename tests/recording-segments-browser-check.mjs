@@ -54,10 +54,19 @@ try{
  assert.equal(await $('segment-undo').isEnabled(),true,'undo history survives reload');
  for(const count of [4,3,2,1]){await $('segment-undo').click();assert.equal(await $('segment-part').locator('option').count(),count);}
  await page.reload();await initialize();await $('segment-open').click();assert.equal(await $('segment-undo').isDisabled(),true,'popped history stays popped after reload');
- // Existing drafts without undo history can merge all boundaries, then undo that merge.
- for(const t of [2,4,6]){await page.evaluate(t=>fixturePlayer.seekTo(t),t);await $('segment-split').click();}
+ // A legacy two-section draft, expanded to five, must undo all the way to one.
+ await page.evaluate(()=>fixturePlayer.seekTo(4));await $('segment-split').click();
  await page.evaluate(()=>{const key='karaoke.segment-draft.v1.segment-fixture',draft=JSON.parse(localStorage.getItem(key));delete draft.undoHistory;localStorage.setItem(key,JSON.stringify(draft));});
- await page.reload();await initialize();await $('segment-open').click();assert.equal(await $('segment-undo').isDisabled(),true);
+ await page.reload();await initialize();await $('segment-open').click();
+ for(const t of [1,2,6]){await page.evaluate(t=>fixturePlayer.seekTo(t),t);await $('segment-split').click();}
+ for(const count of [4,3,2]){await $('segment-undo').click();assert.equal(await $('segment-part').locator('option').count(),count);}
+ assert.equal(await $('segment-undo').isEnabled(),true,'remaining legacy boundary must still be removable with undo');
+ await page.reload();await initialize();await $('segment-open').click();
+ assert.equal(await $('segment-undo').isEnabled(),true,'legacy two-section draft remains undoable after reload');
+ await $('segment-undo').click();assert.equal(await $('segment-part').locator('option').count(),1);assert.equal(await $('segment-undo').isDisabled(),true);
+ await page.reload();await initialize();await $('segment-open').click();assert.equal(await $('segment-part').locator('option').count(),1);
+ // Merging all boundaries is itself undoable.
+ for(const t of [2,4,6]){await page.evaluate(t=>fixturePlayer.seekTo(t),t);await $('segment-split').click();}
  await $('segment-merge-all').click();assert.equal(await $('segment-part').locator('option').count(),1);
  await page.reload();await initialize();await $('segment-open').click();await $('segment-undo').click();assert.equal(await $('segment-part').locator('option').count(),4);
  await $('segment-merge-all').click();assert.equal(await $('segment-part').locator('option').count(),1);

@@ -42,7 +42,7 @@ export function createSegmentRecording(options) {
     $('name').value=p.name;$('boundary').replaceChildren();draft.parts.slice(1).forEach((p,i)=>option($('boundary'),String(i+1),`${i+1}｜${fmt(p.start)}`));$('boundary').value=String(boundary);
     const hasBoundary=draft.parts.length>1;
     for(const id of ['boundary','boundary-time','step','earlier','later','boundary-play','merge','merge-all'])$(id).disabled=locked||!hasBoundary;
-    $('boundary-time').value=hasBoundary?fmt(draft.parts[boundary].start):'00:00.000';$('undo').disabled=locked||!history.length;
+    $('boundary-time').value=hasBoundary?fmt(draft.parts[boundary].start):'00:00.000';$('undo').disabled=locked||(!history.length&&!hasBoundary);
     $('timeline').replaceChildren();
     draft.parts.forEach((p,i)=>{
       const b=document.createElement('button');b.type='button';b.className='segment-block'+(i===selected?' selected':'');b.style.width=(p.end-p.start)/draft.duration*100+'%';b.textContent=String(i+1);b.title=`${p.name} ${fmt(p.start)}–${fmt(p.end)}`;b.setAttribute('aria-label',b.title);b.setAttribute('aria-pressed',String(i===selected));b.disabled=locked;b.onclick=()=>{selected=i;render();};$('timeline').append(b);
@@ -144,7 +144,19 @@ export function createSegmentRecording(options) {
   }
   function action(id,fn){$(id).addEventListener('click',()=>Promise.resolve().then(fn).catch(e=>status(e.message)));}
   action('open',enter);action('whole',leave);action('split',()=>change(()=>{selected=splitSegment(draft,currentTime());boundary=selected;}));
-  action('undo',()=>{if(!history.length||busy())return;const old=draft,nextHistory=history.slice(0,-1);try{draft=structuredClone(history.at(-1));persist(nextHistory);history=nextHistory;invalidate();render();status('已復原上一次分界／版本調整。');}catch(e){draft=old;render();throw e;}});
+  action('undo',()=>{
+    if(busy()||conflict||!draft||(!history.length&&draft.parts.length===1))return;
+    const old=draft,hasHistory=history.length>0,nextHistory=history.slice(0,-1);
+    try{
+      draft=structuredClone(hasHistory?history.at(-1):draft);
+      // Older saved drafts may have boundaries but no undo history. Remove the
+      // last remaining boundary without adding an undo entry that would toggle it back.
+      const different=!hasHistory&&draft.parts.at(-2).takeId!==draft.parts.at(-1).takeId;
+      if(!hasHistory)mergeBoundary(draft,draft.parts.length-1);
+      persist(nextHistory);history=nextHistory;invalidate();render();
+      status(hasHistory?'已復原上一次分界／版本調整。':`已移除最後一道分界，剩 ${draft.parts.length} 段。原始錄音保留。${different?'合併的兩段使用不同版本，請重新挑選演唱版本。':''}`);
+    }catch(e){draft=old;render();throw e;}
+  });
   action('merge-all',()=>change(()=>{while(draft.parts.length>1)mergeBoundary(draft,1);selected=0;}));
   action('save',()=>{persist();status('草稿已保存於目前瀏覽器；各次演唱錄音沿用歌曲庫保存。');});action('refresh',refresh);
   action('earlier',()=>change(()=>moveBoundary(draft,boundary,draft.parts[boundary].start-Number($('step').value))));action('later',()=>change(()=>moveBoundary(draft,boundary,draft.parts[boundary].start+Number($('step').value))));
