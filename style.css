@@ -154,10 +154,11 @@ header{gap:18px;flex-wrap:wrap}
 
 .layout>#recording-post,.layout>.score-card{margin:0}
 
-/* Segmented singing: video and capture on the left, choices and composition on the right. */
+/* Segmented singing: full-width player above equal capture and composition columns. */
 .layout.segment-layout{grid-template-columns:repeat(2,minmax(0,1fr))}
-.layout.segment-layout>#player-section{grid-column:1;grid-row:1;align-self:start}
-.layout.segment-layout>#segment-side{grid-column:2;grid-row:1;align-self:start;margin:0;padding:24px}
+.layout.segment-layout>#player-section{grid-column:1/-1;grid-row:1;align-self:start}
+.layout.segment-layout>#segment-section{grid-column:1;grid-row:2;align-self:start;margin:0;padding:24px}
+.layout.segment-layout>#segment-side{grid-column:2;grid-row:2;align-self:start;margin:0;padding:24px}
 .layout.segment-layout>#voice-section{display:none}
 #segment-side[hidden]{display:none}
 #segment-player-tools[hidden],#segment-take-audio[hidden]{display:none}
@@ -169,8 +170,8 @@ header{gap:18px;flex-wrap:wrap}
 .segment-active>.section-top,.segment-active>#song-form,.segment-active>#player-status,
 .segment-active #score-section>.score-title,.segment-active #score-section>.score-actions,.segment-active .whole-guide-control{display:none}
 .segment-active .player-session{border:0;margin-top:8px;padding:0}
-.segment-active .video-shell{aspect-ratio:16/9;min-height:0;max-height:none}
-.segment-active #segment-section{margin-top:12px;padding-top:12px}
+.segment-active .video-shell{aspect-ratio:16/9;min-height:0;max-height:none;max-width:none}
+.segment-active .clock-row{max-width:none}
 #segment-side .preview-source{font-size:15px;line-height:1.6}
 #segment-side details:first-of-type{margin-top:0}
 #segment-output-panel{--accent:#d6afff;--soft:#d4c4e5;--text:#f6edff;--button-text:#29163c;--input-bg:#241b30;--input-border:#756086;--secondary-border:#9c7ebb;margin-top:22px;padding:16px;border:1px solid #9273ae;border-left:4px solid var(--accent);border-radius:12px;background:#302239;color:var(--soft)}
@@ -179,7 +180,7 @@ header{gap:18px;flex-wrap:wrap}
 #segment-output-panel input[type=checkbox]{accent-color:var(--accent)}
 #segment-output-panel .segment-clear{margin-top:20px;padding-top:16px;border-top:1px solid var(--input-border)}
 #segment-delete-song-takes{width:100%;white-space:normal;border-color:#d99da9;color:#ffd1db}
-@media(max-width:760px){.layout.segment-layout{grid-template-columns:minmax(0,1fr)}.layout.segment-layout>#segment-side{grid-column:1;grid-row:2}}
+@media(max-width:760px){.layout.segment-layout{grid-template-columns:minmax(0,1fr)}.layout.segment-layout>#segment-side{grid-column:1;grid-row:3}}
 
 #voice-output{min-width:0;border:1px solid var(--line);border-radius:10px;padding:14px;margin:18px 0}
 #voice-output legend{color:var(--accent);font-size:14px}

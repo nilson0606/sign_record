@@ -4,6 +4,7 @@ import {recordingSceneDefaultsVersion} from './recording-scenes.mjs';
 
 export function createSegmentRecording(options) {
   const $=id=>document.getElementById('segment-'+id),store=options.recording.store;
+  const sectionHome=document.createComment('segment controls home');$('section').before(sectionHome);
   let enabled=false,draft=null,key=null,rows=[],selected=0,boundary=1,history=[],savedText=null;
   let work=false,capture=null,serial=0,loading=0,ending=Promise.resolve(),loop=false,previewEnd=null,audioEnd=null,trial=null,trialURL=null,conflict=false;
   let takeURL=null,takeRequest=0,takeLoading=false,takeSourceId=null,takeMode='mix';
@@ -126,6 +127,10 @@ export function createSegmentRecording(options) {
     $('status').hidden=enabled;
     const playerSection=document.getElementById('player-section');
     playerSection.classList.toggle('segment-active',enabled);playerSection.parentElement.classList.toggle('segment-layout',enabled);$('side').hidden=$('player-tools').hidden=!enabled;
+    // Move controls only; reparenting the YouTube iframe would interrupt playback.
+    if(enabled&&$('section').parentElement===playerSection)playerSection.after($('section'));
+    else if(!enabled&&$('section').parentElement!==playerSection)sectionHome.after($('section'));
+    $('section').classList.toggle('card',enabled);
     for(const panel of [$('tools'),$('side')])for(const node of panel.querySelectorAll('button,input,select'))node.disabled=locked||!draft;
     $('stop').disabled=$('stop-player').disabled=!capture;$('download').disabled=locked||!trial;$('export').disabled=locked||!trial||!!trial.saved;
     $('delete-song-takes').disabled=locked||!draft||!songTakes().length;
