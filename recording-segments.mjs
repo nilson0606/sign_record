@@ -1,4 +1,20 @@
+import {detectPitch} from './audio.mjs';
+import {mixSettings} from './recording-mix.mjs';
 // Non-destructive edit decisions use song seconds; source files are never changed.
+export async function segmentMixMetadata(raw,meta,balance) {
+  // Old segment takes did not collect pitch samples. Analyze only for gain gating;
+  // this never creates a score or changes the saved source recording.
+  const samples=[],data=raw.getChannelData(0),rate=raw.sampleRate,size=Math.round(rate*.128),window=new Float32Array(size);
+  for(let i=0;i<raw.length;i+=Math.round(rate*.1)){
+    window.fill(0);const start=i-Math.floor(size/2),from=Math.max(0,start),end=Math.min(data.length,start+size);
+    window.set(data.subarray(from,end),from-start);
+    samples.push({offset:i/rate,hz:detectPitch(window,rate).hz});
+    if(samples.length%50===0)await new Promise(resolve=>setTimeout(resolve,0));
+  }
+  const result={...meta,balance:mixSettings(balance),post:{...meta.post,samples}};
+  delete result.fixedMixGains;
+  return result;
+}
 export function segmentDraft(reference) {
   const duration=reference.duration;
   if(!Number.isFinite(duration)||duration<=0||duration>1800)throw Error('分段錄音支援 30 分鐘內的歌曲。');

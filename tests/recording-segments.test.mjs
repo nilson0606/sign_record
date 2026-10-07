@@ -1,10 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {segmentDraft,splitSegment,moveBoundary,mergeBoundary,validateSegmentDraft,normalizeSegmentNames,parseSegmentTime,formatSegmentTime,missingSegmentRanges,composeSegmentVoice} from '../recording-segments.mjs';
+import {segmentDraft,splitSegment,moveBoundary,mergeBoundary,validateSegmentDraft,normalizeSegmentNames,parseSegmentTime,formatSegmentTime,missingSegmentRanges,composeSegmentVoice,segmentMixMetadata} from '../recording-segments.mjs';
 
 globalThis.AudioBuffer=class{constructor({length,sampleRate,numberOfChannels}){Object.assign(this,{length,sampleRate,numberOfChannels,duration:length/sampleRate});this.channels=Array.from({length:numberOfChannels},()=>new Float32Array(length));}getChannelData(c){return this.channels[c];}};
 const ref={cacheId:'fixture',duration:4};
 const draft=()=>segmentDraft(ref);
+
+test('legacy takes gain voiced/silent mix gating without altering source or score metadata',async()=>{
+ const raw=new AudioBuffer({length:48000,sampleRate:48000,numberOfChannels:1}),data=raw.getChannelData(0);
+ for(let i=0;i<24000;i++)data[i]=.12*Math.sin(2*Math.PI*220*i/48000);
+ const before=data.slice(),meta={fixedMixGains:{version:1,voice:1,backing:1},post:{segments:[{offset:0,songTime:4,duration:1}],samples:[],scoring:{}}},snapshot=structuredClone(meta);
+ const out=await segmentMixMetadata(raw,meta,{manual:true,voice:70,backing:30});
+ assert.deepEqual(meta,snapshot);assert.deepEqual(data,before);assert.equal(out.fixedMixGains,undefined);
+ assert.deepEqual(out.balance,{manual:true,voice:70,backing:30});assert.deepEqual(out.post.scoring,{});assert.deepEqual(out.post.segments,meta.post.segments);
+ assert.ok(out.post.samples.filter(s=>s.offset<.4).every(s=>Math.abs(s.hz-220)<2));
+ assert.ok(out.post.samples.filter(s=>s.offset>.7).every(s=>s.hz===null));
+});
 test('default names follow order after splits and merges while custom names survive',()=>{
  const d=draft();splitSegment(d,2);splitSegment(d,1);splitSegment(d,3);
  assert.deepEqual(d.parts.map(p=>p.name),['第 1 段','第 2 段','第 3 段','第 4 段']);

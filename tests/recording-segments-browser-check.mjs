@@ -41,6 +41,19 @@ try{
   });
   const {BrowserRecordingStore}=await import('/recording-store.mjs');window.fixtureStore=new BrowserRecordingStore();
   window.hash=async blob=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer()))).join(',');
+  window.expectedWhole=async(row,mode)=>{
+   const {remixRecording}=await import('/recording-process.mjs'),c=new AudioContext({sampleRate:48000,sinkId:{type:'none'}});
+   try{
+    const raw=await c.decodeAudioData(await(await fixtureStore.blob(row,'voice')).arrayBuffer()),tracks=[];
+    if(mode==='mix')tracks.push(await c.decodeAudioData(await(await fetch('http://127.0.0.1:4274/library/segment-fixture/accompaniment')).arrayBuffer()));
+    const samples=row.segmentComposition?row.post.samples:Array.from({length:Math.ceil(raw.duration/.1)},(_,i)=>({offset:i*.1,hz:443.27}));
+    const meta={...row,mode,balance:JSON.parse(localStorage.getItem('karaoke.recording-balance.v1')||'{"manual":false,"voice":70,"backing":30}'),post:{...row.post,samples},postEdit:{version:1,start:0,end:row.segmentComposition?row.seconds:raw.duration,fadeIn:0,fadeOut:0}};
+    delete meta.fixedMixGains;delete meta.segmentTake;delete meta.segmentComposition;
+    return await remixRecording(raw,tracks,meta,200);
+   }finally{await c.close();}
+  };
+  window.audioError=(a,b)=>{let error=0;for(let i=100;i<Math.min(a.length,b.length)-15000;i++)error=Math.max(error,Math.abs(a[i]-b[i]));return error;};
+
  });
  await page.locator('#url').fill('https://www.youtube.com/watch?v=M7lc1UVf-VE');await page.locator('#prepare-song').click();await page.waitForFunction(()=>!document.getElementById('sing-start').disabled);
  }
@@ -105,8 +118,8 @@ try{
  await $('segment-listen-selected').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);
  const takeAlignment=await page.evaluate(async row=>{
    const c=new AudioContext({sinkId:{type:'none'}}),voice=await c.decodeAudioData(await(await fetch(document.getElementById('segment-take-audio').src)).arrayBuffer()),raw=await c.decodeAudioData(await(await fixtureStore.blob(row,'voice')).arrayBuffer());
-   const v=voice.getChannelData(0),m=previewMixBuffer.getChannelData(0),r=raw.getChannelData(0),rate=voice.sampleRate;let delayError=0,backError=0,backEnergy=0;
-   for(let i=100;i<v.length-10000;i++){const t=i/rate,s=row.post.segments.find(s=>t>=s.offset&&t<s.offset+s.duration),b=s?s.songTime+t-s.offset:0,expected=s&&b<8 ? .06*Math.sin(2*Math.PI*660.37*b) : 0;delayError=Math.max(delayError,Math.abs(v[i]-r[i+Math.round(.2*rate)]));backError=Math.max(backError,Math.abs(m[i]-v[i]-expected));backEnergy+=Math.abs(m[i]-v[i]);}
+   const v=voice.getChannelData(0),m=previewMixBuffer.getChannelData(0),expectedVoice=await expectedWhole(row,'voice'),expectedMix=await expectedWhole(row,'mix');
+   const delayError=audioError(v,expectedVoice.getChannelData(0)),backError=audioError(m,expectedMix.getChannelData(0)),backEnergy=m.reduce((sum,n,i)=>sum+Math.abs(n-v[i]),0);
    await c.close();return {delayError,backError,backEnergy,length:voice.length,mixLength:previewMixBuffer.length,rawLength:raw.length};
  },first);
  assert.ok(takeAlignment.delayError<.00012,JSON.stringify(takeAlignment));assert.ok(takeAlignment.backError<.012,JSON.stringify(takeAlignment));assert.ok(takeAlignment.backEnergy>100);assert.equal(takeAlignment.length,takeAlignment.rawLength);assert.equal(takeAlignment.mixLength,takeAlignment.length);
@@ -126,7 +139,7 @@ try{
  assert.equal(await page.evaluate(()=>fixturePlayer.isMuted()),true,'restore previously muted player');await page.evaluate(()=>fixturePlayer.unMute());
  // A later section uses its saved song position, not accompaniment from time zero.
  await $('segment-take-mode-selected').selectOption('mix');await $('segment-listen-selected').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);
- const laterTake=await page.evaluate(async()=>{const id=document.getElementById('segment-take').value,row=(await fixtureStore.list()).find(r=>r.id===id),c=new AudioContext({sinkId:{type:'none'}}),mix=await c.decodeAudioData(await(await fetch(document.getElementById('segment-take-audio').src)).arrayBuffer()),raw=await c.decodeAudioData(await(await fixtureStore.blob(row,'voice')).arrayBuffer()),m=mix.getChannelData(0),v=raw.getChannelData(0);let error=0;for(let i=100;i<m.length-10000;i++){const t=i/mix.sampleRate,s=row.post.segments.find(s=>t>=s.offset&&t<s.offset+s.duration),expected=s ? .06*Math.sin(2*Math.PI*660.37*(s.songTime+t-s.offset)) : 0;error=Math.max(error,Math.abs(m[i]-v[i+9600]-expected));}await c.close();return {start:row.post.segments[0].songTime,error};});assert.ok(laterTake.start>.8);assert.ok(laterTake.error<.012,JSON.stringify(laterTake));
+ const laterTake=await page.evaluate(async()=>{const id=document.getElementById('segment-take').value,row=(await fixtureStore.list()).find(r=>r.id===id),c=new AudioContext({sinkId:{type:'none'}}),mix=await c.decodeAudioData(await(await fetch(document.getElementById('segment-take-audio').src)).arrayBuffer()),expected=await expectedWhole(row,'mix');await c.close();return {start:row.post.segments[0].songTime,error:audioError(mix.getChannelData(0),expected.getChannelData(0))};});assert.ok(laterTake.start>.8);assert.ok(laterTake.error<.00012,JSON.stringify(laterTake));
  assert.equal(await page.evaluate(()=>localStorage.getItem('karaoke.scores.v1')),beforeScore,'segment mode never writes whole-song scores');
  assert.match(await $('segment-coverage').textContent(),/所有段落/);
  // Default mix uses +200 once, has exact song length, and saves clean source for post.
@@ -145,10 +158,34 @@ try{
  const voice=(await page.evaluate(()=>fixtureStore.list())).find(r=>r.segmentComposition&&r.mode==='voice');assert.ok(voice);assert.equal(voice.appliedDelayMs,200);assert.deepEqual(voice.stems,[]);
  const alignment=await page.evaluate(async({voice,mix})=>{
   const c=new AudioContext({sampleRate:48000,sinkId:{type:'none'}}),decode=async(r,track)=>c.decodeAudioData(await(await fixtureStore.blob(r,track)).arrayBuffer());
-  const v=await decode(voice),m=await decode(mix),raw=await decode(voice,'voice'),a=v.getChannelData(0),b=m.getChannelData(0),r=raw.getChannelData(0);let delayError=0,backError=0;
-  for(let i=100;i<a.length-10000;i++){delayError=Math.max(delayError,Math.abs(a[i]-r[i+9600]));backError=Math.max(backError,Math.abs(b[i]-a[i]-.06*Math.sin(2*Math.PI*660.37*i/48000)));}
+  const v=await decode(voice),m=await decode(mix),expectedVoice=await expectedWhole(voice,'voice'),expectedMix=await expectedWhole(mix,'mix');
+  const delayError=audioError(v.getChannelData(0),expectedVoice.getChannelData(0)),backError=audioError(m.getChannelData(0),expectedMix.getChannelData(0));
   await c.close();return {delayError,backError};
  },{voice,mix});assert.ok(alignment.delayError<.00012,JSON.stringify(alignment));assert.ok(alignment.backError<.00012,JSON.stringify(alignment));
+ // Manual mute, actual signal energy, shared controls and saved composition settings.
+ assert.equal(mix.fixedMixGains,undefined);assert.deepEqual(mix.balance,{manual:false,voice:70,backing:30});assert.ok(mix.post.samples.some(s=>s.hz>0));
+ await $('segment-balance-panel').locator('summary').click();await $('segment-manual').check();
+ async function level(id,value){await $(id).fill(String(value));await $(id).dispatchEvent('input');}
+ await level('segment-voice-level',0);await level('segment-backing-level',0);
+ assert.equal(await $('recording-manual').isChecked(),true);assert.equal(await $('recording-voice-level').inputValue(),'0');
+ assert.equal(await $('segment-export').isDisabled(),true);assert.equal(await $('segment-audio').isHidden(),true);
+ await $('segment-take-mode-selected').selectOption('mix');await $('segment-listen-selected').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);
+ const muted=await page.evaluate(async()=>{const c=new AudioContext({sinkId:{type:'none'}}),b=await c.decodeAudioData(await(await fetch(document.getElementById('segment-take-audio').src)).arrayBuffer());await c.close();return b.getChannelData(0).every(x=>x===0);});assert.equal(muted,true,'zero controls really mute both preview tracks');
+ await level('segment-backing-level',30);
+ await $('segment-listen-selected').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);
+ const isolatedBacking=await page.evaluate(async()=>{const c=new AudioContext({sinkId:{type:'none'}}),b=await c.decodeAudioData(await(await fetch(document.getElementById('segment-take-audio').src)).arrayBuffer()),x=b.getChannelData(0),power=hz=>{let re=0,im=0;for(let i=48000;i<144000;i++){re+=x[i]*Math.cos(2*Math.PI*hz*i/b.sampleRate);im+=x[i]*Math.sin(2*Math.PI*hz*i/b.sampleRate);}return Math.hypot(re,im);};const result={voice:power(443.27),backing:power(660.37)};await c.close();return result;});assert.ok(isolatedBacking.backing>isolatedBacking.voice*100,JSON.stringify(isolatedBacking));
+ await level('segment-voice-level',70);await level('segment-backing-level',30);
+ await mkdir('test-results',{recursive:true});await $('segment-side').screenshot({path:'test-results/segment-balance-panel.png'});
+ await page.setViewportSize({width:390,height:844});assert.ok(await $('segment-side').evaluate(el=>el.scrollWidth<=el.clientWidth+1));await page.setViewportSize({width:1440,height:1100});
+ await $('segment-output').selectOption('mix');await $('segment-compose').click();await page.waitForFunction(()=>!document.getElementById('segment-export').disabled);
+ const manualEnergy=await page.evaluate(async()=>{const c=new AudioContext({sinkId:{type:'none'}}),b=await c.decodeAudioData(await(await fetch(document.getElementById('segment-audio').src)).arrayBuffer());await c.close();return Math.sqrt(b.getChannelData(0).reduce((s,x)=>s+x*x,0)/b.length);});assert.ok(manualEnergy>.03&&manualEnergy<.2,manualEnergy);
+ await $('segment-export').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('已存到錄音後處理'));
+ const manualSaved=(await page.evaluate(()=>fixtureStore.list())).find(r=>r.segmentComposition&&r.balance?.manual);assert.deepEqual(manualSaved.balance,{manual:true,voice:70,backing:30});assert.equal(manualSaved.fixedMixGains,undefined);
+ assert.equal(await page.evaluate(async row=>hash(await fixtureStore.blob(row,'voice')),first),firstHash);
+ await page.reload();await initialize();await $('segment-open').click();assert.equal(await $('segment-manual').isChecked(),true);assert.equal(await $('segment-voice-level').inputValue(),'70');assert.equal(await $('segment-backing-level').inputValue(),'30');
+ await $('segment-balance-panel').locator('summary').click();await $('segment-manual').uncheck();
+ assert.equal(await $('recording-manual').isChecked(),false);await $('segment-output').selectOption('voice');
+ await $('segment-boundary-panel').locator('summary').click();
  // A moved cut beyond a take's handles is rejected until explicitly allowing gaps.
  await $('segment-boundary-time').fill('00:00.200');await $('segment-boundary-time').dispatchEvent('change');await $('segment-compose').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('尚未完整涵蓋'));assert.equal(await $('segment-export').isDisabled(),true);await $('segment-undo').click();
  await $('segment-part').selectOption('0');await $('segment-join').click();await page.waitForFunction(()=>!document.getElementById('segment-export').disabled);await page.evaluate(()=>{const a=document.getElementById('segment-audio');a.currentTime=7.1;a.dispatchEvent(new Event('timeupdate'));});assert.equal(await $('segment-audio').evaluate(el=>el.paused),true,'join audition stops after the selected interval');

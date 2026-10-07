@@ -102,6 +102,12 @@
     <aside id="segment-side" class="card segment-section" aria-labelledby="segment-side-heading" hidden>
           <div class="section-top"><h2 id="segment-side-heading">挑選版本與試合</h2><span class="badge">分段成品</span></div>
           <p id="segment-selected-summary" class="preview-source" aria-live="polite"></p>
+          <details id="segment-balance-panel"><summary>人聲／伴樂音量平衡 · 與從頭開始唱共用</summary>
+          <label class="check-option"><input id="segment-manual" type="checkbox">手動設定比例＋自動微調</label>
+          <p id="segment-balance-help" class="help"></p>
+          <div class="recording-levels"><div><label for="segment-voice-level">歌唱者音量 <output id="segment-voice-value">70%</output></label><input id="segment-voice-level" type="range" min="0" max="100" value="70" disabled></div><div><label for="segment-backing-level">配樂／和音音量 <output id="segment-backing-value">30%</output></label><input id="segment-backing-level" type="range" min="0" max="100" value="30" disabled></div></div>
+          <p class="help">套用目前設定至單段試聽與完整試合；調整後請重新試聽或試合。設定會記住，原始人聲保留；不改變錄音時的帶唱音量。</p>
+          </details>
           <details id="segment-versions-panel" open><summary>挑選本段演唱版本</summary>
           <div class="button-row"><button id="segment-refresh" type="button" class="secondary">重新讀取錄音版本</button><button id="segment-save" type="button" class="secondary">保存草稿</button></div>
           <label for="segment-take">本段採用的演唱版本</label><select id="segment-take"></select>

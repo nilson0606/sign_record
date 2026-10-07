@@ -17,6 +17,13 @@ export function createSingerRecorder(options) {
     $('recording-manual').checked = saved.manual; $('recording-voice-level').value = saved.voice; $('recording-backing-level').value = saved.backing;
   } catch {}
   function balanceSettings() { return mixSettings({manual:$('recording-manual').checked,voice:Number($('recording-voice-level').value),backing:Number($('recording-backing-level').value)}); }
+  function setBalanceSettings(value) {
+    if(active)return;
+    const settings=mixSettings(value);
+    $('recording-manual').checked=settings.manual;$('recording-voice-level').value=settings.voice;$('recording-backing-level').value=settings.backing;
+    controls();try{localStorage.setItem('karaoke.recording-balance.v1',JSON.stringify(settings));}catch{}
+    window.dispatchEvent(new Event('recording-balance-changed'));
+  }
   const post = createRecordingPost({store, stop:()=>stop(), reference:options.reference, pause:()=>{options.pausePlayer();$('recording-audio').pause();}, download, onDelete:async()=>{clearPreview();await render();}});
   const review=createRecordingReview({store,isRecording:()=>!!active,loadStem:options.loadStem,onChanged:render,pause:()=>{options.pausePlayer();post.clearAudio();$('recording-audio').pause();}});
   const status = text => { $('recording-status').textContent = text; };
@@ -238,11 +245,11 @@ export function createSingerRecorder(options) {
   $('recording-refresh').addEventListener('click',()=>render().catch(error=>status(error.message)));
   $('recording-mode').addEventListener('change',()=>{ controls(); try { localStorage.setItem('karaoke.recording-mode.v1',$('recording-mode').value); } catch {} status($('recording-mode').value === 'off' ? '不保存錄音；從頭開始唱只收音評分。' : '按「從頭開始唱」後自動錄製；停止收音、結算或播完時保存。'); });
   for(const id of ['recording-manual','recording-voice-level','recording-backing-level']) $(id).addEventListener('input',()=>{
-    controls(); try {localStorage.setItem('karaoke.recording-balance.v1',JSON.stringify(balanceSettings()));} catch {}
+    setBalanceSettings(balanceSettings());
     $('recording-balance-status').textContent = $('recording-manual').checked ? '下一輪使用手動比例＋自動微調；只影響錄音。' : '下一輪使用自動平衡；只影響錄音。';
   });
   controls();
   window.addEventListener('pagehide',()=>{stop();clearInterval(timer);clearPreview();});
   render().catch(error=>status('瀏覽器錄音儲存不可用：'+error.message));
-  return { prepare, stop, playerState, clearPreview, sample, referenceChanged:post.controls, store, refresh:render };
+  return { prepare, stop, playerState, clearPreview, sample, referenceChanged:post.controls, store, refresh:render, balanceSettings, setBalanceSettings };
 }

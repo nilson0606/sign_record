@@ -1,4 +1,4 @@
-import {segmentDraft,validateSegmentDraft,normalizeSegmentNames,splitSegment,moveBoundary,mergeBoundary,formatSegmentTime as fmt,parseSegmentTime,missingSegmentRanges,composeSegmentVoice} from './recording-segments.mjs';
+import {segmentDraft,validateSegmentDraft,normalizeSegmentNames,splitSegment,moveBoundary,mergeBoundary,formatSegmentTime as fmt,parseSegmentTime,missingSegmentRanges,composeSegmentVoice,segmentMixMetadata} from './recording-segments.mjs';
 import {remixRecording,wavBlob,delaySeconds} from './recording-process.mjs';
 import {recordingSceneDefaultsVersion} from './recording-scenes.mjs';
 
@@ -42,7 +42,7 @@ export function createSegmentRecording(options) {
     if(busy()||takeLoading||!enabled)return;
     const row=validRows().find(r=>r.id===part()?.takeId&&r.segmentTake);
     if(!row)throw Error('本段尚未選用錄音，請先錄這一段，或在右側挑選演唱版本。');
-    const mode=takeMode,delay=Number($('delay').value),ref=structuredClone(row.post.reference);delaySeconds(delay);
+    const mode=takeMode,delay=Number($('delay').value),ref=structuredClone(row.post.reference),balance=options.recording.balanceSettings();delaySeconds(delay);
     if(mode==='mix'&&!reference()?.hasPreview)throw Error('加入伴樂需要已保存的伴奏音軌，請先補建音軌，或改選「純人聲」。');
     clearTakePreview();loop=false;previewEnd=null;options.player()?.pauseVideo?.();options.pauseOther();$('audio').pause();
     const request=takeRequest,cancelled=()=>request!==takeRequest||!enabled||busy();takeSourceId=row.id;takeLoading=true;render();status(`正在準備本段試聽：${takeModeLabel()}…`);
@@ -66,7 +66,7 @@ export function createSegmentRecording(options) {
       }
       // Keep this take's recording-to-song map so accompaniment starts at the
       // recorded section, including any pauses; correction moves only the voice.
-      const meta={...row,mode,seconds:raw.duration,sourceSeconds:raw.duration,fixedMixGains:{version:1,voice:1,backing:1},postEdit:{version:1,start:0,end:raw.duration,fadeIn:0,fadeOut:0}};
+      const meta=await segmentMixMetadata(raw,{...row,mode,seconds:raw.duration,sourceSeconds:raw.duration,postEdit:{version:1,start:0,end:raw.duration,fadeIn:0,fadeOut:0}},balance);if(cancelled())return;
       const preview=wavBlob(await remixRecording(raw,tracks,meta,delay));if(cancelled())return;
       takeURL=URL.createObjectURL(preview);$('take-audio').src=takeURL;$('take-audio').hidden=false;
       await $('take-audio').play();
@@ -131,6 +131,9 @@ export function createSegmentRecording(options) {
     else if(!enabled&&$('section').parentElement!==playerSection)sectionHome.after($('section'));
     $('section').classList.toggle('card',enabled);
     for(const panel of [$('tools'),$('side'),$('transport')])for(const node of panel.querySelectorAll('button,input,select'))node.disabled=locked||!draft;
+    const balance=options.recording.balanceSettings();$('manual').checked=balance.manual;
+    for(const name of ['voice','backing']){$(name+'-level').value=balance[name];$(name+'-value').textContent=balance[name]+'%';$(name+'-level').disabled=locked||!draft||!balance.manual;}
+    $('balance-help').textContent=balance.manual?'手動比例＋自動微調：兩路各自最多修正 ±3 dB，0% 保持靜音。':'自動平衡：人聲 75%、伴樂 45% 為基準，各自最多修正 ±6 dB；下方手動數值不參與。';
     $('stop').disabled=!capture;$('download').disabled=locked||!trial;$('export').disabled=locked||!trial||!!trial.saved;
     $('delete-song-takes').disabled=locked||!draft||!songTakes().length;
     $('export').textContent=trial?.saved?'已存到錄音後處理':'存到錄音後處理';
@@ -241,7 +244,7 @@ export function createSegmentRecording(options) {
   function playerState(state){if(state===1){clearTakePreview();$('audio').pause();options.recording.clearPreview();render();}const c=capture;if(!c?.armed)return;if(state===0){stop().catch(e=>status(e.message));return;}options.recording.playerState(state,currentTime());if(state===1)syncMonitor(c,currentTime());else stopMonitor(c);}
   async function compose(join=false){
     if(busy()||!draft||!enabled)return;const delay=Number($('delay').value);delaySeconds(delay);persist();
-    const ref=structuredClone(reference()),plan=structuredClone(draft),mode=$('output').value,request=++serial;
+    const ref=structuredClone(reference()),plan=structuredClone(draft),mode=$('output').value,balance=options.recording.balanceSettings(),request=++serial;
     work=true;loop=false;previewEnd=null;options.player()?.pauseVideo?.();options.pauseOther();invalidate();render();options.changed();
     const decoder=new AudioContext({sampleRate:48000,sinkId:{type:'none'}});
     try{
@@ -252,7 +255,7 @@ export function createSegmentRecording(options) {
       if(!sources.size)throw Error('至少需錄好一段並選用錄音版本。');
       const raw=composeSegmentVoice(plan,sources,{sampleRate:decoder.sampleRate,delayMs:delay}),voice=wavBlob(raw),tracks=[],stems=[];
       if(mode==='mix'){if(!ref.hasPreview)throw Error('加入伴樂需要已保存的伴奏音軌。');stems.push('accompaniment');if(ref.vocalMode==='lead')stems.push('backing');for(const stem of stems){const b=await decoder.decodeAudioData(await options.loadStem(ref,stem));if(b.duration<plan.duration-.15)throw Error('伴樂長度不足，請補建完整音軌。');tracks.push(b);}}
-      const meta={id:crypto.randomUUID(),title:ref.title+' · 分段合成',videoId:ref.videoId,created:Date.now(),mime:'audio/wav',rawMime:'audio/wav',rawBytes:voice.size,mode,stems,seconds:plan.duration,sourceSeconds:plan.duration,complete:true,appliedDelayMs:delay,recordingDelayMs:delay,postDefaults:recordingSceneDefaultsVersion,fixedMixGains:{version:1,voice:1,backing:1},postEdit:{version:1,start:0,end:plan.duration,fadeIn:0,fadeOut:0},segmentComposition:{version:1,draft:plan,delayMs:delay,crossfadeSeconds:.012},post:{version:1,reference:ref,scoring:{},offsetMs:delay,segments:[{offset:0,songTime:0,duration:plan.duration}],samples:[]}};
+      const meta=await segmentMixMetadata(raw,{id:crypto.randomUUID(),title:ref.title+' · 分段合成',videoId:ref.videoId,created:Date.now(),mime:'audio/wav',rawMime:'audio/wav',rawBytes:voice.size,mode,stems,seconds:plan.duration,sourceSeconds:plan.duration,complete:true,appliedDelayMs:delay,recordingDelayMs:delay,postDefaults:recordingSceneDefaultsVersion,postEdit:{version:1,start:0,end:plan.duration,fadeIn:0,fadeOut:0},segmentComposition:{version:1,draft:plan,delayMs:delay,crossfadeSeconds:.012},post:{version:1,reference:ref,scoring:{},offsetMs:delay,segments:[{offset:0,songTime:0,duration:plan.duration}],samples:[]}},balance);if(request!==serial||key!==plan.key)return;
       const mix=wavBlob(await remixRecording(raw,tracks,meta,delay,{edit:meta.postEdit}));meta.bytes=mix.size;if(request!==serial||key!==plan.key)return;
       trial={meta,mix,voice};trialURL=URL.createObjectURL(mix);$('audio').src=trialURL;$('audio').hidden=false;$('audio').load();
       if(join){$('audio').currentTime=Math.max(0,part().start-3);audioEnd=Math.min(plan.duration,part().end+3);await $('audio').play();}
@@ -285,6 +288,11 @@ export function createSegmentRecording(options) {
   action('listen-selected',listenTake);
   action('delete-selected',deleteTake);
   action('delete-song-takes',deleteSongTakes);
+  for(const id of ['manual','voice-level','backing-level'])$(id).oninput=()=>{
+    if(busy()||conflict)return;
+    options.recording.setBalanceSettings({manual:$('manual').checked,voice:Number($('voice-level').value),backing:Number($('backing-level').value)});
+  };
+  window.addEventListener('recording-balance-changed',()=>{invalidate();render();if(enabled)status('音量平衡已記住，與「從頭開始唱」共用。請重新試聽或試合；原始錄音與已存成品保留。');});
   for(const id of takeModeIds)$(id).onchange=()=>{takeMode=$(id).value==='voice'?'voice':'mix';clearTakePreview();render();status(`已切換為${takeModeLabel()}，請按「試聽本段錄音」。`);};
   for(const id of guideModeIds)$(id).onchange=()=>{guideMode=$(id).value==='backing'?'backing':'original';render();status(guideMode==='backing'?'下次分段錄音只用伴樂／和音帶唱。':'下次分段錄音播放原唱＋伴樂帶唱。');};
   action('export',async()=>{if(!trial||trial.saved||busy())return;work=true;render();options.changed();try{await store.saveRemix(trial.meta,trial.mix,trial.voice);trial.saved=true;await options.recording.refresh(trial.meta.id);status('已存到錄音後處理，可繼續調整與 A/B 比較。分段素材仍保留在分段區。');}finally{work=false;render();options.changed();}});
