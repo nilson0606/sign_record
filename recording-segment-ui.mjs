@@ -7,7 +7,7 @@ export function createSegmentRecording(options) {
   let enabled=false,draft=null,key=null,rows=[],selected=0,boundary=1,history=[],savedText=null;
   let work=false,capture=null,serial=0,loading=0,ending=Promise.resolve(),loop=false,previewEnd=null,audioEnd=null,trial=null,trialURL=null,conflict=false;
   let takeURL=null,takeRequest=0,takeLoading=false,takeSourceId=null,takeMode='mix';
-  const takeModeIds=['take-mode','take-mode-player','take-mode-selected'];
+  const takeModeIds=['take-mode-player','take-mode-selected'];
   const takeModeLabel=()=>takeMode==='mix'?'人聲＋伴樂／和音':'純人聲';
   let guideMode='original';
   const guideModeIds=['guide-mode','guide-mode-player'];
@@ -123,6 +123,7 @@ export function createSegmentRecording(options) {
     const ref=reference(),locked=busy()||conflict;
     $('open').disabled=!ref||busy();$('open').hidden=enabled;$('whole').hidden=!enabled;$('whole').disabled=busy();$('tools').hidden=!enabled;
     $('mode-label').textContent=enabled?'分段模式 · 不計整首分數':'整首評分模式';
+    $('status').hidden=enabled;
     const playerSection=document.getElementById('player-section');
     playerSection.classList.toggle('segment-active',enabled);playerSection.parentElement.classList.toggle('segment-layout',enabled);$('side').hidden=$('player-tools').hidden=!enabled;
     for(const panel of [$('tools'),$('side')])for(const node of panel.querySelectorAll('button,input,select'))node.disabled=locked||!draft;
@@ -132,8 +133,8 @@ export function createSegmentRecording(options) {
     if(draft){selected=Math.max(0,Math.min(selected,draft.parts.length-1));boundary=Math.max(1,Math.min(boundary,draft.parts.length-1));}
     if(takeSourceId&&takeSourceId!==part()?.takeId)clearTakePreview();
     const take=validRows().find(r=>r.id===part()?.takeId&&r.segmentTake);
-    for(const id of ['listen','listen-player','listen-selected'])$(id).disabled=locked||takeLoading||!take;
-    for(const id of ['delete','delete-player','delete-selected'])$(id).disabled=locked||!take;
+    for(const id of ['listen-player','listen-selected'])$(id).disabled=locked||takeLoading||!take;
+    for(const id of ['delete-player','delete-selected'])$(id).disabled=locked||!take;
     for(const id of takeModeIds){$(id).value=takeMode;$(id).disabled=locked||!draft;}
     for(const id of guideModeIds){$(id).value=guideMode;$(id).disabled=locked||!draft;}
     $('take-info').textContent=take?`本段錄音：${takeName(take)} · ${new Date(take.created).toLocaleTimeString()} · ${takeModeLabel()} · 歌聲校正 ${$('delay').value} ms（含起唱與尾音餘量）`:'本段尚未選用錄音；錄完保存後即可試聽，也可在右側挑選已錄版本。';
@@ -277,8 +278,8 @@ export function createSegmentRecording(options) {
   action('loop',async()=>{loop=!loop;previewEnd=null;render();if(loop){$('audio').pause();await seek(part().start);options.player().playVideo();}else options.player()?.pauseVideo?.();});
   action('record',record);action('stop',()=>stop());action('compose',()=>compose());action('join',()=>compose(true));
   action('stop-player',()=>stop());
-  for(const id of ['listen','listen-player','listen-selected'])action(id,listenTake);
-  for(const id of ['delete','delete-player','delete-selected'])action(id,deleteTake);
+  for(const id of ['listen-player','listen-selected'])action(id,listenTake);
+  for(const id of ['delete-player','delete-selected'])action(id,deleteTake);
   action('delete-song-takes',deleteSongTakes);
   for(const id of takeModeIds)$(id).onchange=()=>{takeMode=$(id).value==='voice'?'voice':'mix';clearTakePreview();render();status(`已切換為${takeModeLabel()}，請按「試聽本段錄音」。`);};
   for(const id of guideModeIds)$(id).onchange=()=>{guideMode=$(id).value==='backing'?'backing':'original';render();status(guideMode==='backing'?'下次分段錄音只用伴樂／和音帶唱。':'下次分段錄音播放原唱＋伴樂帶唱。');};

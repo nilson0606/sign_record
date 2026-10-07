@@ -57,7 +57,7 @@
         <div class="button-row"><button id="segment-stop-player" type="button" class="secondary" disabled>停止／保存本段</button><button id="segment-listen-player" type="button" disabled>試聽本段錄音</button><button id="segment-delete-player" type="button" class="secondary" disabled>刪除此版錄音</button></div>
         <p id="segment-take-info" class="help"></p>
         <audio id="segment-take-audio" controls hidden aria-label="本段錄音試聽"></audio>
-        <p id="segment-player-status" class="status"></p>
+        <p id="segment-player-status" class="status" role="status"></p>
       </div>
       <section id="score-section" class="player-session" tabindex="-1" aria-label="演唱控制與分數">
     <p id="result-title" class="score-title">尚未選定歌曲</p>
@@ -101,9 +101,6 @@
           </details>
           <label for="segment-guide-mode">錄音時帶唱</label><select id="segment-guide-mode"><option value="original" selected>原唱＋伴樂（預設）</option><option value="backing">只有伴樂／和音</option></select>
           <div class="button-row"><button id="segment-loop" type="button" class="secondary" aria-pressed="false">循環練唱本段</button><button id="segment-record" type="button">錄這一段</button><button id="segment-stop" type="button" class="secondary" disabled>停止／保存本段</button></div>
-          <label for="segment-take-mode">試聽內容</label><select id="segment-take-mode"><option value="mix" selected>人聲＋伴樂／和音</option><option value="voice">純人聲</option></select>
-          <div class="button-row"><button id="segment-listen" type="button" class="secondary" disabled>試聽本段錄音</button><button id="segment-delete" type="button" class="secondary" disabled>刪除此版錄音</button></div>
-          <p class="help">預設跟影片播放原唱＋伴樂，可改成只有伴樂／和音帶唱。錄音只收你的人聲；請戴耳機，避免原唱漏進麥克風。每次錄製都獨立保存。</p>
         </div>
         <p id="segment-status" class="status" role="status">載入歌曲後，可開啟分段模式。</p>
       </section>

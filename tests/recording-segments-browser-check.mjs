@@ -48,9 +48,9 @@ try{
  await $('segment-open').click();assert.equal(await $('segment-delay').inputValue(),'200');
  for(const id of ['segment-guide-mode','segment-guide-mode-player','sing-guide-mode'])assert.equal(await $(id).inputValue(),'original');
  assert.equal(await $('sing-guide-mode').isHidden(),true);
- for(const id of ['segment-take-mode','segment-take-mode-player','segment-take-mode-selected'])assert.equal(await $(id).inputValue(),'mix');
+ for(const id of ['segment-take-mode-player','segment-take-mode-selected'])assert.equal(await $(id).inputValue(),'mix');
  assert.equal(await $('sing-start').isHidden(),true);assert.equal(await $('segment-side').isVisible(),true);
- assert.equal(await $('voice-section').isHidden(),true);assert.equal(await $('segment-player-tools').isVisible(),true);assert.equal(await $('segment-listen').isDisabled(),true);
+ assert.equal(await $('voice-section').isHidden(),true);assert.equal(await $('segment-player-tools').isVisible(),true);assert.equal(await $('segment-listen-player').isDisabled(),true);
  const layout=await page.evaluate(()=>{const rect=id=>document.getElementById(id).getBoundingClientRect(),left=rect('player-section'),right=rect('segment-side'),video=document.querySelector('#player-section .video-shell').getBoundingClientRect(),controls=rect('segment-section');return{equal:Math.abs(left.width-right.width)<1,aligned:Math.abs(left.top-right.top)<1,right:right.left>=left.right,videoAbove:video.bottom<=controls.top};});assert.deepEqual(layout,{equal:true,aligned:true,right:true,videoAbove:true});
  // Every split can be undone to one section, including after a page reload.
  for(const t of [1,2,4,6]){await page.evaluate(t=>fixturePlayer.seekTo(t),t);await $('segment-split').click();}
@@ -96,11 +96,11 @@ try{
  assert.equal(await $('post-recording').locator('option').count(),0,'single segments stay outside post processing');assert.equal(await $('recording-list').locator('button').count(),0);
  const firstHash=await page.evaluate(async row=>hash(await fixtureStore.blob(row,'voice')),first);
  // A single recorded take is immediately playable even while another section is unrecorded.
- await $('segment-listen').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);
+ await $('segment-listen-player').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);
  assert.equal(await page.evaluate(()=>fixturePlayer.getPlayerState()),2);
  await page.evaluate(async()=>{const c=new AudioContext({sinkId:{type:'none'}});window.previewMixBuffer=await c.decodeAudioData(await(await fetch(document.getElementById('segment-take-audio').src)).arrayBuffer());await c.close();});
  await $('segment-take-mode-selected').selectOption('voice');assert.equal(await $('segment-take-audio').isHidden(),true);
- for(const id of ['segment-take-mode','segment-take-mode-player','segment-take-mode-selected'])assert.equal(await $(id).inputValue(),'voice');
+ for(const id of ['segment-take-mode-player','segment-take-mode-selected'])assert.equal(await $(id).inputValue(),'voice');
  await $('segment-listen-selected').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);
  const takeAlignment=await page.evaluate(async row=>{
    const c=new AudioContext({sinkId:{type:'none'}}),voice=await c.decodeAudioData(await(await fetch(document.getElementById('segment-take-audio').src)).arrayBuffer()),raw=await c.decodeAudioData(await(await fixtureStore.blob(row,'voice')).arrayBuffer());
@@ -115,7 +115,7 @@ try{
  await page.evaluate(async()=>{const {BrowserRecordingStore}=await import('/recording-store.mjs');window.originalBlob=BrowserRecordingStore.prototype.blob;BrowserRecordingStore.prototype.blob=async function(...args){await new Promise(resolve=>window.releaseTakeRead=resolve);return originalBlob.apply(this,args);};});
  await $('segment-listen-player').click();await page.waitForFunction(()=>!!window.releaseTakeRead);await $('segment-part').selectOption('1');
  await page.evaluate(async()=>{const {BrowserRecordingStore}=await import('/recording-store.mjs');BrowserRecordingStore.prototype.blob=originalBlob;releaseTakeRead();});
- await page.waitForTimeout(100);assert.equal(await $('segment-take-audio').isHidden(),true);assert.equal(await $('segment-listen').isDisabled(),true);
+ await page.waitForTimeout(100);assert.equal(await $('segment-take-audio').isHidden(),true);assert.equal(await $('segment-listen-player').isDisabled(),true);
  await $('segment-guide-mode').selectOption('original');assert.equal(await $('segment-guide-mode-player').inputValue(),'original');
  const segmentGuideStarts=await page.evaluate(()=>guideEvents.filter(e=>e.action==='start').length);
  await page.evaluate(()=>fixturePlayer.mute());
@@ -184,7 +184,7 @@ try{
  page.once('dialog',d=>d.accept());await $('segment-delete-selected').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('fixture delete failure'));assert.equal(await $('segment-take').inputValue(),duplicate.id);
  await page.evaluate(async()=>{const {RecordingStore}=await import('/recording-store.mjs');RecordingStore.prototype.delete=originalDelete;});
  page.once('dialog',d=>d.accept());await $('segment-delete-player').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.startsWith('已刪除此版錄音'));
- assert.ok(!(await page.evaluate(()=>fixtureStore.list())).some(r=>r.id===duplicate.id));assert.equal(await $('segment-listen').isDisabled(),true);
+ assert.ok(!(await page.evaluate(()=>fixtureStore.list())).some(r=>r.id===duplicate.id));assert.equal(await $('segment-listen-player').isDisabled(),true);
  await $('segment-undo').click();assert.ok(await page.evaluate(id=>{const d=JSON.parse(localStorage.getItem('karaoke.segment-draft.v1.segment-fixture'));return [d,...d.undoHistory].every(p=>p.parts.every(s=>s.takeId!==id));},duplicate.id),'undo cannot revive deleted source choices');
  assert.equal(await page.evaluate(async row=>hash(await fixtureStore.blob(row,'voice')),first),firstHash);
  assert.ok((await page.evaluate(()=>fixtureStore.list())).some(r=>r.id===mix.id),'saved composition survives source deletion');
