@@ -165,10 +165,20 @@ try{
  await $('segment-merge-all').click();assert.equal(await $('segment-part').locator('option').count(),1);
  await $('segment-undo').click();assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('karaoke.segment-draft.v1.segment-fixture')).parts),savedParts,'undo restores all take selections');
  assert.equal(await page.evaluate(async row=>hash(await fixtureStore.blob(row,'voice')),first),firstHash,'merging boundaries preserves recordings');
+ // All six versions of one section remain selectable; overlapping adjacent takes stay out.
+ const extraTakes=await page.evaluate(async row=>{const mix=await fixtureStore.blob(row),voice=await fixtureStore.blob(row,'voice'),ids=[];for(let i=0;i<5;i++){const copy={...row,id:crypto.randomUUID(),created:Date.now()+i};await fixtureStore.saveRemix(copy,mix,voice);ids.push(copy.id);}return ids;},first);
+ await $('segment-refresh').click();await page.waitForFunction(()=>document.getElementById('segment-take-count').textContent.includes('6 個'));
+ assert.equal(await $('segment-take').locator('option').count(),7);for(const id of extraTakes)await $('segment-take').selectOption(id);
+ await page.reload();await initialize();await $('segment-open').click();assert.equal(await $('segment-take').locator('option').count(),7);
+ await $('segment-part').selectOption('1');assert.equal(await $('segment-take').locator('option').count(),2);assert.ok(!(await $('segment-take').locator('option').evaluateAll(opts=>opts.map(o=>o.value))).includes(first.id),'preroll overlap must not offer another section');
+ await $('segment-part').selectOption('0');await $('segment-take').selectOption(first.id);
  // Delete only the selected fixture version; cancellation, failure and other takes are preserved.
  const duplicate=await page.evaluate(async row=>{const copy={...row,id:crypto.randomUUID(),created:Date.now(),segmentTake:{...row.segmentTake,name:'刪除測試版'}};await fixtureStore.saveRemix(copy,await fixtureStore.blob(row),await fixtureStore.blob(row,'voice'));return copy;},first);
  await $('segment-refresh').click();await page.waitForFunction(id=>[...document.getElementById('segment-take').options].some(o=>o.value===id),duplicate.id);
- await $('segment-take').selectOption(duplicate.id);await $('segment-part').selectOption('1');await $('segment-take').selectOption(duplicate.id);await $('segment-part').selectOption('0');
+ await $('segment-take').selectOption(duplicate.id);
+ // Existing cross-section choices from older drafts are preserved, not silently replaced.
+ await page.evaluate(id=>{const key='karaoke.segment-draft.v1.segment-fixture',d=JSON.parse(localStorage.getItem(key));d.parts[1].takeId=id;localStorage.setItem(key,JSON.stringify(d));},duplicate.id);
+ await page.reload();await initialize();await $('segment-open').click();await $('segment-part').selectOption('1');assert.equal(await $('segment-take').inputValue(),duplicate.id);assert.match(await $('segment-take').locator('option:checked').textContent(),/沿用已選錄音/);await $('segment-part').selectOption('0');
  page.once('dialog',async d=>{assert.match(d.message(),/刪除測試版/);assert.match(d.message(),/2 段/);await d.dismiss();});await $('segment-delete-selected').click();assert.ok((await page.evaluate(()=>fixtureStore.list())).some(r=>r.id===duplicate.id));
  await page.evaluate(async()=>{const {RecordingStore}=await import('/recording-store.mjs');window.originalDelete=RecordingStore.prototype.delete;RecordingStore.prototype.delete=async()=>{throw Error('fixture delete failure');};});
  page.once('dialog',d=>d.accept());await $('segment-delete-selected').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('fixture delete failure'));assert.equal(await $('segment-take').inputValue(),duplicate.id);

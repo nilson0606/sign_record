@@ -133,8 +133,12 @@ export function createSegmentRecording(options) {
     eligible.filter(r=>!r.segmentTake&&r.post.segments?.some(s=>s.songTime<.2)&&r.seconds>=draft.duration-.5).forEach(r=>option($('base'),r.id,`${r.title} · ${new Date(r.created).toLocaleString()}`));
     if(draft.baseId&&![...$('base').options].some(o=>o.value===draft.baseId))option($('base'),draft.baseId,'底稿未找到（請重新讀取／確認歌曲庫）');$('base').value=draft.baseId||'';
     $('take').replaceChildren();option($('take'),'','沿用底稿／未錄處留空');
-    eligible.filter(r=>r.segmentTake&&r.post.segments?.some(s=>s.songTime<p.end&&s.songTime+s.duration>p.start)).forEach(r=>option($('take'),r.id,`${takeName(r)} · ${new Date(r.created).toLocaleTimeString()} · ${r.seconds.toFixed(1)} 秒`));
-    if(p.takeId&&![...$('take').options].some(o=>o.value===p.takeId))option($('take'),p.takeId,'已選版本不涵蓋本段／未找到');$('take').value=p.takeId||'';
+    const partTakes=eligible.filter(r=>r.segmentTake?.partId===p.id);
+    partTakes.forEach(r=>option($('take'),r.id,`${takeName(r)} · ${new Date(r.created).toLocaleString()} · ${r.seconds.toFixed(1)} 秒`));
+    // Preserve an existing choice inherited by splitting or an older draft, without offering other sections' takes.
+    const inherited=p.takeId&&!partTakes.some(r=>r.id===p.takeId)?eligible.find(r=>r.id===p.takeId):null;
+    if(p.takeId&&![...$('take').options].some(o=>o.value===p.takeId))option($('take'),p.takeId,inherited?`沿用已選錄音 · ${takeName(inherited)||inherited.title} · ${new Date(inherited.created).toLocaleString()}`:'已選版本未找到');$('take').value=p.takeId||'';
+    $('take-count').textContent=`本段共有 ${partTakes.length} 個錄音版本，全部列出；可重錄多次，沒有三次上限。${inherited?'另保留草稿原先選用的錄音，可改選本段版本。':''}`;
     const missing=missingSegmentRanges(draft,eligible,Number($('delay').value)||0);$('coverage').textContent=missing.length?`待補錄或涵蓋不足：${missing.join('、')}。可改選版本／底稿，或明確勾選保留靜音。`:'所有段落都有可用人聲；可試合完整版本。';
     $('loop').setAttribute('aria-pressed',String(loop));$('loop').textContent=loop?'停止循環練唱':'循環練唱本段';$('record').disabled=locked||!ref||(guideMode==='backing'&&!ref.hasPreview);
   }
