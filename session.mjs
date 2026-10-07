@@ -28,6 +28,45 @@ export function createKaraokeSession(options) {
   let libraryLocation = null, locationBusy = false;
   const segmentLocks=new Map();
   let previewUrl = null, previewRequest = null, previewSerial = 0, restartToken = 0, segmented = null;
+  let wholeGuide = null;
+  function pauseGuide(c = wholeGuide) {
+    for (const node of c?.nodes || []) { try { node.stop(); } catch {} node.disconnect(); }
+    if (c) c.nodes = [];
+  }
+  function stopGuide() {
+    const c = wholeGuide; wholeGuide = null;
+    if (!c) return;
+    c.armed = false; pauseGuide(c); c.context?.close().catch(() => {});
+    if (c.wasMuted) c.player.mute?.(); else c.player.unMute?.();
+  }
+  async function prepareGuide(ref, player, mode, cancelled) {
+    stopGuide(); player.pauseVideo();
+    const c = wholeGuide = { player, mode, wasMuted: !!player.isMuted?.(), armed: false, nodes: [], buffers: [] };
+    if (mode !== 'backing') return;
+    if (!ref.hasPreview) throw Error('只有伴樂需要已保存的分離音軌，請先補建試聽音軌，或改選「原唱＋伴樂」。');
+    c.context = new AudioContext(); await c.context.resume();
+    for (const stem of ['accompaniment', ...(ref.vocalMode === 'lead' ? ['backing'] : [])]) {
+      const bytes = await loadRecordingStem(ref, stem);
+      if (cancelled() || wholeGuide !== c) return;
+      const buffer = await c.context.decodeAudioData(bytes);
+      if (cancelled() || wholeGuide !== c) return;
+      if (buffer.duration < ref.duration - .2) throw Error('伴樂音軌長度不足，請補建試聽音軌。');
+      c.buffers.push(buffer);
+    }
+  }
+  function syncGuide(state, time) {
+    const c = wholeGuide;
+    if (!c?.armed || !c.context) return;
+    if (state !== 1) { pauseGuide(c); return; }
+    const rate = Number(c.player.getPlaybackRate?.()) || 1;
+    if (c.nodes.length && c.rate === rate && Math.abs(c.anchorTime + (c.context.currentTime - c.anchorClock) * rate - time) < .12) return;
+    pauseGuide(c); c.anchorTime = time; c.anchorClock = c.context.currentTime; c.rate = rate;
+    for (const buffer of c.buffers) {
+      if (time >= buffer.duration) continue;
+      const node = c.context.createBufferSource(); node.buffer = buffer; node.playbackRate.value = rate;
+      node.connect(c.context.destination); node.start(c.anchorClock, Math.max(0, time)); c.nodes.push(node);
+    }
+  }
   async function loadRecordingStem(ref,stem){
     if(!token)await ensureSession();
     const response=await fetch(BASE+`/library/${ref.cacheId}/${stem}`,{headers:{'X-Karaoke-Token':token},credentials:'omit',cache:'no-store',signal:AbortSignal.timeout(30000)});
@@ -82,6 +121,7 @@ export function createKaraokeSession(options) {
     $('clip-seconds').disabled = ['preparing', 'finishing', 'restarting'].includes(phase);
     $('cancel-song').disabled = maskBusy || phase === 'finishing' || (!jobId && phase !== 'preparing' && !reference);
     $('sing-start').disabled = maskBusy || !reference || ['finishing','restarting'].includes(phase);
+    $('sing-guide-mode').disabled = !!wholeGuide || ['preparing','finishing','restarting'].includes(phase);
     $('finish-song').disabled = !take || ['result', 'finishing', 'restarting'].includes(phase);
     $('song-form').querySelector('button').disabled = maskBusy || ['preparing', 'finishing', 'restarting'].includes(phase);
     maskEditor.controls(); recording.referenceChanged(); segmented?.referenceChanged();
@@ -112,7 +152,7 @@ export function createKaraokeSession(options) {
     [...$('beats').children].forEach(dot => dot.classList.remove('active'));
   }
   async function clear(text = '已取消／卸載本次工作；已保存的歌曲仍在本機歌曲庫。', finishing = false) {
-    generation++; restartToken++; clearTimeout(timer); stopPreview();
+    generation++; restartToken++; clearTimeout(timer); stopPreview(); stopGuide();
     const recordingEnd = segmented?.enabled() ? segmented.stop() : recording.stop();
     const id = jobId; jobId = null; reference = null; updateMaskView(); maskEditor.render();
     options.player()?.pauseVideo?.(); $('prepare-progress-panel').hidden = true;
@@ -330,7 +370,7 @@ export function createKaraokeSession(options) {
   window.addEventListener('storage',event=>{if(event.key===HISTORY || event.key===null)renderHistory();});
   async function finish() {
     if (!take || !reference || ['result', 'finishing'].includes(phase)) return;
-    restartToken++; phase = 'finishing'; controls();
+    restartToken++; stopGuide(); phase = 'finishing'; controls();
     if (options.micReady() && options.player()?.getPlayerState?.() === 1) take.advance(options.player().getCurrentTime());
     const result = take.result(), title = reference.title;
     $('take-difficulty').textContent = `本輪已結算 · 評分難度：${take.profile.label}`;
@@ -446,7 +486,7 @@ export function createKaraokeSession(options) {
   $('sing-start').addEventListener('click', async () => {
     if (!reference || maskBusy || phase === 'restarting') return;
     if(segmented?.busy()||!segmented?.leave())return;
-    stopPreview(); options.cancelCalibration?.();
+    stopPreview(); stopGuide(); options.cancelCalibration?.();
     const request = ++restartToken, p = options.player();
     phase = 'restarting'; message(options.micReady() ? '正在同步 YouTube 到 0 秒…' : '正在開啟麥克風，請允許瀏覽器的收音授權…'); controls();
     try {
@@ -458,6 +498,9 @@ export function createKaraokeSession(options) {
         return response.arrayBuffer();
       }, {allowOctave:$('pitch-mode').value==='octave',rangeMode:$('score-range').value,difficulty:$('score-difficulty').value});
       if (request !== restartToken || !reference || !options.micReady()) { await recording.stop(); return; }
+      message('正在準備演唱時帶唱…');
+      await prepareGuide(reference, p, $('sing-guide-mode').value, () => request !== restartToken || !reference || !options.micReady());
+      if (request !== restartToken || !reference || !options.micReady()) return;
       message('正在同步 YouTube 到 0 秒…');
       await seekPlayerToStart(p, () => request !== restartToken || !reference || !options.micReady());
       if (request !== restartToken || !reference || !options.micReady()) return;
@@ -467,11 +510,12 @@ export function createKaraokeSession(options) {
       message('影片已回到開頭，等待播放開始。'); controls();
       $('player-section').focus({ preventScroll: true });
       $('player-section').scrollIntoView({ behavior: 'instant', block: 'start' });
+      if (wholeGuide) { wholeGuide.armed = true; if (wholeGuide.mode === 'backing') p.mute?.(); else p.unMute?.(); }
       p.playVideo();
       if (p.getPlayerState() === 1) playerState(1);
     } catch (error) {
       if (request !== restartToken) return;
-      await recording.stop(); phase = 'paused'; p?.pauseVideo?.(); message(error.message); controls();
+      stopGuide(); await recording.stop(); phase = 'paused'; p?.pauseVideo?.(); message(error.message); controls();
     }
   });
   $('finish-song').addEventListener('click', finish);
@@ -481,6 +525,7 @@ export function createKaraokeSession(options) {
       if(state===1){stopPreview();options.cancelCalibration?.();}
       segmented.playerState(state);return;
     }
+    syncGuide(state, options.player()?.getCurrentTime?.() || 0);
     if (phase !== 'restarting' || state !== 1) recording.playerState(state, options.player()?.getCurrentTime?.() || 0);
     if (state === 1) recording.clearPreview();
     if (maskBusy) return;
@@ -520,6 +565,7 @@ export function createKaraokeSession(options) {
     if(segmented?.enabled())return;
     const p = options.player(); if (!reference || !p?.getCurrentTime) return;
     const t = p.getCurrentTime();
+    syncGuide(p.getPlayerState?.(), t);
     if (!take || phase !== 'singing') {
       const cell = Math.floor((t - Number($('offset').value) / 1000) / reference.step);
       const expected = displayReference?.frames[cell], note = noteOf(expected);
@@ -537,20 +583,21 @@ export function createKaraokeSession(options) {
   // Keep active reference available while the user is setting up or singing.
   const keepalive = setInterval(() => { if (jobId && reference) api(`/jobs/${jobId}`).catch(() => {}); }, 60000);
   window.addEventListener('pagehide', () => {
-    generation++; restartToken++; clearTimeout(timer); stopPreview(); clearInterval(heartbeat); clearInterval(keepalive);
+    generation++; restartToken++; clearTimeout(timer); stopPreview(); stopGuide(); clearInterval(heartbeat); clearInterval(keepalive);
     if (jobId && token) fetch(BASE + `/jobs/${jobId}`, { method: 'DELETE', headers: { 'X-Karaoke-Token': token }, keepalive: true, credentials: 'omit' }).catch(() => {});
     reference = null; take?.clear(); take = null;
   });
   renderHistory(); controls();
   return {
-    reference: () => displayReference, sample, playerState, stopRecording: error=>segmented?.enabled()?segmented.stop(error):recording.stop(error),
-    pauseForCalibration() { if (phase === 'restarting') { recording.stop(); restartToken++; phase = take ? 'paused' : 'ready'; } options.player()?.pauseVideo?.(); stopPreview(); controls(); },
+    reference: () => displayReference, sample, playerState, stopRecording: error=>{stopGuide();return segmented?.enabled()?segmented.stop(error):recording.stop(error);},
+    pauseForCalibration() { if (phase === 'restarting') { stopGuide(); recording.stop(); restartToken++; phase = take ? 'paused' : 'ready'; } options.player()?.pauseVideo?.(); stopPreview(); controls(); },
     async changeSong(id) { if (loadedVideo !== id) { await clear(); loadedVideo = id; } },
     micStarted() {
       if (reference && options.player()?.getPlayerState?.() === 1) playerState(1);
       controls();
     },
     micStopped({ rewind = false, reason = '收音已停止。' } = {}) {
+      stopGuide();
       const interruptedRestart = phase === 'restarting';
       if (interruptedRestart) { restartToken++; phase = take ? 'paused' : 'ready'; message(`未開始演唱：${reason}${take ? ' 上次演唱資料已保留，可先結算。' : ''}`); }
       if (phase === 'singing') { take?.advance(options.player()?.getCurrentTime?.() || 0); phase = 'paused'; options.player()?.pauseVideo?.(); }

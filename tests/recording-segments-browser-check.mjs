@@ -28,6 +28,9 @@ try{
   return r.fulfill({json,headers});
  });
  async function initialize(){await page.evaluate(async()=>{
+  window.guideEvents=[];
+  const BaseContext=window.AudioContext;
+  window.AudioContext=class extends BaseContext{createBufferSource(){const node=super.createBufferSource(),connect=node.connect.bind(node),start=node.start.bind(node),stop=node.stop.bind(node);let monitor=false;node.connect=(dest,...args)=>{monitor=dest===this.destination;return connect(dest,...args);};node.start=(...args)=>{if(monitor)guideEvents.push({action:'start',offset:args[1],rate:node.playbackRate.value});return start(...args);};node.stop=(...args)=>{if(monitor)guideEvents.push({action:'stop'});return stop(...args);};return node;}};
   const {createKaraokeSession}=await import('/session.mjs');
   window.fixtureMic=null;let time=0,anchor=0,state=2,muted=false;
   window.fixturePlayer={getCurrentTime:()=>state===1?Math.min(8,time+(performance.now()-anchor)/1000):time,getPlayerState:()=>state,seekTo(t){time=t;anchor=performance.now();},pauseVideo(){time=this.getCurrentTime();state=2;fixtureSession?.playerState(2);},playVideo(){if(time>=8)time=0;anchor=performance.now();state=1;fixtureSession?.playerState(1);},isMuted:()=>muted,mute(){muted=true;},unMute(){muted=false;},setPlaybackRate(){},getPlaybackRate:()=>1};
@@ -43,6 +46,8 @@ try{
  }
  await page.goto(site);await initialize();const $=id=>page.locator('#'+id);
  await $('segment-open').click();assert.equal(await $('segment-delay').inputValue(),'200');
+ for(const id of ['segment-guide-mode','segment-guide-mode-player','sing-guide-mode'])assert.equal(await $(id).inputValue(),'original');
+ assert.equal(await $('sing-guide-mode').isHidden(),true);
  for(const id of ['segment-take-mode','segment-take-mode-player','segment-take-mode-selected'])assert.equal(await $(id).inputValue(),'mix');
  assert.equal(await $('sing-start').isHidden(),true);assert.equal(await $('segment-side').isVisible(),true);
  assert.equal(await $('voice-section').isHidden(),true);assert.equal(await $('segment-player-tools').isVisible(),true);assert.equal(await $('segment-listen').isDisabled(),true);
@@ -79,6 +84,7 @@ try{
  // Dragging changes both adjacent sections; undo restores exact original timing.
  const marker=page.locator('.segment-marker').first(),rect=await marker.boundingBox();await page.mouse.move(rect.x+rect.width/2,rect.y+rect.height/2);await page.mouse.down();await page.mouse.move(rect.x+rect.width/2+20,rect.y+rect.height/2);await page.mouse.up();assert.notEqual(await $('segment-boundary-time').inputValue(),'00:04.000');await $('segment-undo').click();assert.equal(await $('segment-boundary-time').inputValue(),'00:04.000');
  // Cancellation during slow stem preparation cannot adopt an old take or start later.
+ await $('segment-guide-mode-player').selectOption('backing');assert.equal(await $('segment-guide-mode').inputValue(),'backing');
  stemDelay=700;await $('segment-record').click();
  assert.ok(await page.evaluate(()=>{const r=document.querySelector('#player-section .video-shell').getBoundingClientRect(),nav=document.querySelector('.section-nav').getBoundingClientRect();return r.top>=nav.bottom&&r.bottom<innerHeight;}),'record button brings the video into view');
  assert.equal(await $('segment-listen-player').isDisabled(),true);await $('segment-stop-player').click();await page.waitForFunction(()=>!document.getElementById('segment-record').disabled);await page.waitForTimeout(800);assert.equal((await page.evaluate(()=>fixtureStore.list())).length,0);assert.equal(await page.evaluate(()=>fixturePlayer.isMuted()),false);stemDelay=0;
@@ -110,7 +116,13 @@ try{
  await $('segment-listen-player').click();await page.waitForFunction(()=>!!window.releaseTakeRead);await $('segment-part').selectOption('1');
  await page.evaluate(async()=>{const {BrowserRecordingStore}=await import('/recording-store.mjs');BrowserRecordingStore.prototype.blob=originalBlob;releaseTakeRead();});
  await page.waitForTimeout(100);assert.equal(await $('segment-take-audio').isHidden(),true);assert.equal(await $('segment-listen').isDisabled(),true);
- await $('segment-part').selectOption('1');await $('segment-record').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('本段已保存'),{},{timeout:20000});
+ await $('segment-guide-mode').selectOption('original');assert.equal(await $('segment-guide-mode-player').inputValue(),'original');
+ const segmentGuideStarts=await page.evaluate(()=>guideEvents.filter(e=>e.action==='start').length);
+ await page.evaluate(()=>fixturePlayer.mute());
+ await $('segment-part').selectOption('1');await $('segment-record').click();await page.waitForFunction(()=>fixturePlayer.getPlayerState()===1&&!fixturePlayer.isMuted());
+ await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('本段已保存'),{},{timeout:20000});
+ assert.equal(await page.evaluate(()=>guideEvents.filter(e=>e.action==='start').length),segmentGuideStarts,'original guide does not add a second accompaniment');
+ assert.equal(await page.evaluate(()=>fixturePlayer.isMuted()),true,'restore previously muted player');await page.evaluate(()=>fixturePlayer.unMute());
  // A later section uses its saved song position, not accompaniment from time zero.
  await $('segment-take-mode-player').selectOption('mix');await $('segment-listen-player').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);
  const laterTake=await page.evaluate(async()=>{const id=document.getElementById('segment-take').value,row=(await fixtureStore.list()).find(r=>r.id===id),c=new AudioContext({sinkId:{type:'none'}}),mix=await c.decodeAudioData(await(await fetch(document.getElementById('segment-take-audio').src)).arrayBuffer()),raw=await c.decodeAudioData(await(await fixtureStore.blob(row,'voice')).arrayBuffer()),m=mix.getChannelData(0),v=raw.getChannelData(0);let error=0;for(let i=100;i<m.length-10000;i++){const t=i/mix.sampleRate,s=row.post.segments.find(s=>t>=s.offset&&t<s.offset+s.duration),expected=s ? .06*Math.sin(2*Math.PI*660.37*(s.songTime+t-s.offset)) : 0;error=Math.max(error,Math.abs(m[i]-v[i+9600]-expected));}await c.close();return {start:row.post.segments[0].songTime,error};});assert.ok(laterTake.start>.8);assert.ok(laterTake.error<.012,JSON.stringify(laterTake));
@@ -165,9 +177,26 @@ try{
  await $('segment-part').selectOption('0');await $('segment-listen-player').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);
  await mkdir('test-results',{recursive:true});await page.evaluate(()=>{document.querySelector('.section-nav').style.position='static';document.getElementById('theme-select').value='warm';document.documentElement.dataset.theme='warm';document.getElementById('player-section').scrollIntoView({behavior:'instant',block:'start'});});await page.screenshot({path:'test-results/recording-segments-layout.png'});for(const id of ['player-section','segment-side'])assert.ok(await $(id).evaluate(el=>el.scrollWidth<=el.clientWidth+1));
  // Whole-song start still records and scores through the existing path.
- await $('segment-whole').click();assert.equal(await $('voice-section').isVisible(),true);assert.equal(await $('segment-player-tools').isHidden(),true);assert.equal(await $('segment-take-audio').evaluate(el=>el.paused),true);assert.equal(await $('sing-start').isVisible(),true);assert.equal(await $('segment-side').isHidden(),true);await $('recording-settings').locator('summary').click();await $('recording-mode').selectOption('voice');await $('sing-start').click();await page.waitForFunction(()=>document.getElementById('score-status').textContent.includes('演唱中'));
+ await $('segment-whole').click();assert.equal(await $('voice-section').isVisible(),true);assert.equal(await $('segment-player-tools').isHidden(),true);assert.equal(await $('segment-take-audio').evaluate(el=>el.paused),true);assert.equal(await $('sing-start').isVisible(),true);assert.equal(await $('segment-side').isHidden(),true);await $('recording-settings').locator('summary').click();// Backing guide also works when no recording is saved; cancellation cannot start stale audio.
+ await $('recording-mode').selectOption('off');await $('sing-guide-mode').selectOption('backing');
+ stemDelay=700;await $('sing-start').click();await page.waitForFunction(()=>document.getElementById('score-status').textContent.includes('正在準備演唱時帶唱'));
+ await page.evaluate(()=>{fixtureSession.stopRecording();fixtureSession.micStopped();});await page.waitForTimeout(900);stemDelay=0;
+ assert.equal(await page.evaluate(()=>fixturePlayer.getPlayerState()),2);assert.equal(await page.evaluate(()=>fixturePlayer.isMuted()),false);assert.equal(await page.evaluate(()=>guideEvents.filter(e=>e.action==='start').length),0);
+ await $('sing-start').click();await page.waitForFunction(()=>fixturePlayer.isMuted()&&fixturePlayer.getPlayerState()===1);
+ await page.waitForFunction(()=>guideEvents.some(e=>e.action==='start'));assert.equal(await $('sing-guide-mode').isDisabled(),true);
+ await page.evaluate(()=>fixturePlayer.pauseVideo());assert.equal(await page.evaluate(()=>guideEvents.at(-1).action),'stop');
+ await page.evaluate(()=>{fixturePlayer.seekTo(3);fixturePlayer.playVideo();});await page.waitForFunction(()=>guideEvents.some(e=>e.action==='start'&&e.offset>=3));
+ await page.evaluate(()=>fixturePlayer.seekTo(5));await page.waitForFunction(()=>guideEvents.some(e=>e.action==='start'&&e.offset>=5));
+ await $('finish-song').click();await page.waitForFunction(()=>document.getElementById('score-status').textContent.match(/已結算|未保存分數/));
+ assert.equal(await page.evaluate(()=>fixturePlayer.isMuted()),false);assert.equal(await page.evaluate(()=>guideEvents.at(-1).action),'stop');assert.equal(await $('sing-guide-mode').isEnabled(),true);
+ // Original guide uses the video alone and restores the user's previous mute setting.
+ const wholeGuideStarts=await page.evaluate(()=>guideEvents.filter(e=>e.action==='start').length);
+ await $('sing-guide-mode').selectOption('original');await page.evaluate(()=>fixturePlayer.mute());
+ await $('recording-mode').selectOption('voice');await $('sing-start').click();await page.waitForFunction(()=>document.getElementById('score-status').textContent.includes('演唱中'));
+ assert.equal(await page.evaluate(()=>fixturePlayer.isMuted()),false);assert.equal(await page.evaluate(()=>guideEvents.filter(e=>e.action==='start').length),wholeGuideStarts);
  assert.equal(await $('segment-tools').isHidden(),true);assert.equal(await $('segment-open').isVisible(),true);
  await page.waitForTimeout(700);await page.evaluate(()=>{for(let t=0;t<7;t+=.1)fixtureSession.sample(t,440);fixturePlayer.seekTo(7);});await $('finish-song').click();await page.waitForFunction(()=>document.getElementById('score-status').textContent.includes('已結算'));
+ assert.equal(await page.evaluate(()=>fixturePlayer.isMuted()),true);
  assert.ok(await page.evaluate(()=>JSON.parse(localStorage.getItem('karaoke.scores.v1')).length));
  await page.waitForFunction(()=>!document.getElementById('recording-review').hidden);
  await page.waitForFunction(()=>!document.getElementById('recording-review-save').disabled);

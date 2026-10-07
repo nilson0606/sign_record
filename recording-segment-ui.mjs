@@ -9,6 +9,8 @@ export function createSegmentRecording(options) {
   let takeURL=null,takeRequest=0,takeLoading=false,takeSourceId=null,takeMode='mix';
   const takeModeIds=['take-mode','take-mode-player','take-mode-selected'];
   const takeModeLabel=()=>takeMode==='mix'?'人聲＋伴樂／和音':'純人聲';
+  let guideMode='original';
+  const guideModeIds=['guide-mode','guide-mode-player'];
   const status=text=>{$('status').textContent=$('player-status').textContent=text;},busy=()=>work||!!capture,reference=()=>options.reference(),part=()=>draft?.parts[selected];
   const storageKey=()=>`karaoke.segment-draft.v1.${key}`;
   function persist(undoHistory=history){
@@ -106,6 +108,7 @@ export function createSegmentRecording(options) {
     for(const id of ['listen','listen-player','listen-selected'])$(id).disabled=locked||takeLoading||!take;
     for(const id of ['delete','delete-player','delete-selected'])$(id).disabled=locked||!take;
     for(const id of takeModeIds){$(id).value=takeMode;$(id).disabled=locked||!draft;}
+    for(const id of guideModeIds){$(id).value=guideMode;$(id).disabled=locked||!draft;}
     $('take-info').textContent=take?`本段錄音：${take.segmentTake.name} · ${new Date(take.created).toLocaleTimeString()} · ${takeModeLabel()} · 歌聲校正 ${$('delay').value} ms（含起唱與尾音餘量）`:'本段尚未選用錄音；錄完保存後即可試聽，也可在右側挑選已錄版本。';
     if(!draft)return;
     const p=part();$('song').textContent=ref?.title||'';$('seek').max=draft.duration;
@@ -129,7 +132,7 @@ export function createSegmentRecording(options) {
     eligible.filter(r=>r.segmentTake&&r.post.segments?.some(s=>s.songTime<p.end&&s.songTime+s.duration>p.start)).forEach(r=>option($('take'),r.id,`${r.segmentTake.name} · ${new Date(r.created).toLocaleTimeString()} · ${r.seconds.toFixed(1)} 秒`));
     if(p.takeId&&![...$('take').options].some(o=>o.value===p.takeId))option($('take'),p.takeId,'已選版本不涵蓋本段／未找到');$('take').value=p.takeId||'';
     const missing=missingSegmentRanges(draft,eligible,Number($('delay').value)||0);$('coverage').textContent=missing.length?`待補錄或涵蓋不足：${missing.join('、')}。可改選版本／底稿，或明確勾選保留靜音。`:'所有段落都有可用人聲；可試合完整版本。';
-    $('loop').setAttribute('aria-pressed',String(loop));$('loop').textContent=loop?'停止循環練唱':'循環練唱本段';$('record').disabled=locked||!ref?.hasPreview;
+    $('loop').setAttribute('aria-pressed',String(loop));$('loop').textContent=loop?'停止循環練唱':'循環練唱本段';$('record').disabled=locked||!ref||(guideMode==='backing'&&!ref.hasPreview);
   }
   async function refresh(){const request=++loading,currentKey=key,list=await store.list();if(request!==loading||currentKey!==key)return;rows=list;render();}
   function referenceChanged(){
@@ -173,25 +176,29 @@ export function createSegmentRecording(options) {
     ending=(async()=>{
       try{const row=await stopped;if(row?.segmentTake?.captureId===c.captureId&&draft?.key===c.key){rows=[row,...rows.filter(r=>r.id!==row.id)];const p=draft.parts.find(p=>p.id===c.partId);if(p)p.takeId=row.id;persist();invalidate();status('本段已保存，可按「試聽本段錄音」立即聽這一版，也可切換演唱版本；原先錄音保留。');}else status(error?'本段收音中斷，請查看錄音狀態中的保留片段。':'沒有完成新的錄音；既有版本保留。');}
       catch(e){status('錄音已停止；草稿／保存狀態請確認：'+e.message);}
-      finally{if(c.monitor)await c.monitor.close().catch(()=>{});if(!c.wasMuted)c.player.unMute?.();work=false;render();options.changed();}
+      finally{if(c.monitor)await c.monitor.close().catch(()=>{});if(c.wasMuted)c.player.mute?.();else c.player.unMute?.();work=false;render();options.changed();}
     })();return ending;
   }
   async function record(){
     if(busy()||!enabled||!draft)return;if(!options.canEnter())throw Error('請先結束整首演唱。');
     persist();options.pauseOther();invalidate();loop=false;previewEnd=null;
     const ref=structuredClone(reference()),p=structuredClone(part()),request=++serial,player=options.player();
-    const c={key,partId:p.id,captureId:crypto.randomUUID(),player,wasMuted:!!player.isMuted?.(),nodes:[],buffers:[],armed:false,monitor:null,start:Math.max(0,p.start-Number($('preroll').value)),end:Math.min(draft.duration,p.end+Number($('tail').value))};capture=c;render();options.changed();const cancelled=()=>request!==serial||capture!==c;
+    const c={key,partId:p.id,captureId:crypto.randomUUID(),player,guideMode,wasMuted:!!player.isMuted?.(),nodes:[],buffers:[],armed:false,monitor:null,start:Math.max(0,p.start-Number($('preroll').value)),end:Math.min(draft.duration,p.end+Number($('tail').value))};capture=c;render();options.changed();const cancelled=()=>request!==serial||capture!==c;
     showPlayer();
     try{
-      player.pauseVideo();status('正在準備本段伴樂與收音…');c.monitor=new AudioContext();await c.monitor.resume();
-      const stems=['accompaniment',...(ref.vocalMode==='lead'?['backing']:[])];
-      for(const stem of stems){const bytes=await options.loadStem(ref,stem);if(cancelled())return;c.buffers.push(await c.monitor.decodeAudioData(bytes));if(cancelled())return;}
-      if(c.buffers.some(b=>b.duration<draft.duration-.15))throw Error('伴樂長度不足，請補建完整試聽音軌。');
+      player.pauseVideo();status(`正在準備本段${c.guideMode==='original'?'原唱＋伴樂':'伴樂'}帶唱與收音…`);
+      if(c.guideMode==='backing'){
+        if(!ref.hasPreview)throw Error('只有伴樂帶唱需要已保存的伴奏音軌，請先補建音軌。');
+        c.monitor=new AudioContext();await c.monitor.resume();
+        const stems=['accompaniment',...(ref.vocalMode==='lead'?['backing']:[])];
+        for(const stem of stems){const bytes=await options.loadStem(ref,stem);if(cancelled())return;c.buffers.push(await c.monitor.decodeAudioData(bytes));if(cancelled())return;}
+        if(c.buffers.some(b=>b.duration<draft.duration-.15))throw Error('伴樂長度不足，請補建完整試聽音軌。');
+      }
       if(!options.micReady())await options.startMic();if(cancelled())return;if(!options.micReady())throw Error('麥克風未就緒，請查看收音設定。');
-      await options.recording.prepare(ref,()=>{}, {}, {mode:'voice',delayMs:0,segmentTake:{version:1,key,partId:p.id,captureId:c.captureId,name:p.name,start:p.start,end:p.end}});
+      await options.recording.prepare(ref,()=>{}, {}, {mode:'voice',delayMs:0,segmentTake:{version:1,key,partId:p.id,captureId:c.captureId,name:p.name,start:p.start,end:p.end,guideMode:c.guideMode}});
       if(cancelled())return;await seek(c.start,cancelled);if(cancelled())return;
-      player.setPlaybackRate?.(1);player.mute?.();c.armed=true;player.playVideo();if(player.getPlayerState()===1)playerState(1);
-      status(`準備起唱：${p.name}，${fmt(p.start)}–${fmt(p.end)}；到尾音餘量後自動保存。`);
+      player.setPlaybackRate?.(1);if(c.guideMode==='backing')player.mute?.();else player.unMute?.();c.armed=true;player.playVideo();if(player.getPlayerState()===1)playerState(1);
+      status(`準備起唱：${p.name}，${fmt(p.start)}–${fmt(p.end)} · ${c.guideMode==='original'?'原唱＋伴樂':'只有伴樂／和音'}帶唱；到尾音餘量後自動保存。`);
     }catch(e){if(!cancelled()){await stop(e);status('無法完成本段錄音：'+e.message);}}
   }
   function playerState(state){if(state===1){clearTakePreview();$('audio').pause();options.recording.clearPreview();render();}const c=capture;if(!c?.armed)return;if(state===0){stop().catch(e=>status(e.message));return;}options.recording.playerState(state,currentTime());if(state===1)syncMonitor(c,currentTime());else stopMonitor(c);}
@@ -242,6 +249,7 @@ export function createSegmentRecording(options) {
   for(const id of ['listen','listen-player','listen-selected'])action(id,listenTake);
   for(const id of ['delete','delete-player','delete-selected'])action(id,deleteTake);
   for(const id of takeModeIds)$(id).onchange=()=>{takeMode=$(id).value==='voice'?'voice':'mix';clearTakePreview();render();status(`已切換為${takeModeLabel()}，請按「試聽本段錄音」。`);};
+  for(const id of guideModeIds)$(id).onchange=()=>{guideMode=$(id).value==='backing'?'backing':'original';render();status(guideMode==='backing'?'下次分段錄音只用伴樂／和音帶唱。':'下次分段錄音播放原唱＋伴樂帶唱。');};
   action('export',async()=>{if(!trial||trial.saved||busy())return;work=true;render();options.changed();try{await store.saveRemix(trial.meta,trial.mix,trial.voice);trial.saved=true;await options.recording.refresh(trial.meta.id);status('已存到錄音後處理，可繼續調整與 A/B 比較。分段素材仍保留在分段區。');}finally{work=false;render();options.changed();}});
   action('download',()=>{if(!trial)return;const a=document.createElement('a');a.href=trialURL;a.download=trial.meta.title.replace(/[\\/:*?"<>|]/g,'_')+`-${trial.meta.mode}-${trial.meta.appliedDelayMs}ms.wav`;a.click();});
   $('part').onchange=()=>{selected=Number($('part').value);loop=false;render();};$('boundary').onchange=()=>{boundary=Number($('boundary').value);render();};

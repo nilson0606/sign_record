@@ -167,7 +167,7 @@ header{gap:18px;flex-wrap:wrap}
 #recording-review label{margin-top:12px}
 #segment-player-tools .button-row{flex-wrap:wrap;margin-top:12px}
 .segment-active>.section-top,.segment-active>#song-form,.segment-active>#player-status,
-.segment-active #score-section>.score-title,.segment-active #score-section>.score-actions{display:none}
+.segment-active #score-section>.score-title,.segment-active #score-section>.score-actions,.segment-active .whole-guide-control{display:none}
 .segment-active .player-session{border:0;margin-top:8px;padding:0}
 .segment-active .video-shell{aspect-ratio:16/9;min-height:0;max-height:none}
 .segment-active #segment-section{margin-top:12px;padding-top:12px}
