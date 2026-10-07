@@ -2,7 +2,15 @@
 export function segmentDraft(reference) {
   const duration=reference.duration;
   if(!Number.isFinite(duration)||duration<=0||duration>1800)throw Error('分段錄音支援 30 分鐘內的歌曲。');
-  return {version:1,key:reference.cacheId,duration,baseId:null,parts:[{id:crypto.randomUUID(),name:'第 1 段',start:0,end:duration,takeId:null}]};
+  return {version:1,key:reference.cacheId,duration,baseId:null,parts:[{id:crypto.randomUUID(),name:'第 1 段',autoName:true,start:0,end:duration,takeId:null}]};
+}
+export function normalizeSegmentNames(draft) {
+  draft.parts.forEach((p,i)=>{
+    // Recognize the default names emitted by older drafts, including nested splits.
+    if(typeof p.autoName!=='boolean')p.autoName=/^第\s*\d+\s*段(?:（後段）)*$/.test(p.name);
+    if(p.autoName)p.name=`第 ${i+1} 段`;
+  });
+  return draft;
 }
 export function validateSegmentDraft(draft) {
   if(draft?.version!==1||!Number.isFinite(draft.duration)||draft.duration<=0||draft.duration>1800||!Array.isArray(draft.parts)||!draft.parts.length||draft.parts.length>200)throw Error('分段草稿格式無效。');
@@ -19,8 +27,9 @@ export function splitSegment(draft,time) {
   if(draft.parts.length>=200)throw Error('最多保留 200 段。');
   const i=draft.parts.findIndex(p=>time>=p.start+.1&&time<=p.end-.1);
   if(i<0)throw Error('分界需離相鄰分界至少 0.1 秒。');
+  normalizeSegmentNames(draft);
   const p=draft.parts[i],next={...p,id:crypto.randomUUID(),name:p.name+'（後段）',start:time};
-  next.name=next.name.slice(0,80);p.end=time;draft.parts.splice(i+1,0,next);return i+1;
+  next.name=next.name.slice(0,80);p.end=time;draft.parts.splice(i+1,0,next);normalizeSegmentNames(draft);return i+1;
 }
 export function moveBoundary(draft,index,time) {
   if(!Number.isInteger(index)||index<1||index>=draft.parts.length)throw Error('請選擇內部分界；歌曲起訖固定。');
@@ -33,7 +42,7 @@ export function mergeBoundary(draft,index) {
   const prev=draft.parts[index-1],next=draft.parts[index];
   // A merged section has one source choice. Keep all recorded versions elsewhere.
   prev.end=next.end;if(prev.takeId!==next.takeId)prev.takeId=null;
-  draft.parts.splice(index,1);return validateSegmentDraft(draft);
+  draft.parts.splice(index,1);return normalizeSegmentNames(validateSegmentDraft(draft));
 }
 export function formatSegmentTime(seconds){const ms=Math.round(Math.max(0,seconds)*1000);return `${String(Math.floor(ms/60000)).padStart(2,'0')}:${String(Math.floor(ms/1000)%60).padStart(2,'0')}.${String(ms%1000).padStart(3,'0')}`;}
 export function parseSegmentTime(value){if(!/^\d{1,3}:[0-5]\d(?:\.\d{1,3})?$/.test(value.trim()))throw Error('時間請輸入 mm:ss 或 mm:ss.sss。');const [m,s]=value.split(':');return Number(m)*60+Number(s);}

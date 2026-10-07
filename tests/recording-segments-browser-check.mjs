@@ -153,7 +153,13 @@ try{
  await $('segment-part').selectOption('0');await $('segment-join').click();await page.waitForFunction(()=>!document.getElementById('segment-export').disabled);await page.evaluate(()=>{const a=document.getElementById('segment-audio');a.currentTime=7.1;a.dispatchEvent(new Event('timeupdate'));});assert.equal(await $('segment-audio').evaluate(el=>el.paused),true,'join audition stops after the selected interval');
  await page.evaluate(()=>{fixturePlayer.seekTo(7.2);fixturePlayer.playVideo();});await page.waitForTimeout(120);assert.equal(await page.evaluate(()=>fixturePlayer.getPlayerState()),1,'audio audition endpoint does not stop later video playback');await page.evaluate(()=>fixturePlayer.pauseVideo());
  // Persisted decisions reopen. No real user library or profile is touched.
+ // Old drafts and recorded take labels must display current segment numbers after reload.
+ await page.evaluate(()=>{const key='karaoke.segment-draft.v1.segment-fixture',d=JSON.parse(localStorage.getItem(key));d.parts.forEach((p,i)=>{delete p.autoName;p.name='第 1 段'+'（後段）'.repeat(i);});for(const h of d.undoHistory)h.parts.forEach((p,i)=>{delete p.autoName;p.name='第 1 段'+'（後段）'.repeat(i);});localStorage.setItem(key,JSON.stringify(d));});
  await page.reload();await initialize();await $('segment-open').click();assert.equal(await $('segment-part').locator('option').count(),2);assert.match(await $('segment-coverage').textContent(),/所有段落/);
+ await $('segment-part').selectOption('1');assert.equal(await $('segment-name').inputValue(),'第 2 段');assert.match(await $('segment-selected-summary').textContent(),/^第 2 段/);assert.match(await $('segment-take-info').textContent(),/本段錄音：第 2 段/);
+ await $('segment-boundary-panel').locator('summary').click();await $('segment-name').fill('副歌');await $('segment-name').dispatchEvent('change');
+ await $('segment-part').selectOption('0');assert.equal(await $('segment-name').inputValue(),'第 1 段');await $('segment-part').selectOption('1');assert.equal(await $('segment-name').inputValue(),'副歌');
+ await $('segment-undo').click();assert.equal(await $('segment-name').inputValue(),'第 2 段');await $('segment-save').click();await $('segment-part').selectOption('0');
  await $('segment-listen-player').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);assert.equal(await $('segment-take-audio').isVisible(),true);
  const savedParts=await page.evaluate(()=>JSON.parse(localStorage.getItem('karaoke.segment-draft.v1.segment-fixture')).parts);
  await $('segment-merge-all').click();assert.equal(await $('segment-part').locator('option').count(),1);

@@ -1,10 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {segmentDraft,splitSegment,moveBoundary,mergeBoundary,validateSegmentDraft,parseSegmentTime,formatSegmentTime,missingSegmentRanges,composeSegmentVoice} from '../recording-segments.mjs';
+import {segmentDraft,splitSegment,moveBoundary,mergeBoundary,validateSegmentDraft,normalizeSegmentNames,parseSegmentTime,formatSegmentTime,missingSegmentRanges,composeSegmentVoice} from '../recording-segments.mjs';
 
 globalThis.AudioBuffer=class{constructor({length,sampleRate,numberOfChannels}){Object.assign(this,{length,sampleRate,numberOfChannels,duration:length/sampleRate});this.channels=Array.from({length:numberOfChannels},()=>new Float32Array(length));}getChannelData(c){return this.channels[c];}};
 const ref={cacheId:'fixture',duration:4};
 const draft=()=>segmentDraft(ref);
+test('default names follow order after splits and merges while custom names survive',()=>{
+ const d=draft();splitSegment(d,2);splitSegment(d,1);splitSegment(d,3);
+ assert.deepEqual(d.parts.map(p=>p.name),['第 1 段','第 2 段','第 3 段','第 4 段']);
+ d.parts[1].name='副歌';d.parts[1].autoName=false;d.parts[2].takeId='saved';const id=d.parts[2].id;
+ mergeBoundary(d,1);assert.deepEqual(d.parts.map(p=>p.name),['第 1 段','第 2 段','第 3 段']);assert.equal(d.parts[1].id,id);assert.equal(d.parts[1].takeId,'saved');
+ d.parts[1].name='第 99 段';d.parts[1].autoName=false;splitSegment(d,2.5);
+ assert.equal(d.parts[1].name,'第 99 段');assert.equal(d.parts[2].name,'第 99 段（後段）');
+});
+test('legacy default names migrate without altering timing, source choices or custom labels',()=>{
+ const d=draft();splitSegment(d,1);splitSegment(d,2);splitSegment(d,3);
+ const names=['第 1 段','第 1 段（後段）','第 1 段（後段）（後段）','副歌'];
+ d.parts.forEach((p,i)=>{delete p.autoName;p.name=names[i];p.takeId='take-'+i;});
+ const before=d.parts.map(({id,start,end,takeId})=>({id,start,end,takeId}));normalizeSegmentNames(d);
+ assert.deepEqual(d.parts.map(p=>p.name),['第 1 段','第 2 段','第 3 段','副歌']);
+ assert.deepEqual(d.parts.map(({id,start,end,takeId})=>({id,start,end,takeId})),before);
+ splitSegment(d,3.5);assert.equal(d.parts[3].name,'副歌');assert.equal(d.parts[4].name,'副歌（後段）');
+});
 function source(id,start,duration,value,rate=1000){const audio=new AudioBuffer({length:duration*rate,sampleRate:rate,numberOfChannels:1});audio.getChannelData(0).fill(value);return{audio,meta:{id,rawBytes:audio.length*2+44,seconds:duration,post:{segments:[{songTime:start,offset:0,duration}]}}};}
 
 test('splitting, moving and merging share boundaries and preserve source choices',()=>{

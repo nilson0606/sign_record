@@ -1,4 +1,4 @@
-import {segmentDraft,validateSegmentDraft,splitSegment,moveBoundary,mergeBoundary,formatSegmentTime as fmt,parseSegmentTime,missingSegmentRanges,composeSegmentVoice} from './recording-segments.mjs';
+import {segmentDraft,validateSegmentDraft,normalizeSegmentNames,splitSegment,moveBoundary,mergeBoundary,formatSegmentTime as fmt,parseSegmentTime,missingSegmentRanges,composeSegmentVoice} from './recording-segments.mjs';
 import {remixRecording,wavBlob,delaySeconds} from './recording-process.mjs';
 import {recordingSceneDefaultsVersion} from './recording-scenes.mjs';
 
@@ -13,6 +13,10 @@ export function createSegmentRecording(options) {
   const guideModeIds=['guide-mode','guide-mode-player'];
   const status=text=>{$('status').textContent=$('player-status').textContent=text;},busy=()=>work||!!capture,reference=()=>options.reference(),part=()=>draft?.parts[selected];
   const storageKey=()=>`karaoke.segment-draft.v1.${key}`;
+  const takeName=row=>{
+    const name=row.segmentTake?.name;
+    return /^第\s*\d+\s*段(?:（後段）)*$/.test(name)?draft?.parts.find(p=>p.id===row.segmentTake.partId)?.name||name:name;
+  };
   function persist(undoHistory=history){
     if(!draft)return;
     if(conflict||localStorage.getItem(storageKey())!==savedText){conflict=true;throw Error('另一分頁已更新這份草稿，請重新整理頁面後繼續；錄音仍保留。');}
@@ -74,7 +78,7 @@ export function createSegmentRecording(options) {
     const row=validRows().find(r=>r.id===part()?.takeId&&r.segmentTake);
     if(!row)return;
     const uses=draft.parts.filter(p=>p.takeId===row.id).length;
-    if(!confirm(`刪除「${row.segmentTake.name} · ${new Date(row.created).toLocaleString()} · ${row.seconds.toFixed(1)} 秒」這一版錄音？\n目前有 ${uses} 段選用此版本，刪除後需重新挑選。\n此版人聲及錄音檔會刪除，無法復原；其他版本與已另存成品保留。`))return;
+    if(!confirm(`刪除「${takeName(row)} · ${new Date(row.created).toLocaleString()} · ${row.seconds.toFixed(1)} 秒」這一版錄音？\n目前有 ${uses} 段選用此版本，刪除後需重新挑選。\n此版人聲及錄音檔會刪除，無法復原；其他版本與已另存成品保留。`))return;
     persist();work=true;invalidate();loop=false;previewEnd=null;options.player()?.pauseVideo?.();options.pauseOther();render();options.changed();
     let deleted=false;
     try{
@@ -109,7 +113,7 @@ export function createSegmentRecording(options) {
     for(const id of ['delete','delete-player','delete-selected'])$(id).disabled=locked||!take;
     for(const id of takeModeIds){$(id).value=takeMode;$(id).disabled=locked||!draft;}
     for(const id of guideModeIds){$(id).value=guideMode;$(id).disabled=locked||!draft;}
-    $('take-info').textContent=take?`本段錄音：${take.segmentTake.name} · ${new Date(take.created).toLocaleTimeString()} · ${takeModeLabel()} · 歌聲校正 ${$('delay').value} ms（含起唱與尾音餘量）`:'本段尚未選用錄音；錄完保存後即可試聽，也可在右側挑選已錄版本。';
+    $('take-info').textContent=take?`本段錄音：${takeName(take)} · ${new Date(take.created).toLocaleTimeString()} · ${takeModeLabel()} · 歌聲校正 ${$('delay').value} ms（含起唱與尾音餘量）`:'本段尚未選用錄音；錄完保存後即可試聽，也可在右側挑選已錄版本。';
     if(!draft)return;
     const p=part();$('song').textContent=ref?.title||'';$('seek').max=draft.duration;
     $('selected-summary').textContent=`${p.name} · ${fmt(p.start)}–${fmt(p.end)}`;
@@ -129,7 +133,7 @@ export function createSegmentRecording(options) {
     eligible.filter(r=>!r.segmentTake&&r.post.segments?.some(s=>s.songTime<.2)&&r.seconds>=draft.duration-.5).forEach(r=>option($('base'),r.id,`${r.title} · ${new Date(r.created).toLocaleString()}`));
     if(draft.baseId&&![...$('base').options].some(o=>o.value===draft.baseId))option($('base'),draft.baseId,'底稿未找到（請重新讀取／確認歌曲庫）');$('base').value=draft.baseId||'';
     $('take').replaceChildren();option($('take'),'','沿用底稿／未錄處留空');
-    eligible.filter(r=>r.segmentTake&&r.post.segments?.some(s=>s.songTime<p.end&&s.songTime+s.duration>p.start)).forEach(r=>option($('take'),r.id,`${r.segmentTake.name} · ${new Date(r.created).toLocaleTimeString()} · ${r.seconds.toFixed(1)} 秒`));
+    eligible.filter(r=>r.segmentTake&&r.post.segments?.some(s=>s.songTime<p.end&&s.songTime+s.duration>p.start)).forEach(r=>option($('take'),r.id,`${takeName(r)} · ${new Date(r.created).toLocaleTimeString()} · ${r.seconds.toFixed(1)} 秒`));
     if(p.takeId&&![...$('take').options].some(o=>o.value===p.takeId))option($('take'),p.takeId,'已選版本不涵蓋本段／未找到');$('take').value=p.takeId||'';
     const missing=missingSegmentRanges(draft,eligible,Number($('delay').value)||0);$('coverage').textContent=missing.length?`待補錄或涵蓋不足：${missing.join('、')}。可改選版本／底稿，或明確勾選保留靜音。`:'所有段落都有可用人聲；可試合完整版本。';
     $('loop').setAttribute('aria-pressed',String(loop));$('loop').textContent=loop?'停止循環練唱':'循環練唱本段';$('record').disabled=locked||!ref||(guideMode==='backing'&&!ref.hasPreview);
@@ -141,13 +145,13 @@ export function createSegmentRecording(options) {
     if(next){try{
       savedText=localStorage.getItem(storageKey());
       const {undoHistory=[],...stored}=savedText?JSON.parse(savedText):segmentDraft(ref);
-      draft=validateSegmentDraft(stored);
+      draft=normalizeSegmentNames(validateSegmentDraft(stored));
       if(draft.key!==next||Math.abs(draft.duration-ref.duration)>.01)throw Error('歌曲範圍與草稿不同，請載入原先版本。');
       // Old drafts have no history. Invalid history must not prevent loading the saved draft.
       try{history=Array.isArray(undoHistory)?undoHistory.slice(-40).map(item=>{
         const {undoHistory:ignored,...snapshot}=item;validateSegmentDraft(snapshot);
         if(snapshot.key!==next||Math.abs(snapshot.duration-draft.duration)>.01)throw Error('復原紀錄歌曲不同。');
-        return snapshot;
+        return normalizeSegmentNames(snapshot);
       }):[];}catch{history=[];}
       status(savedText?'已讀取分段草稿。':'可開啟分段模式，邊播放邊加入分界。');refresh().catch(e=>status(e.message));
     }catch(e){draft=null;status('無法開啟草稿：'+e.message);}}
@@ -253,7 +257,7 @@ export function createSegmentRecording(options) {
   action('export',async()=>{if(!trial||trial.saved||busy())return;work=true;render();options.changed();try{await store.saveRemix(trial.meta,trial.mix,trial.voice);trial.saved=true;await options.recording.refresh(trial.meta.id);status('已存到錄音後處理，可繼續調整與 A/B 比較。分段素材仍保留在分段區。');}finally{work=false;render();options.changed();}});
   action('download',()=>{if(!trial)return;const a=document.createElement('a');a.href=trialURL;a.download=trial.meta.title.replace(/[\\/:*?"<>|]/g,'_')+`-${trial.meta.mode}-${trial.meta.appliedDelayMs}ms.wav`;a.click();});
   $('part').onchange=()=>{selected=Number($('part').value);loop=false;render();};$('boundary').onchange=()=>{boundary=Number($('boundary').value);render();};
-  $('name').onchange=()=>change(()=>{part().name=$('name').value.trim()||`第 ${selected+1} 段`;});$('boundary-time').onchange=()=>change(()=>moveBoundary(draft,boundary,parseSegmentTime($('boundary-time').value)));
+  $('name').onchange=()=>change(()=>{const name=$('name').value.trim();part().autoName=!name;part().name=name||`第 ${selected+1} 段`;});$('boundary-time').onchange=()=>change(()=>moveBoundary(draft,boundary,parseSegmentTime($('boundary-time').value)));
   $('base').onchange=()=>change(()=>{draft.baseId=$('base').value||null;});$('take').onchange=()=>change(()=>{part().takeId=$('take').value||null;});
   $('seek').oninput=()=>{$('position').textContent=fmt(Number($('seek').value));};$('seek').onchange=()=>{options.player()?.seekTo?.(Number($('seek').value),true);};
   for(const id of ['delay','output','allow-gaps'])$(id).onchange=()=>{invalidate();render();status('試合設定已變更，請重新試合完整一版。');};
