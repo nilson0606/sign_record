@@ -243,6 +243,28 @@ try{
  await $('recording-refresh').click();await page.waitForFunction(id=>document.getElementById('recording-review-take').value===id,pendingCopy.id);
  page.once('dialog',d=>d.accept());await $('recording-delete-all').click();await page.waitForFunction(()=>document.querySelectorAll('#post-recording option').length===0);
  const retained=await page.evaluate(()=>fixtureStore.list());assert.ok(retained.some(r=>r.id===pendingCopy.id));assert.ok(retained.some(r=>r.id===first.id));assert.ok(retained.every(r=>r.postPending||r.segmentTake));
+ // Song-scoped clearing never touches whole takes, approved products or another song.
+ const protectedRows=await page.evaluate(async row=>{
+  const mix=await fixtureStore.blob(row),voice=await fixtureStore.blob(row,'voice'),copies=[];
+  for(const kind of ['whole','composition','foreign']){const copy=structuredClone(row);copy.id=crypto.randomUUID();copy.created=Date.now();if(kind==='foreign'){copy.post.reference.cacheId='another-song';copy.segmentTake.key='another-song';}else{delete copy.segmentTake;copy.postPending=false;if(kind==='composition')copy.segmentComposition={version:1};}await fixtureStore.saveRemix(copy,mix,voice);copies.push({id:copy.id,hash:await hash(voice)});}return copies;
+ },first);
+ await $('recording-refresh').click();await page.waitForFunction(id=>[...document.getElementById('post-recording').options].some(o=>o.value===id),protectedRows[0].id);
+ await $('segment-open').click();await $('segment-refresh').click();await page.waitForFunction(()=>!document.getElementById('segment-delete-song-takes').disabled);
+ const idsBeforeClear=await page.evaluate(async()=>(await fixtureStore.list()).map(r=>r.id).sort()),postBeforeClear=await $('post-recording').locator('option').evaluateAll(opts=>opts.map(o=>o.value).sort());
+ const boundariesBeforeClear=await page.evaluate(()=>JSON.parse(localStorage.getItem('karaoke.segment-draft.v1.segment-fixture')).parts.map(({id,name,start,end})=>({id,name,start,end})));
+ page.once('dialog',async d=>{assert.match(d.message(),/分段錄音隔離測試/);assert.match(d.message(),/全部 \d+ 筆分段錄音/);assert.match(d.message(),/錄音後處理/);await d.dismiss();});await $('segment-delete-song-takes').click();await page.waitForFunction(()=>!document.getElementById('segment-delete-song-takes').disabled);
+ assert.deepEqual(await page.evaluate(async()=>(await fixtureStore.list()).map(r=>r.id).sort()),idsBeforeClear,'cancelling deletes nothing');
+ await page.evaluate(async id=>{const {RecordingStore}=await import('/recording-store.mjs');window.clearOriginalDelete=RecordingStore.prototype.delete;RecordingStore.prototype.delete=function(target){if(target===id)throw Error('fixture clear failure');return clearOriginalDelete.call(this,target);};},first.id);
+ page.once('dialog',d=>d.accept());await $('segment-delete-song-takes').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('1 筆未能清除'));
+ assert.ok((await page.evaluate(()=>fixtureStore.list())).some(r=>r.id===first.id));
+ await page.evaluate(async()=>{const {RecordingStore}=await import('/recording-store.mjs');RecordingStore.prototype.delete=clearOriginalDelete;});
+ page.once('dialog',d=>d.accept());await $('segment-delete-song-takes').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('已清除此歌曲的 1 筆'));
+ assert.equal(await $('segment-delete-song-takes').isDisabled(),true);assert.deepEqual(await $('post-recording').locator('option').evaluateAll(opts=>opts.map(o=>o.value).sort()),postBeforeClear);
+ const rowsAfterClear=await page.evaluate(()=>fixtureStore.list());assert.ok(rowsAfterClear.some(r=>r.id===pendingCopy.id));assert.ok(!rowsAfterClear.some(r=>r.segmentTake?.key==='segment-fixture'));
+ for(const entry of protectedRows)assert.equal(await page.evaluate(async({id})=>hash(await fixtureStore.blob((await fixtureStore.list()).find(r=>r.id===id),'voice')),entry),entry.hash);
+ assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('karaoke.segment-draft.v1.segment-fixture')).parts.map(({id,name,start,end})=>({id,name,start,end}))),boundariesBeforeClear);
+ assert.ok(await page.evaluate(()=>{const d=JSON.parse(localStorage.getItem('karaoke.segment-draft.v1.segment-fixture'));return [d,...d.undoHistory].every(plan=>plan.parts.every(p=>!p.takeId));}),'undo history cannot revive cleared sources');
+ await page.reload();await initialize();await $('segment-open').click();assert.equal(await $('segment-delete-song-takes').isDisabled(),true);assert.equal(await $('segment-take').locator('option').count(),1);
  assert.deepEqual(errors,[]);assert.ok(!requests.some(r=>r.startsWith('DELETE /library')));
  console.log(JSON.stringify({undoToOne:true,persistedUndo:true,legacyMergeAll:true,mergePreservesRecordings:true,splitWhilePlaying:true,dragPreciseUndo:true,cancelPreparation:true,pauseResume:true,realPCM:true,twoSegmentCapture:true,default200ms:true,backingClockUnchanged:true,missingCoverageBlocked:true,fullLength:true,rawUnchanged:true,pureVoice:true,postEdit:true,reload:true,wholeSongScoring:true,errors}));
 }finally{await browser?.close();server.kill();}

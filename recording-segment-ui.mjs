@@ -89,6 +89,28 @@ export function createSegmentRecording(options) {
     }catch(e){throw Error((deleted?'此版錄音已刪除，但草稿或列表更新失敗：':'未能完成刪除：')+e.message);}
     finally{work=false;render();options.changed();}
   }
+  const songTakes=()=>rows.filter(r=>r.segmentTake&&!r.segmentComposition&&r.post?.reference?.cacheId===key&&r.segmentTake.key===key);
+  async function deleteSongTakes(){
+    if(busy()||conflict||!enabled||!draft)return;
+    work=true;render();options.changed();
+    let deleted=0;
+    try{
+      // Read a fresh list, then delete only the explicitly confirmed song's segment sources.
+      rows=await store.list();const targets=songTakes();
+      if(!targets.length){status('此歌曲沒有可清除的分段錄音。');return;}
+      if(!confirm(`清除「${reference().title}」的全部 ${targets.length} 筆分段錄音？\n包含各段所有演唱版本，刪除後無法復原。\n段落分界、其他歌曲、整首錄音及錄音後處理中的已存成品都會保留。`))return;
+      persist();invalidate();loop=false;previewEnd=null;options.player()?.pauseVideo?.();options.pauseOther();
+      const failed=[];
+      for(const row of targets){
+        try{await store.delete(row.id);}catch(e){failed.push(e.message);continue;}
+        deleted++;rows=rows.filter(r=>r.id!==row.id);
+        for(const plan of [draft,...history]){if(plan.baseId===row.id)plan.baseId=null;for(const p of plan.parts)if(p.takeId===row.id)p.takeId=null;}
+      }
+      persist();await options.recording.refresh();
+      status(failed.length?`已清除 ${deleted} 筆分段錄音，${failed.length} 筆未能清除，可重試。${failed[0]}`:`已清除此歌曲的 ${deleted} 筆分段錄音。段落分界保留，可重新錄製；其他歌曲、整首錄音與後處理成品都保留。`);
+    }catch(e){throw Error(`已清除 ${deleted} 筆分段錄音；未能完成清除或列表更新：${e.message}`);}
+    finally{work=false;render();options.changed();}
+  }
   function change(fn){
     if(busy()||!draft)return;const old=structuredClone(draft);
     try{fn();if(JSON.stringify(draft)===JSON.stringify(old)){render();return;}const nextHistory=[...history,old].slice(-40);persist(nextHistory);history=nextHistory;invalidate();render();status('分界與版本選擇已保存。原始錄音保留。');}
@@ -105,6 +127,7 @@ export function createSegmentRecording(options) {
     playerSection.classList.toggle('segment-active',enabled);playerSection.parentElement.classList.toggle('segment-layout',enabled);$('side').hidden=$('player-tools').hidden=!enabled;
     for(const panel of [$('tools'),$('side')])for(const node of panel.querySelectorAll('button,input,select'))node.disabled=locked||!draft;
     $('stop').disabled=$('stop-player').disabled=!capture;$('download').disabled=locked||!trial;$('export').disabled=locked||!trial||!!trial.saved;
+    $('delete-song-takes').disabled=locked||!draft||!songTakes().length;
     $('export').textContent=trial?.saved?'已存到錄音後處理':'存到錄音後處理';
     if(draft){selected=Math.max(0,Math.min(selected,draft.parts.length-1));boundary=Math.max(1,Math.min(boundary,draft.parts.length-1));}
     if(takeSourceId&&takeSourceId!==part()?.takeId)clearTakePreview();
@@ -256,6 +279,7 @@ export function createSegmentRecording(options) {
   action('stop-player',()=>stop());
   for(const id of ['listen','listen-player','listen-selected'])action(id,listenTake);
   for(const id of ['delete','delete-player','delete-selected'])action(id,deleteTake);
+  action('delete-song-takes',deleteSongTakes);
   for(const id of takeModeIds)$(id).onchange=()=>{takeMode=$(id).value==='voice'?'voice':'mix';clearTakePreview();render();status(`已切換為${takeModeLabel()}，請按「試聽本段錄音」。`);};
   for(const id of guideModeIds)$(id).onchange=()=>{guideMode=$(id).value==='backing'?'backing':'original';render();status(guideMode==='backing'?'下次分段錄音只用伴樂／和音帶唱。':'下次分段錄音播放原唱＋伴樂帶唱。');};
   action('export',async()=>{if(!trial||trial.saved||busy())return;work=true;render();options.changed();try{await store.saveRemix(trial.meta,trial.mix,trial.voice);trial.saved=true;await options.recording.refresh(trial.meta.id);status('已存到錄音後處理，可繼續調整與 A/B 比較。分段素材仍保留在分段區。');}finally{work=false;render();options.changed();}});
