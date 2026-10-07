@@ -103,10 +103,12 @@ try{
  assert.ok(await page.evaluate(()=>{const r=document.querySelector('#player-section .video-shell').getBoundingClientRect(),nav=document.querySelector('.section-nav').getBoundingClientRect();return r.top>=nav.bottom&&r.bottom<innerHeight;}),'record button brings the video into view');
  assert.equal(await $('segment-listen-selected').isDisabled(),true);await $('segment-stop').click();await page.waitForFunction(()=>!document.getElementById('segment-record').disabled);await page.waitForTimeout(800);assert.equal((await page.evaluate(()=>fixtureStore.list())).length,0);assert.equal(await page.evaluate(()=>fixturePlayer.isMuted()),false);stemDelay=0;
  const beforeScore=await page.evaluate(()=>localStorage.getItem('karaoke.scores.v1'));
- await $('segment-record-settings').locator('summary').click();await $('segment-tail').selectOption('1');await $('segment-preroll').selectOption('3');await $('segment-part').selectOption('0');
+ await $('segment-record-settings').locator('summary').click();await $('segment-tail').selectOption('1');assert.equal(await $('segment-preroll').inputValue(),'5');
+ for(const value of ['', '-1', '61', '1.5']){await $('segment-preroll').fill(value);await $('segment-record').click();assert.ok((await $('segment-status').textContent()).includes('提前播放請輸入'));assert.equal(await $('segment-record').isEnabled(),true);assert.equal((await page.evaluate(()=>fixtureStore.list())).length,0);}
+ await $('segment-preroll').fill('15');await $('segment-part').selectOption('0');
  await $('segment-record').click();await page.waitForFunction(()=>fixturePlayer.isMuted()&&fixturePlayer.getPlayerState()===1);await page.evaluate(()=>fixturePlayer.pauseVideo());await page.waitForTimeout(250);await page.evaluate(()=>fixturePlayer.playVideo());await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('本段已保存'),{},{timeout:20000});
  assert.equal(await page.evaluate(()=>fixturePlayer.isMuted()),false);assert.equal(await $('segment-take').locator('option').count(),2);
- const first=(await page.evaluate(()=>fixtureStore.list()))[0];assert.ok(first.segmentTake);assert.equal(first.appliedDelayMs,0);assert.ok(first.seconds>=4.9);
+ const first=(await page.evaluate(()=>fixtureStore.list()))[0];assert.ok(first.segmentTake);assert.equal(first.appliedDelayMs,0);assert.ok(first.seconds>=4.9);assert.ok(first.post.segments[0].songTime<.2,'long preroll starts at the beginning when there is insufficient lead-in');
  assert.equal(await $('post-recording').locator('option').count(),0,'single segments stay outside post processing');assert.equal(await $('recording-list').locator('button').count(),0);
  const firstHash=await page.evaluate(async row=>hash(await fixtureStore.blob(row,'voice')),first);
  // A single recorded take is immediately playable even while another section is unrecorded.
@@ -133,7 +135,7 @@ try{
  await $('segment-guide-mode').selectOption('original');assert.equal(await $('segment-guide-mode').inputValue(),'original');
  const segmentGuideStarts=await page.evaluate(()=>guideEvents.filter(e=>e.action==='start').length);
  await page.evaluate(()=>fixturePlayer.mute());
- await $('segment-part').selectOption('1');await $('segment-record').click();await page.waitForFunction(()=>fixturePlayer.getPlayerState()===1&&!fixturePlayer.isMuted());
+ await $('segment-preroll').fill('3');await $('segment-part').selectOption('1');await $('segment-record').click();await page.waitForFunction(()=>fixturePlayer.getPlayerState()===1&&!fixturePlayer.isMuted());
  await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('本段已保存'),{},{timeout:20000});
  assert.equal(await page.evaluate(()=>guideEvents.filter(e=>e.action==='start').length),segmentGuideStarts,'original guide does not add a second accompaniment');
  assert.equal(await page.evaluate(()=>fixturePlayer.isMuted()),true,'restore previously muted player');await page.evaluate(()=>fixturePlayer.unMute());

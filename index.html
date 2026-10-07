@@ -91,7 +91,8 @@
           <p class="help">拖曳時間軸的分界線或輸入精確時間；相鄰兩段會一起更新。更改分界不會裁掉原始錄音。</p>
           </details>
           <details id="segment-record-settings"><summary>起唱與尾音設定 · 預設提前 5 秒／尾音 2 秒</summary>
-          <div class="segment-fields"><label>提前播放<select id="segment-preroll"><option value="3">3 秒</option><option value="5" selected>5 秒</option><option value="8">8 秒</option></select></label><label>尾音餘量<select id="segment-tail"><option value="1">1 秒</option><option value="2" selected>2 秒</option><option value="3">3 秒</option></select></label></div>
+          <div class="segment-fields"><label>提前播放（秒，0～60）<input id="segment-preroll" type="number" min="0" max="60" step="1" value="5" required></label><label>尾音餘量<select id="segment-tail"><option value="1">1 秒</option><option value="2" selected>2 秒</option><option value="3">3 秒</option></select></label></div>
+          <p class="help">可輸入較長的準備秒數；若段落前不足指定時間，就從歌曲開頭播放。</p>
           </details>
           <label for="segment-guide-mode">錄音時帶唱</label><select id="segment-guide-mode"><option value="original" selected>原唱＋伴樂（預設）</option><option value="backing">只有伴樂／和音</option></select>
           <div class="button-row"><button id="segment-loop" type="button" class="secondary" aria-pressed="false">循環練唱本段</button><button id="segment-record" type="button">錄這一段</button><button id="segment-stop" type="button" class="secondary" disabled>停止／保存本段</button></div>

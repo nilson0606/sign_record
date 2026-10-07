@@ -221,6 +221,7 @@ export function createSegmentRecording(options) {
   }
   async function record(){
     if(busy()||!enabled||!draft)return;if(!options.canEnter())throw Error('請先結束整首演唱。');
+    if(!$('preroll').checkValidity()){$('record-settings').open=true;$('preroll').reportValidity();throw Error('提前播放請輸入 0～60 的整數秒數。');}
     persist();options.pauseOther();invalidate();loop=false;previewEnd=null;
     const ref=structuredClone(reference()),p=structuredClone(part()),request=++serial,player=options.player();
     const c={key,partId:p.id,captureId:crypto.randomUUID(),player,guideMode,wasMuted:!!player.isMuted?.(),nodes:[],buffers:[],armed:false,monitor:null,start:Math.max(0,p.start-Number($('preroll').value)),end:Math.min(draft.duration,p.end+Number($('tail').value))};capture=c;render();options.changed();const cancelled=()=>request!==serial||capture!==c;
