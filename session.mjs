@@ -1,4 +1,6 @@
 import {keyLabel,keyShift} from './song-key.mjs';
+import {recordingReviewKey} from './recording-review.mjs';
+import {libraryRecordingCounts,updateLibraryRecordingBadges} from './library-recordings.mjs';
 import {createKeyPlayback} from './key-playback.mjs';
 import { youtubeId, noteOf } from './audio.mjs';
 import { createSingerRecorder } from './recording.mjs';
@@ -28,6 +30,11 @@ export function createKaraokeSession(options) {
   const modelName = model => ({ demucs: 'Demucs／htdemucs', 'bs-roformer': 'BS-RoFormer／Viperx 1297', 'mel-roformer': 'Mel-Band RoFormer／Kim 人聲' }[model] || 'Demucs／htdemucs');
   let phase = 'idle', loadedVideo = null, lastProgress = 0, rangeComplete = false;
   let libraryLocation = null, locationBusy = false;
+  let libraryCounts=new Map();
+  function recordingInventoryChanged(rows){
+    libraryCounts=libraryRecordingCounts(rows);
+    updateLibraryRecordingBadges($('library-list'),libraryCounts);
+  }
   const segmentLocks=new Map();
   let previewUrl = null, previewRequest = null, previewSerial = 0, restartToken = 0, segmented = null;
   let wholeGuide = null, requestedKey=0;
@@ -74,7 +81,7 @@ export function createKaraokeSession(options) {
     const response=await fetch(BASE+`/library/${ref.cacheId}/${stem}`,{headers:{'X-Karaoke-Token':token},credentials:'omit',cache:'no-store',signal:AbortSignal.timeout(30000)});
     if(!response.ok)throw Error('無法讀取已保存的伴樂／和音，請確認本機工具與歌曲庫。');return response.arrayBuffer();
   }
-  const recording = createSingerRecorder({reference:()=>phase==='preparing'?null:reference, voiced: options.voiced, context: options.context, stream: options.stream, inputSource:options.inputSource, player: options.player, loadStem:loadRecordingStem, pausePlayer: () => { options.player()?.pauseVideo?.(); stopPreview(); }});
+  const recording = createSingerRecorder({reference:()=>phase==='preparing'?null:reference, voiced: options.voiced, context: options.context, stream: options.stream, inputSource:options.inputSource, player: options.player, loadStem:loadRecordingStem, onInventoryChanged:recordingInventoryChanged, pausePlayer: () => { options.player()?.pauseVideo?.(); stopPreview(); }});
   segmented = createSegmentRecording({recording, reference:()=>reference, player:options.player, micReady:options.micReady, startMic:options.startMic,
     canEnter:()=>!take&&!maskBusy&&!['preparing','finishing','restarting'].includes(phase), changed:()=>controls(),
     pauseOther:()=>{stopPreview();recording.clearPreview();options.cancelCalibration?.();},
@@ -294,7 +301,7 @@ export function createKaraokeSession(options) {
     try {
       await ensureSession();
       if (!libraryLocation.configured) { $('library-list').replaceChildren(); $('library-status').textContent = '請先指定歌曲庫資料夾。'; return; }
-      const { songs } = await api('/library');
+      const [{songs}]=await Promise.all([api('/library'),recording.store.list().then(recordingInventoryChanged)]);
       if (!Array.isArray(songs)) throw new Error('本機工具回應不相容，請重新啟動。');
       const list = $('library-list'); list.replaceChildren();
       const keyVideos=new Set(songs.filter(song=>song.pitchShift).map(song=>song.videoId)),groups=new Map();
@@ -305,6 +312,7 @@ export function createKaraokeSession(options) {
         const load = document.createElement('button'), remove = document.createElement('button');
         load.type = remove.type = 'button'; load.className = 'song-choice'; remove.className = 'secondary song-delete'; remove.textContent = '刪除';
         load.dataset.songId = song.id; load.setAttribute('aria-label', '載入 ' + song.title); load.append(title, detail);
+        load.dataset.reviewKey=recordingReviewKey({cacheId:song.id,videoId:song.videoId,pitchShift:song.pitchShift??0});
         if (reference?.cacheId === song.id) load.setAttribute('aria-current', 'true');
         load.addEventListener('click', () => {
           if (['preparing','finishing','restarting'].includes(phase)) return;
@@ -341,7 +349,8 @@ export function createKaraokeSession(options) {
           groups.get(song.videoId).append(li);
         }else list.append(li);
       }
-      $('library-status').textContent = `這台電腦已保存 ${songs.length} 個歌曲基準。`; controls();
+      updateLibraryRecordingBadges(list,libraryCounts);
+      $('library-status').textContent = `這台電腦已保存 ${songs.length} 個歌曲基準。金色標記表示有整首待確認或分段錄音。`; controls();
     } catch (error) { $('library-status').textContent = '無法讀取歌曲庫：' + error.message; }
     finally { $('library-refresh').disabled = false; }
   }

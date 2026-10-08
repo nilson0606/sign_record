@@ -254,3 +254,8 @@ header{gap:18px;flex-wrap:wrap}
 .post-repair-panel .post-eq-grid { align-items: start; }
 
 .song-key-control{margin:18px 0}.song-key-control select{min-width:0}.song-key-group>details{width:100%;min-width:0}.key-versions{margin:8px 0 0;padding-left:12px;border-left:2px solid var(--line)}
+.song-choice.has-pending-review{border-color:#d5aa57;background:rgba(213,170,87,.12)}
+.song-choice.has-pending-review[aria-current=true]{outline:2px solid var(--accent);outline-offset:2px}
+.song-pending-badge{display:inline-block;margin:8px 0 0;padding:4px 9px;border-radius:6px;background:#f0cf88;color:#352710;font-size:12px;font-weight:700;line-height:1.5}
+.song-pending-badge[hidden]{display:none}
+.song-key-group summary>.song-pending-badge{margin:0 0 0 10px}

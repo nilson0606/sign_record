@@ -49,6 +49,7 @@ export function createSingerRecorder(options) {
   }
   async function render(savedId = null) {
     const all=await store.list(),rows=all.filter(isPostRecording), list = $('recording-list'); list.replaceChildren(); review.refresh(all,savedId);post.refresh(rows);
+    options.onInventoryChanged?.(all);
     if(savedId && rows.some(row=>row.id===savedId&&row.complete)){
       post.select(savedId,{scroll:false});
       $('post-status').textContent='已選取最新錄音，可試聽、下載或後處理。';

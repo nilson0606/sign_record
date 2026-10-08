@@ -19,7 +19,7 @@ try{
   if(req.method()==='OPTIONS')return r.fulfill({status:204,headers});
   let json;if(url.pathname==='/session')json={token:'fixture',features:['separation-progress','pitch-methods']};
   else if(url.pathname==='/library/location')json={configured:true,path:'fixture-only'};
-  else if(url.pathname==='/library')json={songs:[]};
+  else if(url.pathname==='/library')json={songs:[{...ref,id:ref.cacheId,seconds:0,bytes:1000},{...ref,id:'other-key',pitchShift:4,seconds:0,bytes:1000},{...ref,id:'other-song',videoId:'other',title:'其他歌曲',seconds:0,bytes:1000}]};
   else if(url.pathname==='/jobs'&&req.method()==='POST')json={id:'fixture-job'};
   else if(url.pathname==='/jobs/fixture-job/reference')json=ref;
   else if(url.pathname==='/jobs/fixture-job')json={ready:true,cached:true,stage:'ready',message:'Ready'};
@@ -59,6 +59,9 @@ try{
  await page.locator('#url').fill('https://www.youtube.com/watch?v=M7lc1UVf-VE');await page.locator('#prepare-song').click();await page.waitForFunction(()=>!document.getElementById('sing-start').disabled);
  }
  await page.goto(site);await initialize();const $=id=>page.locator('#'+id);
+ const librarySong=page.locator('.song-choice[data-song-id="segment-fixture"]');
+ await page.waitForFunction(()=>document.querySelectorAll('.song-choice').length===3);
+ assert.equal(await librarySong.locator('.song-pending-badge').isHidden(),true);
  await $('segment-open').click();assert.equal(await $('segment-delay').inputValue(),'200');
  for(const id of ['segment-guide-mode','sing-guide-mode'])assert.equal(await $(id).inputValue(),'original');
  assert.equal(await $('sing-guide-mode').isHidden(),true);
@@ -110,6 +113,11 @@ try{
  await $('segment-record').click();await page.waitForFunction(()=>fixturePlayer.isMuted()&&fixturePlayer.getPlayerState()===1);await page.evaluate(()=>fixturePlayer.pauseVideo());await page.waitForTimeout(250);await page.evaluate(()=>fixturePlayer.playVideo());await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('本段已保存'),{},{timeout:20000});
  assert.equal(await page.evaluate(()=>fixturePlayer.isMuted()),false);assert.equal(await $('segment-take').locator('option').count(),2);
  const first=(await page.evaluate(()=>fixtureStore.list()))[0];assert.ok(first.segmentTake);assert.equal(first.appliedDelayMs,0);assert.ok(first.seconds>=4.9);assert.ok(first.post.segments[0].songTime<.2,'long preroll starts at the beginning when there is insufficient lead-in');
+ assert.equal(await librarySong.locator('.song-pending-badge').textContent(),'分段錄音 1 筆');
+ assert.match(await librarySong.getAttribute('class'),/has-pending-review/);
+ assert.equal(await page.locator('.song-choice[data-song-id="other-key"] .song-pending-badge').isHidden(),true);
+ assert.equal(await page.locator('.song-choice[data-song-id="other-song"] .song-pending-badge').isHidden(),true);
+ assert.equal(await page.locator('.song-key-group summary .song-pending-badge').textContent(),'分段錄音 1 筆');
  assert.equal(await $('post-recording').locator('option').count(),0,'single segments stay outside post processing');assert.equal(await $('recording-list').locator('button').count(),0);
  const firstHash=await page.evaluate(async row=>hash(await fixtureStore.blob(row,'voice')),first);
  // A single recorded take is immediately playable even while another section is unrecorded.
@@ -272,6 +280,7 @@ try{
  await page.evaluate(async()=>{const {RecordingStore}=await import('/recording-store.mjs');RecordingStore.prototype.save=originalSave;});
  await $('recording-review-save').click();await page.waitForFunction(id=>document.getElementById('post-recording').value===id,pending.id);
  assert.equal((await page.evaluate(()=>fixtureStore.list())).find(r=>r.id===pending.id).postPending,false);assert.equal(await $('recording-review').isHidden(),true);
+ assert.ok(!(await librarySong.locator('.song-pending-badge').textContent()).includes('整首待確認'));
  // Both pending takes and legacy/saved recordings still support explicit deletion.
  const pendingCopy=await page.evaluate(async row=>{const copy={...row,id:crypto.randomUUID(),created:Date.now(),postPending:true};await fixtureStore.saveRemix(copy,await fixtureStore.blob(row),await fixtureStore.blob(row,'voice'));return copy;},pending);
  await $('recordings-panel').locator('summary').click();await $('recording-refresh').click();await page.waitForFunction(id=>document.getElementById('recording-review-take').value===id,pendingCopy.id);
@@ -331,6 +340,7 @@ try{
  page.once('dialog',d=>d.accept());await $('segment-delete-song-takes').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('已清除此歌曲的 1 筆'));
  assert.equal(await $('segment-delete-song-takes').isDisabled(),true);assert.deepEqual(await $('post-recording').locator('option').evaluateAll(opts=>opts.map(o=>o.value).sort()),postBeforeClear);
  const rowsAfterClear=await page.evaluate(()=>fixtureStore.list());assert.ok(rowsAfterClear.some(r=>r.id===pendingCopy.id));assert.ok(!rowsAfterClear.some(r=>r.segmentTake?.key==='segment-fixture'));
+ assert.equal(await librarySong.locator('.song-pending-badge').textContent(),'整首待確認 1 筆');
  for(const entry of protectedRows)assert.equal(await page.evaluate(async({id})=>hash(await fixtureStore.blob((await fixtureStore.list()).find(r=>r.id===id),'voice')),entry),entry.hash);
  assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('karaoke.segment-draft.v1.segment-fixture')).parts.map(({id,name,start,end})=>({id,name,start,end}))),boundariesBeforeClear);
  assert.ok(await page.evaluate(()=>{const d=JSON.parse(localStorage.getItem('karaoke.segment-draft.v1.segment-fixture'));return [d,...d.undoHistory].every(plan=>plan.parts.every(p=>!p.takeId));}),'undo history cannot revive cleared sources');

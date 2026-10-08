@@ -1,11 +1,11 @@
 import {remixRecording,wavBlob} from './recording-process.mjs';
 
-function songKey(row){
-  const ref=row?.post?.reference;
+export function recordingReviewKey(ref){
   if(!ref)return null;
   if(ref.cacheId)return JSON.stringify(['cache',ref.cacheId,ref.pitchShift??0]);
   return ref.videoId?JSON.stringify(['video',ref.videoId,ref.pitchShift??0]):null;
 }
+const songKey=row=>recordingReviewKey(row?.post?.reference);
 
 // Pending whole-song takes stay durable, but are not offered to post-processing.
 export function createRecordingReview({store,pause,loadStem,onChanged,isRecording,reference=()=>null}) {
