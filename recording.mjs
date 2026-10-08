@@ -1,3 +1,4 @@
+import {prepareRecordingDiagnostics} from './recording-diagnostics.mjs';
 import { recordingTuningSuffix } from './recording-tune.mjs';
 import { recordingSofteningSuffix, recordingEffectsSuffix } from './recording-soften.mjs';
 import {remixRecording,wavBlob,delaySeconds,recordingDelaySuffix} from './recording-process.mjs';
@@ -133,7 +134,9 @@ export function createSingerRecorder(options) {
     meta.captureClock={version:1,source:'audio-worklet-pcm',sampleRate:context.sampleRate,input:direct?'native-worklet-v2':'browser-media-stream'};
     if(direct?.nativeCapturePolicy)meta.captureClock.nativeCapturePolicy=direct.nativeCapturePolicy;
     if(direct?.nativeCaptureId)meta.captureClock.nativeCaptureId=direct.nativeCaptureId;
-    const a = { recorder, rawRecorder, rawCount:0, segment:null, context, mic, mix, destination, buffers, meta, chunks: [], queue: Promise.resolve(), count: 0, backing: [], error: null };
+    const diagnostics=await prepareRecordingDiagnostics({context,mic,stream,recorder,meta,native:!!direct});
+    if(request!==operation||options.context()!==context){recorder.dispose();mix.disconnect();destination.disconnect();throw new Error('錄音準備已取消。');}
+    const a = { diagnostics, recorder, rawRecorder, rawCount:0, segment:null, context, mic, mix, destination, buffers, meta, chunks: [], queue: Promise.resolve(), count: 0, backing: [], error: null };
     active = a; controls();
     rawRecorder.ondataavailable = event => {
       if (!event.data.size) return;
@@ -168,11 +171,13 @@ export function createSingerRecorder(options) {
     if(state===1){review.clear();review.controls();}
     const a = active; if (!a) return;
     if (state === 1) {
+      a.diagnostics?.start();
       if (a.recorder.state === 'inactive') { a.recorder.start(1000); a.rawRecorder.start(1000); }
       else if (a.recorder.state === 'paused') { a.recorder.resume(); a.rawRecorder.resume(); }
       syncTimeline(a,time); syncBacking(a,time); status(`● 錄音中 · ${a.meta.mode === 'mix' ? (a.meta.stems.includes('backing') ? '歌唱者＋配樂／和音' : '歌唱者＋配樂（無獨立和音）') : '歌唱者'}（錄製中暫存，停止後存入歌曲庫）`);
     } else if (state === 0) { stop(); }
     else {
+      a.diagnostics?.pause();
       if (a.recorder.state === 'recording') { a.recorder.pause(); a.rawRecorder.pause(); }
       closeSegment(a);
       stopBacking(a); status(a.recorder.state === 'inactive' ? '錄音已就緒，等待影片播放。' : '錄音暫停，會隨影片續播。');
@@ -182,6 +187,7 @@ export function createSingerRecorder(options) {
     operation++;
     const a = active; if (!a) return stopping;
     if(captureError instanceof Error){a.error=captureError;a.meta.captureError=captureError.message;}
+    a.diagnostics?.pause();
     if(a.recorder.state==='recording')a.recorder.pause();
     closeSegment(a); active = null; stopBacking(a); controls();
     const wasStarted = a.recorder.state !== 'inactive' || a.count > 0;
@@ -189,7 +195,9 @@ export function createSingerRecorder(options) {
       if(recorder.state==='inactive')resolve();else {recorder.onstop=resolve;recorder.stop();}
     })));
     stopping = (async () => {
-      await ended; await a.queue;
+      await ended;
+      a.diagnostics?.finish().catch(()=>{});
+      await a.queue;
       a.recorder.dispose();a.mix.disconnect();a.destination.disconnect();
       if (!wasStarted || !a.meta.bytes) { status('未開始播放，沒有保存空白錄音。'); return; }
       // Rewrite only the fixed-size WAV headers; PCM chunks stay intact in IDB.

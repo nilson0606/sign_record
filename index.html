@@ -21,6 +21,14 @@
     <div class="fold-body">
       <label for="capture-mode">收音方式</label><select id="capture-mode"><option value="browser">瀏覽器收音（原有方式）</option><option value="native">本機相容收音（開麥後伴奏變小聲時使用）</option></select><p class="help">本機相容模式由這台電腦的 Python 收音，需要啟動本機工具並允許 Python 麥克風權限。聲音只送回本機瀏覽器；仍依下方錄音選項決定是否保存。切換收音方式後請重新測試延遲。</p>
       <label for="input-device">收音麥克風</label><select id="input-device"><option value="">系統預設麥克風</option></select><p class="help">第一次允許收音後可選裝置。建議先用有線耳機或 USB 麥克風測試。</p>
+      <details id="recording-diagnostics-panel"><summary>錄音診斷 · 自動保存問題線索</summary>
+        <label class="check-option"><input id="diagnostics-enabled" type="checkbox" checked> 錄音時自動診斷</label>
+        <p class="help">只在整首／分段錄音期間保存對照音訊。暫停與停止錄音後停止收集；開麥測試、練唱、試聽與後處理不會啟動。診斷可能影響音訊時序，不代表斷音已修好。</p>
+        <p id="diagnostics-status" class="status" role="status">診斷待命。</p>
+        <p id="diagnostics-storage" class="help"></p>
+        <div class="button-row"><button id="diagnostics-refresh" type="button" class="secondary">重新整理診斷狀態</button><button id="diagnostics-clear" type="button" class="secondary">清除所有診斷資料</button></div>
+        <p class="help">只存本機，重新整理後仍保留。最多 2 GB；容量不足時停止診斷並提示，演唱錄音繼續。清除診斷不會刪除歌曲、錄音或後處理成品。</p>
+      </details>
     </div>
   </details>
   <details id="local-section" tabindex="-1" class="card local-tools" aria-labelledby="local-heading" open>

@@ -21,11 +21,12 @@ export async function createPCMRecorders(context,mic,mixed){
   const silent=context.createGain();silent.gain.value=0;node.connect(silent);silent.connect(context.destination);
   mic.connect(node,0,0);mixed.connect(node,0,1);
   let state='inactive',started=false,stopping=false,total=0,previousEnd=null,timeout,disposed=false;
+  const observers=new Set();
   const raw={mimeType:'audio/wav',get state(){return state;},start(){},resume(){},pause(){},stop(){}};
-  function disconnect(){if(disposed)return;disposed=true;clearTimeout(timeout);mic.disconnect(node);mixed.disconnect(node);node.disconnect();silent.disconnect();node.port.close();}
+  function disconnect(){if(disposed)return;disposed=true;observers.clear();clearTimeout(timeout);mic.disconnect(node);mixed.disconnect(node);node.disconnect();silent.disconnect();node.port.close();}
   function emit(recorder,data){recorder.ondataavailable?.({data});}
   function error(message){mix.onerror?.({error:new Error(message)});}
-  const mix={mimeType:'audio/wav',get state(){return state;},clock,
+  const mix={observeSamples(fn){observers.add(fn);return()=>observers.delete(fn);},mimeType:'audio/wav',get state(){return state;},clock,
     start(){if(started)return;started=true;state='recording';clock.resume(context.currentTime);emit(raw,pcmHeader(0,1,context.sampleRate));emit(mix,pcmHeader(0,2,context.sampleRate));},
     resume(){if(stopping)return;state='recording';clock.resume(context.currentTime);},
     pause(){clock.pause(context.currentTime);state='paused';},
@@ -50,6 +51,7 @@ export async function createPCMRecorders(context,mic,mixed){
     if(previousEnd!==null&&data.start!==previousEnd){error('錄音取樣時間軸中斷，已停止，避免繼續產生錯位。');return;}
     previousEnd=data.start+data.frames;
     for(const {from,to} of clock.portions(data.start,data.frames)){
+      for(const observe of observers){try{observe({start:data.start+from,recordedFrame:total,voice:data.voice.slice(from,to)});}catch{/* Diagnostic observers never interrupt recording. */}}
       total+=to-from;emit(raw,pcm16(data.voice,from,to));emit(mix,pcm16(data.mix,from*2,to*2));
     }
     if(total/context.sampleRate>1800&&!stopping)error('單次錄音已達 30 分鐘，已停止並保留錄音。');

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 export const assets = ['style.css','theme.mjs','app.mjs','native-microphone.mjs','native-mic-worklet.mjs','navigation.mjs','audio.mjs','session.mjs','scoring.mjs','calibration.mjs','mask-editor.mjs','recording.mjs','recording-store.mjs','recording-mix.mjs','recording-post.mjs','recording-audition.mjs','recording-process.mjs','recording-pcm.mjs','recording-pcm-worklet.mjs','recording-tune.mjs','recording-soften.mjs','recording-analysis.mjs'];
 assets.push('recording-scenes.mjs','song-key.mjs','key-playback.mjs');
-assets.push('recording-review.mjs');
+assets.push('recording-review.mjs','recording-diagnostics.mjs','recording-diagnostics-worklet.mjs');
 assets.push('recording-segments.mjs','recording-segment-ui.mjs');
 assets.push('recording-repair.mjs','recording-repair-client.mjs','recording-repair-worker.mjs');
 assets.push('soulx-client.mjs','soulx-settings.mjs','arrangement-client.mjs','arrangement-settings.mjs');

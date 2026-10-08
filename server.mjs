@@ -1,3 +1,4 @@
+import {createDiagnosticsHandler} from './recording-diagnostics-server.mjs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,7 +12,10 @@ files.set('/recording-review.mjs',['recording-review.mjs','text/javascript']);
 for(const name of ['recording-segments.mjs','recording-segment-ui.mjs'])files.set('/'+name,[name,'text/javascript']);
 for(const name of ['recording-repair.mjs','recording-repair-client.mjs','recording-repair-worker.mjs'])files.set('/'+name,[name,'text/javascript']);
 for(const name of ['soulx-client.mjs','soulx-settings.mjs','arrangement-client.mjs','arrangement-settings.mjs'])files.set('/'+name,[name,'text/javascript']);
+for(const name of ['recording-diagnostics.mjs','recording-diagnostics-worklet.mjs'])files.set('/'+name,[name,'text/javascript']);
+const handleDiagnostics=createDiagnosticsHandler(fileURLToPath(new URL('./.runtime/recording-diagnostics',import.meta.url)));
 const server = http.createServer(async (req, res) => {
+  if(await handleDiagnostics(req,res))return;
   if (!['GET', 'HEAD'].includes(req.method)) { res.writeHead(405); res.end(); return; }
   const pathname = new URL(req.url, 'http://localhost').pathname;
   const versioned = /^\/assets\/[a-f0-9]{16}\/([a-z-]+\.(?:mjs|css))$/.exec(pathname);

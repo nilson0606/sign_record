@@ -2,6 +2,8 @@ import {nativeInputDevices,openNativeMicrophone} from './native-microphone.mjs';
 import { youtubeId, noteOf, detectPitch, playerResponse, alignedTime } from './audio.mjs';
 import { createCalibration } from './calibration.mjs';
 import { createKaraokeSession } from './session.mjs';
+import {initRecordingDiagnostics} from './recording-diagnostics.mjs';
+initRecordingDiagnostics();
 const $ = id => document.getElementById(id);
 // Opt-in local troubleshooting: no audio, credentials, or full reference data are logged.
 let playbackTraceEnabled=new URLSearchParams(location.search).get('tracePlayback')==='1';
