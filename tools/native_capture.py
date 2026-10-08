@@ -6,6 +6,11 @@ No recorded samples are repaired, dropped or synthesized except explicit
 WASAPI SILENT packets, which Windows defines as silence.
 """
 import time
+import sys
+import ctypes
+import queue
+import threading
+from contextlib import contextmanager
 
 DISCONTINUITY = 1
 SILENT = 2
@@ -17,6 +22,75 @@ class CaptureInterrupted(RuntimeError):
     def __init__(self, code, message):
         super().__init__(message)
         self.code = code
+
+
+@contextmanager
+def audio_priority(report):
+    """Register only the device-reading thread with Windows' audio scheduler."""
+    handle = None
+    avrt = None
+    try:
+        if sys.platform == 'win32':
+            avrt = ctypes.WinDLL('avrt', use_last_error=True)
+            avrt.AvSetMmThreadCharacteristicsW.argtypes = [ctypes.c_wchar_p, ctypes.POINTER(ctypes.c_ulong)]
+            avrt.AvSetMmThreadCharacteristicsW.restype = ctypes.c_void_p
+            avrt.AvRevertMmThreadCharacteristics.argtypes = [ctypes.c_void_p]
+            avrt.AvRevertMmThreadCharacteristics.restype = ctypes.c_int
+            task = ctypes.c_ulong(0)
+            handle = avrt.AvSetMmThreadCharacteristicsW('Audio', ctypes.byref(task))
+            report({'capture': True, 'event': 'audio-scheduler', 'enabled': bool(handle),
+                    'errorCode': 0 if handle else ctypes.get_last_error()})
+    except OSError as error:
+        report({'capture': True, 'event': 'audio-scheduler', 'enabled': False, 'error': str(error)})
+    try:
+        yield
+    finally:
+        if handle:
+            avrt.AvRevertMmThreadCharacteristics(handle)
+
+
+class PCMDelivery:
+    """Keep pipe writes/monitor work off the WASAPI reading thread; never drop PCM."""
+    def __init__(self, send, capacity=100):
+        self.send = send
+        self.queue = queue.Queue(maxsize=capacity)  # Up to 2 s at 20 ms/chunk.
+        self.error = None
+        self.closed = threading.Event()
+        self.thread = threading.Thread(target=self._run, daemon=True, name='pcm-delivery')
+        self.thread.start()
+
+    def _run(self):
+        try:
+            while True:
+                try:
+                    data = self.queue.get(timeout=.02)
+                except queue.Empty:
+                    if self.closed.is_set():
+                        return
+                    continue
+                self.send(data)
+        except Exception as error:
+            self.error = error
+
+    def submit(self, data):
+        if self.error:
+            raise self.error
+        if self.closed.is_set():
+            raise RuntimeError('PCM delivery is closed')
+        if not data:
+            return
+        try:
+            self.queue.put_nowait(data)
+        except queue.Full:
+            raise CaptureInterrupted('transport-backlog', '本機音訊傳送阻塞超過緩衝容量，已保留已錄部分。')
+
+    def close(self):
+        self.closed.set()
+        self.thread.join(timeout=3)
+        if self.thread.is_alive():
+            raise CaptureInterrupted('transport-timeout', '本機音訊傳送未回應，無法送完已收取資料。')
+        if self.error:
+            raise self.error
 
 
 class WasapiPackets:
@@ -64,6 +138,7 @@ class ContinuousCapture:
         self.started = False
         self.silent = False
         self.failed = None
+        self.last_packet_at = None
 
     def fail(self, code, message, **details):
         self.failed = CaptureInterrupted(code, message)
@@ -92,7 +167,9 @@ class ContinuousCapture:
         waited = self.clock() - begin
         if self.started and flags & DISCONTINUITY:
             self.fail("device-discontinuity", "Windows 回報收音資料不連續，已停止並保留已錄部分。",
-                      devicePosition=position, flags=flags)
+                      devicePosition=position, flags=flags, packetFrames=count,
+                      sinceLastPacketMs=round((self.clock() - self.last_packet_at) * 1000, 3),
+                      waitedMs=round(waited * 1000, 3))
         if self.started and self.expected_position is not None and position != self.expected_position:
             # Device positions need not advance by the client PCM frame count:
             # shared-mode resampling can use different device/client rates.
@@ -126,6 +203,7 @@ class ContinuousCapture:
         self.started, self.silent = True, silent
         self.expected_position = position + count
         self.frames += count
+        self.last_packet_at = self.clock()
         return payload
 
     def read(self, frames):

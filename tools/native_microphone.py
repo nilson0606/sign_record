@@ -3,7 +3,7 @@ import argparse,json,sys,threading
 import numpy as np
 import soundcard as sc
 from native_monitor import NativeMonitor
-from native_capture import ContinuousCapture, WasapiPackets, CaptureInterrupted, CAPTURE_POLICY
+from native_capture import ContinuousCapture, WasapiPackets, CaptureInterrupted, CAPTURE_POLICY, PCMDelivery, audio_priority
 p=argparse.ArgumentParser()
 p.add_argument('--list',action='store_true')
 p.add_argument('--outputs',action='store_true')
@@ -32,6 +32,7 @@ else:
             monitor.close()
     threading.Thread(target=controls,daemon=True,name='monitor-controls').start()
     capture=None
+    delivery=None
     out=sys.stdout.buffer
     def send_pcm(data):
         if not data:return
@@ -46,18 +47,23 @@ else:
         # A 20 ms capacity overflowed during ordinary Windows scheduling delays.
         # Reserve 200 ms of headroom but continue draining/sending every 20 ms;
         # do not wait for this buffer to fill or alter any captured samples.
-        with mic.recorder(samplerate=48000,channels=2,blocksize=9600) as source:
+        # Pipe writes and monitoring run separately, so even a blocked consumer
+        # cannot prevent this thread from draining the device buffer promptly.
+        delivery = PCMDelivery(send_pcm)
+        out.write((json.dumps({'label':mic.name,'sampleRate':48000,'channels':1,'capturePolicy':CAPTURE_POLICY})+'\n').encode())
+        out.flush()
+        with audio_priority(report), mic.recorder(samplerate=48000,channels=2,blocksize=9600) as source:
             capture = ContinuousCapture(WasapiPackets(source), report)
             report({'capture':True,'event':'configured','bufferFrames':source.buffersize,
-                    'sampleRate':48000,'deliveryFrames':960})
-            out.write((json.dumps({'label':mic.name,'sampleRate':48000,'channels':1,'capturePolicy':CAPTURE_POLICY})+'\n').encode())
-            out.flush()
+                    'sampleRate':48000,'deliveryFrames':960,'device':mic.name,'transport':'queued-v1'})
             while True:
-                send_pcm(capture.read(960))
-    except CaptureInterrupted:
+                delivery.submit(capture.read(960))
+    except CaptureInterrupted as error:
         # ContinuousCapture already emitted a structured diagnostic; closing
         # stdout tells the browser to preserve this take as incomplete.
-        if capture:send_pcm(capture.drain())
+        if not capture or capture.failed is None:
+            report({'capture':True,'event':'error','code':error.code,'error':str(error)})
+        if capture and delivery and capture.failed:delivery.submit(capture.drain())
         raise SystemExit(2)
     except BrokenPipeError:
         pass  # The browser closed this capture normally.
@@ -65,4 +71,9 @@ else:
         report({'capture':True,'event':'error','code':'capture-exception','error':str(error)[:500]})
         raise
     finally:
+        if delivery:
+            try:delivery.close()
+            except BrokenPipeError:pass
+            except Exception as error:
+                report({'capture':True,'event':'error','code':getattr(error,'code','transport-error'),'error':str(error)})
         monitor.close()

@@ -2,11 +2,12 @@ import struct
 import sys
 import unittest
 import types
+import threading
 from unittest.mock import patch
 from collections import deque
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from native_capture import ContinuousCapture, WasapiPackets, CaptureInterrupted, SILENT, DISCONTINUITY, TIMESTAMP_ERROR
+from native_capture import ContinuousCapture, WasapiPackets, CaptureInterrupted, SILENT, DISCONTINUITY, TIMESTAMP_ERROR, PCMDelivery
 
 
 def pcm(count, value=.25):
@@ -161,6 +162,49 @@ class PacketAdapterTests(unittest.TestCase):
         packet, released = self.packet(0, 0, None)
         self.assertEqual(packet.take()[0], 0)
         self.assertEqual(released, [])
+
+
+class DeliveryTests(unittest.TestCase):
+    def test_blocked_pipe_does_not_block_capture_and_preserves_order(self):
+        entered, release = threading.Event(), threading.Event()
+        sent = []
+        def send(data):
+            entered.set()
+            if not release.wait(2):raise TimeoutError('test release missing')
+            sent.append(data)
+        delivery = PCMDelivery(send, capacity=20)
+        try:
+            delivery.submit(b'first')
+            self.assertTrue(entered.wait(1))
+            chunks = [pcm(960, i / 20) for i in range(15)]
+            # Submit 300 ms of real samples while the sender remains blocked.
+            for chunk in chunks:delivery.submit(chunk)
+            self.assertEqual(sent, [])
+        finally:
+            release.set()
+            delivery.close()
+        self.assertEqual(sent, [b'first', *chunks])
+
+    def test_full_queue_fails_instead_of_dropping_or_blocking(self):
+        entered, release = threading.Event(), threading.Event()
+        sent = []
+        def send(data):
+            entered.set();release.wait(2);sent.append(data)
+        delivery = PCMDelivery(send, capacity=2)
+        try:
+            delivery.submit(b'first');self.assertTrue(entered.wait(1))
+            delivery.submit(b'second');delivery.submit(b'third')
+            with self.assertRaises(CaptureInterrupted) as failure:delivery.submit(b'overflow')
+            self.assertEqual(failure.exception.code, 'transport-backlog')
+        finally:
+            release.set();delivery.close()
+        self.assertEqual(sent, [b'first', b'second', b'third'])
+
+    def test_broken_consumer_is_reported_on_flush(self):
+        def send(data):raise BrokenPipeError('closed')
+        delivery = PCMDelivery(send)
+        delivery.submit(b'packet')
+        with self.assertRaises(BrokenPipeError):delivery.close()
 
 
 if __name__ == '__main__':
