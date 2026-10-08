@@ -8,16 +8,18 @@ function songKey(row){
 }
 
 // Pending whole-song takes stay durable, but are not offered to post-processing.
-export function createRecordingReview({store,pause,loadStem,onChanged,isRecording}) {
+export function createRecordingReview({store,pause,loadStem,onChanged,isRecording,reference=()=>null}) {
   const $=id=>document.getElementById('recording-review-'+id);
-  let rows=[],selected=null,working=false,loading=false,url=null,request=0;
+  let allRows=[],rows=[],selected=null,working=false,loading=false,url=null,request=0,scope=null;
+  const currentKey=()=>songKey({post:{reference:reference()}});
+  const currentSelection=()=>selected&&songKey(selected)===currentKey();
   const status=text=>{$('status').textContent=document.getElementById('recording-status').textContent=text;};
   function clear(){
     request++;loading=false;$('audio').pause();$('audio').removeAttribute('src');$('audio').load();$('audio').hidden=true;
     if(url)URL.revokeObjectURL(url);url=null;
   }
   function controls(){
-    const locked=working||isRecording();
+    const locked=working||isRecording()||!currentSelection();
     $('take').disabled=$('mode').disabled=locked;
     $('listen').disabled=locked||loading||!selected?.rawBytes;
     $('save').disabled=locked||!selected?.complete;
@@ -25,7 +27,9 @@ export function createRecordingReview({store,pause,loadStem,onChanged,isRecordin
     $('delete-song').disabled=locked||!songKey(selected);
   }
   function refresh(all,savedId){
-    rows=all.filter(row=>row.postPending&&!row.segmentTake);
+    allRows=all;const nextScope=currentKey();
+    if(nextScope!==scope){clear();status('');selected=null;scope=nextScope;}
+    rows=scope?all.filter(row=>row.postPending&&!row.segmentTake&&songKey(row)===scope):[];
     const id=rows.some(row=>row.id===savedId)?savedId:selected?.id;
     const next=rows.find(row=>row.id===id)||rows[0]||null;
     if(next?.id!==selected?.id)clear();selected=next;
@@ -34,11 +38,12 @@ export function createRecordingReview({store,pause,loadStem,onChanged,isRecordin
     document.getElementById('recording-review').hidden=!rows.length;
     controls();
   }
+  function referenceChanged(){if(currentKey()!==scope)refresh(allRows);else controls();}
   async function listen(){
-    if(working||loading||isRecording()||!selected)return;
+    if(working||loading||isRecording()||!currentSelection())return;
     const row=selected,mode=$('mode').value,delay=row.recordingDelayMs??200,ref=row.post.reference;
     if(mode==='mix'&&!ref.hasPreview)throw Error('沒有已保存的伴樂，請補建音軌或選「純人聲」。');
-    clear();pause();const token=request,cancelled=()=>token!==request||isRecording();loading=true;controls();status('正在準備試聽…');
+    clear();pause();const token=request,cancelled=()=>token!==request||isRecording()||songKey(row)!==currentKey();loading=true;controls();status('正在準備試聽…');
     let context;
     try{
       const blob=await store.blob(row,'voice');if(cancelled())return;
@@ -58,13 +63,13 @@ export function createRecordingReview({store,pause,loadStem,onChanged,isRecordin
     finally{if(context)await context.close().catch(()=>{});if(token===request)loading=false;controls();}
   }
   async function save(){
-    if(working||isRecording()||!selected?.complete)return;
+    if(working||isRecording()||!currentSelection()||!selected.complete)return;
     const row=selected;working=true;clear();controls();
     try{await store.save({...row,postPending:false});await onChanged(row.id);status('已存到錄音後處理。');}
     finally{working=false;controls();}
   }
   async function remove(){
-    if(working||isRecording()||!selected)return;
+    if(working||isRecording()||!currentSelection())return;
     const row=selected;
     if(!confirm(`刪除待確認錄音「${row.title} · ${new Date(row.created).toLocaleString()}」？此版錄音與人聲將刪除，無法復原。`))return;
     working=true;clear();pause();controls();
@@ -72,13 +77,13 @@ export function createRecordingReview({store,pause,loadStem,onChanged,isRecordin
     finally{working=false;controls();}
   }
   async function removeSong(){
-    if(working||isRecording()||!selected)return;
+    if(working||isRecording()||!currentSelection())return;
     const row=selected,key=songKey(row);if(!key)return;
     working=true;controls();
     let removed=0,failed=0;
     try{
       const targets=(await store.list()).filter(r=>r.postPending&&!r.segmentTake&&songKey(r)===key);
-      if(isRecording())return;
+      if(isRecording()||key!==currentKey())return;
       if(!targets.length){await onChanged();status('這首歌已沒有待確認錄音。');return;}
       if(!confirm(`刪除「${row.title}」同一 Key 的全部 ${targets.length} 筆待確認錄音？\n\n只刪除這首的待確認整首錄音與人聲；其他歌曲、其他 Key、分段錄音及已存到錄音後處理的成品都保留。\n刪除後無法復原。`))return;
       clear();pause();
@@ -97,5 +102,5 @@ export function createRecordingReview({store,pause,loadStem,onChanged,isRecordin
   $('audio').onplay=()=>{if(isRecording()||working){clear();controls();return;}pause();for(const audio of document.querySelectorAll('audio'))if(audio!==$('audio'))audio.pause();};
   document.addEventListener('play',event=>{if(event.target instanceof HTMLMediaElement&&event.target!==$('audio')){clear();controls();}},true);
   window.addEventListener('pagehide',clear);
-  return {refresh,controls,clear};
+  return {refresh,controls,clear,referenceChanged};
 }

@@ -26,7 +26,7 @@ export function createSingerRecorder(options) {
     window.dispatchEvent(new Event('recording-balance-changed'));
   }
   const post = createRecordingPost({store, stop:()=>stop(), reference:options.reference, pause:()=>{options.pausePlayer();$('recording-audio').pause();}, download, onDelete:async()=>{clearPreview();await render();}});
-  const review=createRecordingReview({store,isRecording:()=>!!active,loadStem:options.loadStem,onChanged:render,pause:()=>{options.pausePlayer();post.clearAudio();$('recording-audio').pause();}});
+  const review=createRecordingReview({store,reference:options.reference,isRecording:()=>!!active,loadStem:options.loadStem,onChanged:render,pause:()=>{options.pausePlayer();post.clearAudio();$('recording-audio').pause();}});
   const status = text => { $('recording-status').textContent = text; };
   function controls() {
     review.controls();
@@ -261,5 +261,5 @@ export function createSingerRecorder(options) {
   controls();
   window.addEventListener('pagehide',()=>{stop();clearInterval(timer);clearPreview();});
   render().catch(error=>status('瀏覽器錄音儲存不可用：'+error.message));
-  return { prepare, stop, playerState, clearPreview, sample, referenceChanged:post.controls, store, refresh:render, balanceSettings, setBalanceSettings };
+  return { prepare, stop, playerState, clearPreview, sample, referenceChanged(){post.controls();review.referenceChanged();}, store, refresh:render, balanceSettings, setBalanceSettings };
 }

@@ -31,6 +31,7 @@ try{
   window.guideEvents=[];
   const BaseContext=window.AudioContext;
   window.AudioContext=class extends BaseContext{createBufferSource(){const node=super.createBufferSource(),connect=node.connect.bind(node),start=node.start.bind(node),stop=node.stop.bind(node);let monitor=false;node.connect=(dest,...args)=>{monitor=dest===this.destination;return connect(dest,...args);};node.start=(...args)=>{if(monitor)guideEvents.push({action:'start',offset:args[1],rate:node.playbackRate.value});return start(...args);};node.stop=(...args)=>{if(monitor)guideEvents.push({action:'stop'});return stop(...args);};return node;}};
+  localStorage.setItem('karaoke.recording-diagnostics.v1','off'); // Keep fixtures out of real diagnostic storage.
   const {createKaraokeSession}=await import('/session.mjs');
   window.fixtureMic=null;let time=0,anchor=0,state=2,muted=false;
   window.fixturePlayer={getCurrentTime:()=>state===1?Math.min(8,time+(performance.now()-anchor)/1000):time,getPlayerState:()=>state,seekTo(t){time=t;anchor=performance.now();},pauseVideo(){time=this.getCurrentTime();state=2;fixtureSession?.playerState(2);},playVideo(){if(time>=8)time=0;anchor=performance.now();state=1;fixtureSession?.playerState(1);},isMuted:()=>muted,mute(){muted=true;},unMute(){muted=false;},setPlaybackRate(){},getPlaybackRate:()=>1};
@@ -287,7 +288,7 @@ try{
   }return copies;
  },pending);
  await $('recording-refresh').click();await page.waitForFunction(id=>[...document.getElementById('recording-review-take').options].some(o=>o.value===id),bulk[0].id);
- await $('recording-review-take').selectOption(bulk.find(r=>r.kind==='unidentified').id);assert.equal(await $('recording-review-delete-song').isDisabled(),true);
+ assert.deepEqual((await $('recording-review-take').locator('option').evaluateAll(nodes=>nodes.map(n=>n.value))).sort(),bulk.filter(r=>r.kind.startsWith('target-')).map(r=>r.id).sort());
  await $('recording-review-take').selectOption(bulk[0].id);
  await $('recording-review').scrollIntoViewIfNeeded();await page.screenshot({path:'test-results/recording-review-bulk-delete.png'});
  const beforeBulk=await page.evaluate(async()=>Promise.all((await fixtureStore.list()).map(async row=>({id:row.id,hash:await hash(await fixtureStore.blob(row,'voice'))}))));
