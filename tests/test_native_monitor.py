@@ -186,7 +186,7 @@ class MonitorTests(unittest.TestCase):
                    np.full((960, 2), -.25, dtype=np.float32)]
         calls, sent = [], []
         class Source:
-            buffersize = 9600
+            buffersize = 24000
             def __enter__(self): return self
             def __exit__(self, *args): pass
         class PacketSource:
@@ -217,7 +217,7 @@ class MonitorTests(unittest.TestCase):
                 runpy.run_path(str(Path(__file__).resolve().parents[1] / "tools" / "native_microphone.py"), run_name="__main__")
         header, raw = binary.getvalue().split(b"\n", 1)
         self.assertEqual(json.loads(header), dict(label="USB fixture", sampleRate=48000, channels=1, capturePolicy="wasapi-packets-v1"))
-        self.assertEqual(calls[0], dict(samplerate=48000, channels=2, blocksize=9600))
+        self.assertEqual(calls[0], dict(samplerate=48000, channels=2, blocksize=24000))
         self.assertEqual([len(chunk) for chunk in sent], [960, 960])  # Capacity must not increase delivery latency.
         self.assertEqual(len(calls), 1)  # SoundCard record() must never be called.
         expected = np.concatenate([np.mean(np.arange(1920, dtype=np.float32).reshape(960, 2)/1920, axis=1), np.full(960, -.25, dtype=np.float32)]).astype("<f4")

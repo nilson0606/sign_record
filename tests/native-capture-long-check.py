@@ -66,7 +66,7 @@ finally:
     reader.join(timeout=2)
 assert not any(e.get('event') == 'error' for e in events), events
 configuration = next(e for e in events if e.get('event') == 'configured')
-assert configuration['bufferFrames'] >= 9600, configuration
+assert configuration['bufferFrames'] >= 24000, configuration
 assert configuration['deliveryFrames'] == 960, configuration
 assert abs(total / 192000 - elapsed) < 1, (total, elapsed)
 print(json.dumps({'device': meta['label'], 'seconds': total / 192000,

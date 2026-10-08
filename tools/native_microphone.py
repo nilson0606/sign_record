@@ -45,14 +45,14 @@ else:
         # wall-clock-based silence insertion in record().
         # WASAPI blocksize is the device buffer capacity, not our delivery size.
         # A 20 ms capacity overflowed during ordinary Windows scheduling delays.
-        # Reserve 200 ms of headroom but continue draining/sending every 20 ms;
+        # Reserve 500 ms of headroom but continue draining/sending every 20 ms;
         # do not wait for this buffer to fill or alter any captured samples.
         # Pipe writes and monitoring run separately, so even a blocked consumer
         # cannot prevent this thread from draining the device buffer promptly.
         delivery = PCMDelivery(send_pcm)
         out.write((json.dumps({'label':mic.name,'sampleRate':48000,'channels':1,'capturePolicy':CAPTURE_POLICY})+'\n').encode())
         out.flush()
-        with audio_priority(report), mic.recorder(samplerate=48000,channels=2,blocksize=9600) as source:
+        with audio_priority(report), mic.recorder(samplerate=48000,channels=2,blocksize=24000) as source:
             capture = ContinuousCapture(WasapiPackets(source), report)
             report({'capture':True,'event':'configured','bufferFrames':source.buffersize,
                     'sampleRate':48000,'deliveryFrames':960,'device':mic.name,'transport':'queued-v1'})
