@@ -216,7 +216,7 @@ class MonitorTests(unittest.TestCase):
             with self.assertRaises(EOFError):
                 runpy.run_path(str(Path(__file__).resolve().parents[1] / "tools" / "native_microphone.py"), run_name="__main__")
         header, raw = binary.getvalue().split(b"\n", 1)
-        self.assertEqual(json.loads(header), dict(label="USB fixture", sampleRate=48000, channels=1, capturePolicy="wasapi-packets-v1"))
+        self.assertEqual(json.loads(header), dict(label="USB fixture", sampleRate=48000, channels=1, capturePolicy="wasapi-packets-v2"))
         self.assertEqual(calls[0], dict(samplerate=48000, channels=2, blocksize=24000))
         self.assertEqual([len(chunk) for chunk in sent], [960, 960])  # Capacity must not increase delivery latency.
         self.assertEqual(len(calls), 1)  # SoundCard record() must never be called.

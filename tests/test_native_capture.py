@@ -1,4 +1,5 @@
 import struct
+import json
 import sys
 import unittest
 import types
@@ -76,9 +77,8 @@ class CaptureTests(unittest.TestCase):
             stream.read(960)
         self.assertEqual(len([e for e in self.events if e['event'] == 'error']), 1)
 
-    def test_discontinuity_and_bad_timestamp_stop_before_bad_packet(self):
-        for flags, position, code in [(DISCONTINUITY, 960, 'device-discontinuity'),
-                                       (TIMESTAMP_ERROR, 960, 'device-timestamp-error')]:
+    def test_bad_timestamp_stops_before_bad_packet(self):
+        for flags, position, code in [(TIMESTAMP_ERROR, 960, 'device-timestamp-error')]:
             with self.subTest(code=code):
                 stream, _ = self.capture([(0, (960, DISCONTINUITY, 0, pcm(960))),
                                           (.02, (960, flags, position, pcm(960)))])
@@ -87,6 +87,37 @@ class CaptureTests(unittest.TestCase):
                     stream.read(960)
                 self.assertEqual(self.events[-1]['code'], code)
                 self.assertEqual(stream.frames, 960)
+
+    def test_discontinuity_with_real_pcm_warns_but_keeps_recording(self):
+        chunks = [pcm(960, value) for value in [.25, -.25, .1, -.1]]
+        stream, _ = self.capture([(0, (960, DISCONTINUITY, 0, chunks[0])),
+                                  (.02, (960, DISCONTINUITY, 1920, chunks[1])),
+                                  (.04, (960, 0, 2880, chunks[2])),
+                                  (.06, (960, DISCONTINUITY, 4800, chunks[3]))])
+        self.assertEqual(stream.read(3840), b''.join(chunks))
+        self.assertEqual(stream.frames, 3840)  # No zeros inserted for device-position gaps.
+        self.assertIsNone(stream.failed)
+        warnings = [e for e in self.events if e['event'] == 'warning']
+        self.assertEqual([e['count'] for e in warnings], [1, 2])
+        self.assertEqual(warnings[-1]['recentPackets'][-1]['pos'], 4800)
+        self.assertLess(len(json.dumps(warnings[-1], ensure_ascii=True)), 4096)
+
+    def test_packet_diagnostics_are_bounded_and_contain_no_audio(self):
+        chunk = pcm(960)
+        stream, _ = self.capture([(0, (960, DISCONTINUITY if i == 25 else 0, i * 960, chunk))
+                                  for i in range(30)])
+        self.assertEqual(stream.read(30 * 960), chunk * 30)
+        warning = next(e for e in self.events if e['event'] == 'warning')
+        self.assertEqual(len(warning['recentPackets']), 12)
+        self.assertLess(len(json.dumps(warning, ensure_ascii=True)), 4096)
+        self.assertEqual(set(warning['recentPackets'][-1]), {'f', 'n', 'flags', 'pos', 'qpc100ns', 'readGapMs'})
+
+    def test_discontinuity_does_not_allow_invalid_pcm(self):
+        stream, _ = self.capture([(0, (960, 0, 0, pcm(960))),
+                                  (.02, (960, DISCONTINUITY, 960, b'bad'))])
+        stream.read(960)
+        with self.assertRaises(CaptureInterrupted):stream.read(960)
+        self.assertEqual(self.events[-1]['code'], 'invalid-packet')
 
     def test_usb_device_positions_do_not_reject_resampled_client_pcm(self):
         # Observed JAZZ-UB036 packets: device position advances 444 frames,
@@ -119,7 +150,7 @@ class CaptureTests(unittest.TestCase):
     def test_valid_partial_packet_is_available_for_rescue_after_failure(self):
         data = pcm(137)
         stream, _ = self.capture([(0, (137, 0, 0, data)),
-                                  (.02, (960, DISCONTINUITY, 137, pcm(960)))])
+                                  (.02, (960, TIMESTAMP_ERROR, 137, pcm(960)))])
         with self.assertRaises(CaptureInterrupted):
             stream.read(960)
         self.assertEqual(stream.drain(), data)
@@ -135,6 +166,7 @@ class PacketAdapterTests(unittest.TestCase):
             def buffer(self, data, size):return memoryview(data)[:size]
         def get_buffer(client, data, frames, status, position, qpc):
             data[0], frames[0], status[0], position[0] = payload, count, flags, 12345
+            qpc[0] = 987654321
             return 0
         backend = types.SimpleNamespace(_ffi=FFI(), _com=types.SimpleNamespace(check_error=lambda hr: None))
         source = types.SimpleNamespace(channelmap=[0, 1], samplerate=48000,
@@ -148,6 +180,7 @@ class PacketAdapterTests(unittest.TestCase):
         data = pcm(23)
         packet, released = self.packet(23, 0, data)
         self.assertEqual(packet.take(), (23, 0, 12345, data))
+        self.assertEqual(packet.last_qpc, 987654321)
         self.assertEqual(released, [23])
 
     def test_explicit_silent_packet_allows_null_pointer_and_is_released(self):

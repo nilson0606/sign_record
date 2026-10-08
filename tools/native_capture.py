@@ -11,11 +11,12 @@ import ctypes
 import queue
 import threading
 from contextlib import contextmanager
+from collections import deque
 
 DISCONTINUITY = 1
 SILENT = 2
 TIMESTAMP_ERROR = 4
-CAPTURE_POLICY = "wasapi-packets-v1"
+CAPTURE_POLICY = "wasapi-packets-v2"
 
 
 class CaptureInterrupted(RuntimeError):
@@ -99,6 +100,7 @@ class WasapiPackets:
         self.source, self.ffi, self.com = source, _ffi, _com
         self.channels = len(set(source.channelmap))
         self.sample_rate = source.samplerate
+        self.last_qpc = None
 
     def available(self):
         return self.source._capture_available_frames()
@@ -106,10 +108,11 @@ class WasapiPackets:
     def take(self):
         ffi = self.ffi
         data, frames, flags = ffi.new("BYTE**"), ffi.new("UINT32*"), ffi.new("DWORD*")
-        position = ffi.new("UINT64*")
+        position, qpc = ffi.new("UINT64*"), ffi.new("UINT64*")
         client = self.source._ppCaptureClient
-        result = client[0][0].lpVtbl.GetBuffer(client[0], data, frames, flags, position, ffi.NULL)
+        result = client[0][0].lpVtbl.GetBuffer(client[0], data, frames, flags, position, qpc)
         self.com.check_error(result)
+        self.last_qpc = int(qpc[0])
         count = int(frames[0])
         if not count:
             return (0, int(flags[0]), int(position[0]), b"")
@@ -139,11 +142,14 @@ class ContinuousCapture:
         self.silent = False
         self.failed = None
         self.last_packet_at = None
+        self.recent_packets = deque(maxlen=12)
+        self.discontinuities = 0
 
     def fail(self, code, message, **details):
         self.failed = CaptureInterrupted(code, message)
         self.report({"capture": True, "event": "error", "code": code,
-                     "error": message, "frame": self.frames, **details})
+                     "error": message, "frame": self.frames,
+                     "recentPackets": list(self.recent_packets), **details})
         raise self.failed
 
     def packet(self):
@@ -165,11 +171,13 @@ class ContinuousCapture:
                           waitedMs=round((self.clock() - begin) * 1000, 3))
             self.sleep(.001)
         waited = self.clock() - begin
-        if self.started and flags & DISCONTINUITY:
-            self.fail("device-discontinuity", "Windows 回報收音資料不連續，已停止並保留已錄部分。",
-                      devicePosition=position, flags=flags, packetFrames=count,
-                      sinceLastPacketMs=round((self.clock() - self.last_packet_at) * 1000, 3),
-                      waitedMs=round(waited * 1000, 3))
+        # Keep a bounded timing-only history. Device positions and client PCM
+        # may use different rates; QPC timestamps allow comparison without
+        # assuming their units match. Never log sample values.
+        self.recent_packets.append({"f": self.frames, "n": count, "flags": flags,
+                                    "pos": position, "qpc100ns": getattr(self.packets, 'last_qpc', None),
+                                    "readGapMs": None if self.last_packet_at is None else
+                                    round((self.clock() - self.last_packet_at) * 1000, 3)})
         if self.started and self.expected_position is not None and position != self.expected_position:
             # Device positions need not advance by the client PCM frame count:
             # shared-mode resampling can use different device/client rates.
@@ -191,6 +199,17 @@ class ContinuousCapture:
             payload = bytes(size)
         elif len(payload) != size:
             self.fail("invalid-packet", "Windows 收音封包長度不正確，已停止。")
+        if self.started and flags & DISCONTINUITY:
+            # The notification does not make the returned PCM invalid. The
+            # previous implementation aborted even with usable audio available.
+            # Retain every real sample and report the potential gap; never
+            # invent silence, duplicate samples or restart the device here.
+            self.discontinuities += 1
+            self.report({"capture": True, "event": "warning", "code": "device-discontinuity",
+                         "message": "Windows 回報短暫收音不連續，已記錄並繼續接收有效音訊。",
+                         "frame": self.frames, "devicePosition": position, "flags": flags,
+                         "packetFrames": count, "count": self.discontinuities,
+                         "recentPackets": list(self.recent_packets)})
         if not self.started:
             self.report({"capture": True, "event": "started", "policy": CAPTURE_POLICY,
                          "frame": 0, "devicePosition": position, "flags": flags})
