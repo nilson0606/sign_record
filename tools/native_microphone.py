@@ -42,8 +42,14 @@ else:
     try:
         # Device format and PCM wire format stay the same; never use SoundCard's
         # wall-clock-based silence insertion in record().
-        with mic.recorder(samplerate=48000,channels=2,blocksize=960) as source:
+        # WASAPI blocksize is the device buffer capacity, not our delivery size.
+        # A 20 ms capacity overflowed during ordinary Windows scheduling delays.
+        # Reserve 200 ms of headroom but continue draining/sending every 20 ms;
+        # do not wait for this buffer to fill or alter any captured samples.
+        with mic.recorder(samplerate=48000,channels=2,blocksize=9600) as source:
             capture = ContinuousCapture(WasapiPackets(source), report)
+            report({'capture':True,'event':'configured','bufferFrames':source.buffersize,
+                    'sampleRate':48000,'deliveryFrames':960})
             out.write((json.dumps({'label':mic.name,'sampleRate':48000,'channels':1,'capturePolicy':CAPTURE_POLICY})+'\n').encode())
             out.flush()
             while True:
