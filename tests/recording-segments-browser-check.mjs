@@ -308,7 +308,8 @@ try{
  page.once('dialog',d=>d.accept());await $('recording-review-delete-song').click();await page.waitForFunction(()=>document.getElementById('recording-review-status').textContent.includes('尚有 1 筆未能刪除'));
  assert.ok(!(await page.evaluate(()=>fixtureStore.list())).some(r=>r.id===bulk[0].id));
  await page.evaluate(async()=>{const {RecordingStore}=await import('/recording-store.mjs');RecordingStore.prototype.delete=bulkOriginalDelete;});
- await $('recording-review-take').selectOption(bulk[1].id);page.once('dialog',d=>d.accept());await $('recording-review-delete-song').click();await page.waitForFunction(()=>document.getElementById('recording-review-status').textContent==='已刪除這首的 1 筆待確認錄音。');
+ await $('recording-review-take').selectOption(bulk[1].id);page.once('dialog',d=>d.accept());await $('recording-review-delete-song').click();await page.waitForFunction(()=>document.getElementById('recording-review-status').textContent.includes('清除完成'));
+ assert.equal(await $('recording-review').isHidden(),true);assert.equal(await $('recording-review-status').isVisible(),true);
  await page.reload();await initialize();
  const expectedBulk=beforeBulk.filter(r=>!bulk.slice(0,2).some(b=>b.id===r.id));
  assert.deepEqual((await page.evaluate(()=>fixtureStore.list())).map(r=>r.id).sort(),expectedBulk.map(r=>r.id).sort(),'only selected song/key pending takes removed, including after reload');
@@ -335,9 +336,11 @@ try{
  assert.deepEqual(await page.evaluate(async()=>(await fixtureStore.list()).map(r=>r.id).sort()),idsBeforeClear,'cancelling deletes nothing');
  await page.evaluate(async id=>{const {RecordingStore}=await import('/recording-store.mjs');window.clearOriginalDelete=RecordingStore.prototype.delete;RecordingStore.prototype.delete=function(target){if(target===id)throw Error('fixture clear failure');return clearOriginalDelete.call(this,target);};},first.id);
  page.once('dialog',d=>d.accept());await $('segment-delete-song-takes').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('1 筆未能清除'));
+ assert.equal(await $('segment-clear-result').isVisible(),true);assert.match(await $('segment-clear-result').textContent(),/1 筆未能清除/);
  assert.ok((await page.evaluate(()=>fixtureStore.list())).some(r=>r.id===first.id));
  await page.evaluate(async()=>{const {RecordingStore}=await import('/recording-store.mjs');RecordingStore.prototype.delete=clearOriginalDelete;});
  page.once('dialog',d=>d.accept());await $('segment-delete-song-takes').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('已清除此歌曲的 1 筆'));
+ assert.equal(await $('segment-clear-result').isVisible(),true);assert.match(await $('segment-clear-result').textContent(),/清除完成，目前剩餘 0 筆/);
  assert.equal(await $('segment-delete-song-takes').isDisabled(),true);assert.deepEqual(await $('post-recording').locator('option').evaluateAll(opts=>opts.map(o=>o.value).sort()),postBeforeClear);
  const rowsAfterClear=await page.evaluate(()=>fixtureStore.list());assert.ok(rowsAfterClear.some(r=>r.id===pendingCopy.id));assert.ok(!rowsAfterClear.some(r=>r.segmentTake?.key==='segment-fixture'));
  assert.equal(await librarySong.locator('.song-pending-badge').textContent(),'整首待確認 1 筆');

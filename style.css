@@ -163,6 +163,8 @@ header{gap:18px;flex-wrap:wrap}
 #segment-side[hidden]{display:none}
 #segment-player-tools[hidden],#segment-take-audio[hidden]{display:none}
 #recording-review[hidden],.segment-active #recording-review{display:none}
+.recording-action-result:not([hidden]){padding:12px 14px;border:1px solid var(--accent);border-radius:8px;color:var(--text);background:var(--inset-bg)}
+.segment-active #recording-review-status{display:none}
 #recording-review{margin:16px 0;padding:16px;border:1px solid var(--line);border-radius:10px}
 #recording-review .button-row{flex-wrap:wrap;margin-top:14px}
 #recording-review label{margin-top:12px}

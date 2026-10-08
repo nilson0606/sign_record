@@ -13,7 +13,7 @@ export function createRecordingReview({store,pause,loadStem,onChanged,isRecordin
   let allRows=[],rows=[],selected=null,working=false,loading=false,url=null,request=0,scope=null;
   const currentKey=()=>songKey({post:{reference:reference()}});
   const currentSelection=()=>selected&&songKey(selected)===currentKey();
-  const status=text=>{$('status').textContent=document.getElementById('recording-status').textContent=text;};
+  const status=text=>{$('status').textContent=document.getElementById('recording-status').textContent=text;$('status').hidden=!text;};
   function clear(){
     request++;loading=false;$('audio').pause();$('audio').removeAttribute('src');$('audio').load();$('audio').hidden=true;
     if(url)URL.revokeObjectURL(url);url=null;
@@ -32,7 +32,7 @@ export function createRecordingReview({store,pause,loadStem,onChanged,isRecordin
     rows=scope?all.filter(row=>row.postPending&&!row.segmentTake&&songKey(row)===scope):[];
     const id=rows.some(row=>row.id===savedId)?savedId:selected?.id;
     const next=rows.find(row=>row.id===id)||rows[0]||null;
-    if(next?.id!==selected?.id)clear();selected=next;
+    if(next?.id!==selected?.id){clear();status('');}selected=next;
     $('take').replaceChildren(...rows.map(row=>new Option(`${row.title} · ${new Date(row.created).toLocaleString()} · ${row.seconds.toFixed(1)} 秒${row.complete?'':' · 未完整結束'}`,row.id)));
     if(selected)$('take').value=selected.id;
     document.getElementById('recording-review').hidden=!rows.length;
@@ -87,13 +87,14 @@ export function createRecordingReview({store,pause,loadStem,onChanged,isRecordin
       if(!targets.length){await onChanged();status('這首歌已沒有待確認錄音。');return;}
       if(!confirm(`刪除「${row.title}」同一 Key 的全部 ${targets.length} 筆待確認錄音？\n\n只刪除這首的待確認整首錄音與人聲；其他歌曲、其他 Key、分段錄音及已存到錄音後處理的成品都保留。\n刪除後無法復原。`))return;
       clear();pause();
+      status(`正在清除這首的 ${targets.length} 筆待確認錄音…`);
       for(const target of targets){
         if(isRecording())break;
         try{await store.delete(target.id);removed++;}catch{failed++;}
       }
       await onChanged();
       const remaining=targets.length-removed;
-      status(`已刪除這首的 ${removed} 筆待確認錄音。${remaining?`尚有 ${remaining} 筆${failed?'未能刪除，請重試':'因開始錄音而保留'}。`:''}`);
+      status(`已刪除這首的 ${removed} 筆待確認錄音。${remaining?`尚有 ${remaining} 筆${failed?'未能刪除，請重試':'因開始錄音而保留'}。`:'清除完成，這首此 Key 的待確認整首錄音已全部清空。'}`);
     }finally{working=false;controls();}
   }
   for(const [id,fn]of [['listen',listen],['save',save],['delete',remove],['delete-song',removeSong]])$(id).onclick=()=>Promise.resolve().then(fn).catch(e=>status(e.message));

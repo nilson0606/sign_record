@@ -88,8 +88,8 @@
       <div class="button-row"><button id="recording-review-delete-song" type="button" class="secondary">刪除這首全部待確認錄音</button></div>
       <p class="help">依上方選取的歌曲與 Key 清除；分段錄音與已存到錄音後處理的成品保留。</p>
       <audio id="recording-review-audio" controls hidden aria-label="待確認整首錄音試聽"></audio>
-      <p id="recording-review-status" class="status" role="status">試聽滿意後，再存到錄音後處理。</p>
     </section>
+    <p id="recording-review-status" class="status recording-action-result" role="status" hidden></p>
     <div class="score-grid"><div class="total"><strong id="total-score">—</strong><span>總分 / 100</span></div><div><strong id="pitch-score">—</strong><span>音準 · 60%</span></div><div><strong id="rhythm-score">—</strong><span>進拍 · 25%</span></div><div><strong id="coverage-score">—</strong><span>完整度 · 15%</span></div></div>
     <p id="take-difficulty" class="help" aria-live="polite">尚未開始演唱；每輪開始後固定難度。</p>
     <p id="score-status" class="status" role="status">準備歌曲並開啟麥克風後，按播放就開始評分。</p>
@@ -148,7 +148,7 @@
           <audio id="segment-audio" controls hidden preload="metadata"></audio>
           <div class="button-row"><button id="segment-export" type="button" class="secondary" disabled>存到錄音後處理</button><button id="segment-download" type="button" class="secondary" disabled>下載試合 WAV</button></div>
           <p class="help">單段錄音保存在分段區，試合只供暫存試聽，兩者都不加入錄音後處理。滿意後按「存到錄音後處理」，才保存完整成品供後製及 A/B。試合可加伴樂，校正預設 200 ms；原始分段錄音保留。</p>
-          <div class="segment-clear"><button id="segment-delete-song-takes" type="button" class="secondary" disabled>清除此歌曲的所有分段錄音</button><p class="help">只刪除目前歌曲的各段錄音版本。段落分界、其他歌曲、整首錄音與錄音後處理中的已存成品都保留。</p></div>
+          <div class="segment-clear"><button id="segment-delete-song-takes" type="button" class="secondary" disabled>清除此歌曲的所有分段錄音</button><p id="segment-clear-result" class="status recording-action-result" role="status" hidden></p><p class="help">只刪除目前歌曲的各段錄音版本。段落分界、其他歌曲、整首錄音與錄音後處理中的已存成品都保留。</p></div>
           </details>
     </aside>
     <section id="voice-section" tabindex="-1" class="card voice-card">
