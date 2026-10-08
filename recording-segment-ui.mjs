@@ -94,22 +94,23 @@ export function createSegmentRecording(options) {
   const songTakes=()=>rows.filter(r=>r.segmentTake&&!r.segmentComposition&&r.post?.reference?.cacheId===key&&r.segmentTake.key===key);
   async function deleteSongTakes(){
     if(busy()||conflict||!enabled||!draft)return;
-    work=true;render();options.changed();
+    work=true;render();options.changed();clearResult('正在讀取要清除的分段錄音清單…');
     let deleted=0;
     try{
       // Read a fresh list, then delete only the explicitly confirmed song's segment sources.
       rows=await store.list();const targets=songTakes();
       if(!targets.length){const text='此歌曲的分段錄音已清空，目前剩餘 0 筆。';status(text);clearResult(text);return;}
-      if(!confirm(`清除「${reference().title}」的全部 ${targets.length} 筆分段錄音？\n包含各段所有演唱版本，刪除後無法復原。\n段落分界、其他歌曲、整首錄音及錄音後處理中的已存成品都會保留。`))return;
+      if(!confirm(`清除「${reference().title}」的全部 ${targets.length} 筆分段錄音？\n包含各段所有演唱版本，刪除後無法復原。\n段落分界、其他歌曲、整首錄音及錄音後處理中的已存成品都會保留。`)){clearResult('已取消清除，錄音保留。');return;}
       persist();invalidate();loop=false;previewEnd=null;options.player()?.pauseVideo?.();options.pauseOther();
       clearResult(`正在清除 ${targets.length} 筆分段錄音…`);
-      const failed=[];
+      const failed=[];let processed=0;
       for(const row of targets){
         try{await store.delete(row.id);}catch(e){failed.push(e.message);continue;}
+        finally{clearResult(`正在清除分段錄音：${++processed}／${targets.length} 筆${failed.length?`，${failed.length} 筆失敗`:''}…`);}
         deleted++;rows=rows.filter(r=>r.id!==row.id);
         for(const plan of [draft,...history]){if(plan.baseId===row.id)plan.baseId=null;for(const p of plan.parts)if(p.takeId===row.id)p.takeId=null;}
       }
-      persist();await options.recording.refresh();
+      clearResult(`已處理 ${processed}／${targets.length} 筆，正在更新錄音清單…`);persist();await options.recording.refresh();
       const text=failed.length?`已清除 ${deleted} 筆分段錄音，${failed.length} 筆未能清除，可重試。${failed[0]}`:`已清除此歌曲的 ${deleted} 筆分段錄音。清除完成，目前剩餘 0 筆。段落分界保留，可重新錄製；其他歌曲、整首錄音與後處理成品都保留。`;
       status(text);clearResult(text);
     }catch(e){const text=`已清除 ${deleted} 筆分段錄音；未能完成清除或列表更新：${e.message}`;clearResult(text);throw Error(text);}

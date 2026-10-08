@@ -79,20 +79,21 @@ export function createRecordingReview({store,pause,loadStem,onChanged,isRecordin
   async function removeSong(){
     if(working||isRecording()||!currentSelection())return;
     const row=selected,key=songKey(row);if(!key)return;
-    working=true;controls();
-    let removed=0,failed=0;
+    working=true;controls();status('正在讀取要清除的待確認錄音清單…');
+    let removed=0,failed=0,processed=0;
     try{
       const targets=(await store.list()).filter(r=>r.postPending&&!r.segmentTake&&songKey(r)===key);
       if(isRecording()||key!==currentKey())return;
       if(!targets.length){await onChanged();status('這首歌已沒有待確認錄音。');return;}
-      if(!confirm(`刪除「${row.title}」同一 Key 的全部 ${targets.length} 筆待確認錄音？\n\n只刪除這首的待確認整首錄音與人聲；其他歌曲、其他 Key、分段錄音及已存到錄音後處理的成品都保留。\n刪除後無法復原。`))return;
+      if(!confirm(`刪除「${row.title}」同一 Key 的全部 ${targets.length} 筆待確認錄音？\n\n只刪除這首的待確認整首錄音與人聲；其他歌曲、其他 Key、分段錄音及已存到錄音後處理的成品都保留。\n刪除後無法復原。`)){status('已取消清除，錄音保留。');return;}
       clear();pause();
       status(`正在清除這首的 ${targets.length} 筆待確認錄音…`);
       for(const target of targets){
         if(isRecording())break;
         try{await store.delete(target.id);removed++;}catch{failed++;}
+        status(`正在清除待確認錄音：${++processed}／${targets.length} 筆，已刪除 ${removed} 筆${failed?`，${failed} 筆失敗`:''}…`);
       }
-      await onChanged();
+      status(`已處理 ${processed}／${targets.length} 筆，正在更新錄音清單…`);await onChanged();
       const remaining=targets.length-removed;
       status(`已刪除這首的 ${removed} 筆待確認錄音。${remaining?`尚有 ${remaining} 筆${failed?'未能刪除，請重試':'因開始錄音而保留'}。`:'清除完成，這首此 Key 的待確認整首錄音已全部清空。'}`);
     }finally{working=false;controls();}

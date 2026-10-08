@@ -66,9 +66,9 @@ export class BrowserRecordingStore {
 
 // IndexedDB buffers an active take. Completed recordings move to the local helper.
 export class RecordingStore {
-  constructor({status=()=>{}}={}){this.browser=new BrowserRecordingStore();this.status=status;this.pending=Promise.resolve();this.diskRows=[];this.session=null;}
+  constructor({status=()=>{}}={}){this.browser=new BrowserRecordingStore();this.status=status;this.pending=Promise.resolve();this.diskRows=[];this.session=null;this.listRequest=null;}
   open(){return this.browser.open();}
-  serial(work){const result=this.pending.then(work);this.pending=result.catch(()=>{});return result;}
+  serial(work){this.listRequest=null;const result=this.pending.then(work);this.pending=result.catch(()=>{});return result;}
   async request(route,{method='GET',body,root}={}){
     const base='http://127.0.0.1:4274';
     if(!this.session||Date.now()-this.session.time>5000){const r=await fetch(base+'/session',{signal:AbortSignal.timeout(5000)});if(!r.ok)throw new Error('本機工具無法連接。');this.session={...await r.json(),time:Date.now()};}
@@ -95,6 +95,7 @@ export class RecordingStore {
     return stored;
   }
   save(meta,chunk,index,track='mix'){
+    this.listRequest=null;
     if(chunk&&!meta.complete)return this.browser.save(meta,chunk,index,track);
     return this.serial(async()=>{
       if(meta._archiveRoot&&!chunk){
@@ -114,7 +115,11 @@ export class RecordingStore {
       await this.archiveCompleted(meta);
     });
   }
-  list(){return this.serial(async()=>{
+  list(){
+    // Share overlapping readers only. A queued mutation invalidates this request,
+    // so a subsequent reader still waits for the write and gets a fresh inventory.
+    if(this.listRequest)return this.listRequest;
+    const request=this.serial(async()=>{
     const local=await this.browser.list();let info;
     try{info=await this.info();}catch(error){this.status('本機錄音目錄未連線；瀏覽器待搬存資料仍保留。'+error.message);return [...local,...this.diskRows.filter(r=>!local.some(l=>l.id===r.id))].sort((a,b)=>b.created-a.created);}
     const records=new Map(info.records.map(row=>[row.id,row]));let moved=0;const errors=[];
@@ -126,7 +131,11 @@ export class RecordingStore {
     this.diskRows=[...records.values()].filter(r=>r._archiveRoot);
     this.status(`錄音位置：${info.path}。${moved?'已搬存 '+moved+' 筆，瀏覽器舊副本已清除。':''}${errors.length?'部分錄音仍留在瀏覽器：'+errors[0]:''}`);
     return [...records.values()].sort((a,b)=>b.created-a.created);
-  });}
+    });
+    this.listRequest=request;
+    const clear=()=>{if(this.listRequest===request)this.listRequest=null;};request.then(clear,clear);
+    return request;
+  }
   async blob(meta,track='mix'){
     if(meta._archiveRoot)return (await this.request('/recordings/'+meta.id+'/'+track,{root:meta._archiveRoot})).blob();
     const local=await this.browser.blob(meta,track);if(local.size)return local;
@@ -135,14 +144,16 @@ export class RecordingStore {
   }
   delete(id){return this.serial(async()=>{
     const known=this.diskRows.find(r=>r.id===id);let info;
-    try{info=await this.info();}catch(error){if(known)throw error;}
+    // A listed row already carries its archive root. DELETE validates that root
+    // and the target on the server; rescanning every other recording adds no safety.
+    if(!known)try{info=await this.info();}catch{/* Browser-only takes remain deletable offline. */}
     const disk=info?.records.find(r=>r.id===id)||known;
     if(disk){await this.request('/recordings/'+id,{method:'DELETE',root:disk._archiveRoot});}
     await this.browser.delete(id);this.diskRows=this.diskRows.filter(r=>r.id!==id);
   });}
   async deleteAll(){const rows=await this.list();for(const row of rows)await this.delete(row.id);return rows.length;}
   async saveMp3(meta,blob){
-    const info=await this.info(),stored=info.records.find(r=>r.id===meta.id);if(!stored)throw new Error('請先將這筆錄音搬存到歌曲庫。');
+    const stored=this.diskRows.find(r=>r.id===meta.id)||(await this.info()).records.find(r=>r.id===meta.id);if(!stored)throw new Error('請先將這筆錄音搬存到歌曲庫。');
     return (await this.request('/recordings/'+meta.id+'/mp3',{method:'POST',body:blob,root:stored._archiveRoot})).json();
   }
 }

@@ -13,11 +13,12 @@ await new Promise(resolve=>helper.listen(0,'127.0.0.1',resolve));const api='http
 const server=spawn(process.execPath,['server.mjs'],{env:{...process.env,PORT:'4276'},windowsHide:true,stdio:['ignore','pipe','pipe']});
 await new Promise((resolve,reject)=>{server.stdout.once('data',resolve);server.once('error',reject);});let browser;
 try{
- browser=await chromium.launch({channel:process.env.BROWSER_CHANNEL||'msedge',headless:true,args:['--disable-gpu']});let offline=false;
+ browser=await chromium.launch({channel:process.env.BROWSER_CHANNEL||'msedge',headless:true,args:['--disable-gpu']});let offline=false,inventoryReads=0;
  async function client(){const context=await browser.newContext();const page=await context.newPage();
   await page.route(site+'/archive-fixture',r=>r.fulfill({contentType:'text/html',body:'<title>Archive fixture</title>'}));
   await page.route('http://127.0.0.1:4274/**',async route=>{
    const req=route.request(),url=new URL(req.url());if(offline){await route.abort();return;}
+   if(url.pathname==='/recordings'&&req.method()==='GET')inventoryReads++;
    if(url.pathname==='/session'){await route.fulfill({json:{token:'test',features:['recording-library','recording-raw-mime']}});return;}
    const response=await fetch(api+url.pathname+url.search,{method:req.method(),body:['GET','HEAD'].includes(req.method())?undefined:req.postDataBuffer()});
    await route.fulfill({status:response.status,body:Buffer.from(await response.arrayBuffer()),contentType:response.headers.get('content-type')||'application/json'});
@@ -49,8 +50,9 @@ try{
  await other.page.evaluate(async id=>{await diskStore.delete(id);},remix.id);
  await page.evaluate(async row=>{await localStore.save(row,new Blob(['mix123']),0);await localStore.save(row,new Blob(['voice']),0,'voice');},meta);
  assert.equal((await page.evaluate(()=>diskStore.list())).length,0,'deleted disk record must not resurrect from stale browser');
- await page.evaluate(async()=>{for(let i=0;i<2;i++){const row={id:crypto.randomUUID(),title:'Remix '+i,mime:'audio/wav',created:Date.now(),seconds:1,bytes:3,complete:true};await diskStore.save(row,new Blob(['wav']),0);}});
- assert.equal((await archive.list()).records.length,2);await writeFile(path.join(root,'song-kept.txt'),'keep');
- assert.equal(await page.evaluate(()=>diskStore.deleteAll()),2);assert.equal((await archive.list()).records.length,0);assert.equal(await readFile(path.join(root,'song-kept.txt'),'utf8'),'keep');
+ await page.evaluate(async()=>{for(let i=0;i<10;i++){const row={id:crypto.randomUUID(),title:'Remix '+i,mime:'audio/wav',created:Date.now(),seconds:1,bytes:3,complete:true};await diskStore.save(row,new Blob(['wav']),0);}});
+ assert.equal((await archive.list()).records.length,10);await writeFile(path.join(root,'song-kept.txt'),'keep');
+ const beforeDeleteReads=inventoryReads;
+ assert.equal(await page.evaluate(()=>diskStore.deleteAll()),10);assert.equal(inventoryReads-beforeDeleteReads,1,'ten disk deletions require only the initial inventory request');assert.equal((await archive.list()).records.length,0);assert.equal(await readFile(path.join(root,'song-kept.txt'),'utf8'),'keep');
  console.log('Real browser migration, interrupted/offline retry, cross-browser listing, metadata/MP3 persistence, stale-copy deletion and delete-all passed.');
 }finally{await browser?.close();server.kill();await new Promise(resolve=>helper.close(resolve));if(path.dirname(root)===tmpdir()&&path.basename(root).startsWith('karaoke-archive-browser-'))await rm(root,{recursive:true,force:true,maxRetries:5});}
