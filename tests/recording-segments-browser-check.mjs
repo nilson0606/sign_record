@@ -276,6 +276,35 @@ try{
  await $('recordings-panel').locator('summary').click();await $('recording-refresh').click();await page.waitForFunction(id=>document.getElementById('recording-review-take').value===id,pendingCopy.id);
  page.once('dialog',d=>d.dismiss());await $('recording-review-delete').click();assert.ok((await page.evaluate(()=>fixtureStore.list())).some(r=>r.id===pendingCopy.id));
  page.once('dialog',d=>d.accept());await $('recording-review-delete').click();await page.waitForFunction(()=>document.getElementById('recording-review').hidden);assert.ok(!(await page.evaluate(()=>fixtureStore.list())).some(r=>r.id===pendingCopy.id));
+ // Bulk pending deletion is scoped to the selected song/key, with cancellation and partial failure recovery.
+ const bulk=await page.evaluate(async row=>{
+  const copies=[];for(const kind of ['target-a','target-b','foreign','key','unidentified']){
+   const copy=structuredClone(row);copy.id=crypto.randomUUID();copy.created=Date.now();copy.postPending=true;
+   if(kind==='foreign')copy.post.reference.cacheId='another-song';
+   if(kind==='key'){copy.post.reference.cacheId+='-key4';copy.post.reference.pitchShift=4;}
+   if(kind==='unidentified')delete copy.post.reference;
+   await fixtureStore.saveRemix(copy,await fixtureStore.blob(row),await fixtureStore.blob(row,'voice'));copies.push({kind,id:copy.id});
+  }return copies;
+ },pending);
+ await $('recording-refresh').click();await page.waitForFunction(id=>[...document.getElementById('recording-review-take').options].some(o=>o.value===id),bulk[0].id);
+ await $('recording-review-take').selectOption(bulk.find(r=>r.kind==='unidentified').id);assert.equal(await $('recording-review-delete-song').isDisabled(),true);
+ await $('recording-review-take').selectOption(bulk[0].id);
+ await $('recording-review').scrollIntoViewIfNeeded();await page.screenshot({path:'test-results/recording-review-bulk-delete.png'});
+ const beforeBulk=await page.evaluate(async()=>Promise.all((await fixtureStore.list()).map(async row=>({id:row.id,hash:await hash(await fixtureStore.blob(row,'voice'))}))));
+ page.once('dialog',async d=>{assert.match(d.message(),/分段錄音隔離測試/);assert.match(d.message(),/全部 2 筆/);await d.dismiss();});
+ await $('recording-review-delete-song').click();await page.waitForFunction(()=>!document.getElementById('recording-review-delete-song').disabled);
+ assert.deepEqual((await page.evaluate(()=>fixtureStore.list())).map(r=>r.id).sort(),beforeBulk.map(r=>r.id).sort());
+ await page.evaluate(async id=>{const {RecordingStore}=await import('/recording-store.mjs');window.bulkOriginalDelete=RecordingStore.prototype.delete;RecordingStore.prototype.delete=function(target){if(target===id)throw Error('fixture bulk failure');return bulkOriginalDelete.call(this,target);};},bulk[1].id);
+ page.once('dialog',d=>d.accept());await $('recording-review-delete-song').click();await page.waitForFunction(()=>document.getElementById('recording-review-status').textContent.includes('尚有 1 筆未能刪除'));
+ assert.ok(!(await page.evaluate(()=>fixtureStore.list())).some(r=>r.id===bulk[0].id));
+ await page.evaluate(async()=>{const {RecordingStore}=await import('/recording-store.mjs');RecordingStore.prototype.delete=bulkOriginalDelete;});
+ await $('recording-review-take').selectOption(bulk[1].id);page.once('dialog',d=>d.accept());await $('recording-review-delete-song').click();await page.waitForFunction(()=>document.getElementById('recording-review-status').textContent==='已刪除這首的 1 筆待確認錄音。');
+ await page.reload();await initialize();
+ const expectedBulk=beforeBulk.filter(r=>!bulk.slice(0,2).some(b=>b.id===r.id));
+ assert.deepEqual((await page.evaluate(()=>fixtureStore.list())).map(r=>r.id).sort(),expectedBulk.map(r=>r.id).sort(),'only selected song/key pending takes removed, including after reload');
+ for(const entry of expectedBulk)assert.equal(await page.evaluate(async({id})=>hash(await fixtureStore.blob((await fixtureStore.list()).find(r=>r.id===id),'voice')),entry),entry.hash);
+ await page.evaluate(async ids=>{for(const id of ids)await fixtureStore.delete(id);},bulk.slice(2).map(r=>r.id));
+ await $('recordings-panel').locator('summary').click();
  const legacy=await page.evaluate(async row=>{const copy={...row,id:crypto.randomUUID(),created:Date.now()};delete copy.postPending;await fixtureStore.saveRemix(copy,await fixtureStore.blob(row),await fixtureStore.blob(row,'voice'));return copy;},pending);
  await $('recording-refresh').click();await page.waitForFunction(id=>[...document.getElementById('post-recording').options].some(o=>o.value===id),legacy.id);
  for(const id of [legacy.id,mix.id]){await $('post-recording').selectOption(id);page.once('dialog',d=>d.accept());await $('selected-recording-delete').click();await page.waitForFunction(id=>![...document.getElementById('post-recording').options].some(o=>o.value===id),id);assert.ok(!(await page.evaluate(()=>fixtureStore.list())).some(r=>r.id===id));}

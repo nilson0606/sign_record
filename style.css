@@ -181,7 +181,7 @@ header{gap:18px;flex-wrap:wrap}
 #segment-output-panel .help{margin-bottom:0}
 #segment-output-panel input[type=checkbox]{accent-color:var(--accent)}
 #segment-output-panel .segment-clear{margin-top:20px;padding-top:16px;border-top:1px solid var(--input-border)}
-#segment-delete-song-takes{width:100%;white-space:normal;border-color:#d99da9;color:#ffd1db}
+#segment-delete-song-takes,#recording-review-delete-song{width:100%;white-space:normal;border-color:#d99da9;color:#ffd1db}
 @media(max-width:760px){.layout.segment-layout{grid-template-columns:minmax(0,1fr)}.layout.segment-layout>#segment-side{grid-column:1;grid-row:3}}
 
 #voice-output{min-width:0;border:1px solid var(--line);border-radius:10px;padding:14px;margin:18px 0}

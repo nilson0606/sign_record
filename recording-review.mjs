@@ -1,5 +1,12 @@
 import {remixRecording,wavBlob} from './recording-process.mjs';
 
+function songKey(row){
+  const ref=row?.post?.reference;
+  if(!ref)return null;
+  if(ref.cacheId)return JSON.stringify(['cache',ref.cacheId,ref.pitchShift??0]);
+  return ref.videoId?JSON.stringify(['video',ref.videoId,ref.pitchShift??0]):null;
+}
+
 // Pending whole-song takes stay durable, but are not offered to post-processing.
 export function createRecordingReview({store,pause,loadStem,onChanged,isRecording}) {
   const $=id=>document.getElementById('recording-review-'+id);
@@ -15,6 +22,7 @@ export function createRecordingReview({store,pause,loadStem,onChanged,isRecordin
     $('listen').disabled=locked||loading||!selected?.rawBytes;
     $('save').disabled=locked||!selected?.complete;
     $('delete').disabled=locked||!selected;
+    $('delete-song').disabled=locked||!songKey(selected);
   }
   function refresh(all,savedId){
     rows=all.filter(row=>row.postPending&&!row.segmentTake);
@@ -63,7 +71,27 @@ export function createRecordingReview({store,pause,loadStem,onChanged,isRecordin
     try{await store.delete(row.id);await onChanged();status('已刪除此版待確認錄音。');}
     finally{working=false;controls();}
   }
-  for(const [id,fn]of [['listen',listen],['save',save],['delete',remove]])$(id).onclick=()=>Promise.resolve().then(fn).catch(e=>status(e.message));
+  async function removeSong(){
+    if(working||isRecording()||!selected)return;
+    const row=selected,key=songKey(row);if(!key)return;
+    working=true;controls();
+    let removed=0,failed=0;
+    try{
+      const targets=(await store.list()).filter(r=>r.postPending&&!r.segmentTake&&songKey(r)===key);
+      if(isRecording())return;
+      if(!targets.length){await onChanged();status('這首歌已沒有待確認錄音。');return;}
+      if(!confirm(`刪除「${row.title}」同一 Key 的全部 ${targets.length} 筆待確認錄音？\n\n只刪除這首的待確認整首錄音與人聲；其他歌曲、其他 Key、分段錄音及已存到錄音後處理的成品都保留。\n刪除後無法復原。`))return;
+      clear();pause();
+      for(const target of targets){
+        if(isRecording())break;
+        try{await store.delete(target.id);removed++;}catch{failed++;}
+      }
+      await onChanged();
+      const remaining=targets.length-removed;
+      status(`已刪除這首的 ${removed} 筆待確認錄音。${remaining?`尚有 ${remaining} 筆${failed?'未能刪除，請重試':'因開始錄音而保留'}。`:''}`);
+    }finally{working=false;controls();}
+  }
+  for(const [id,fn]of [['listen',listen],['save',save],['delete',remove],['delete-song',removeSong]])$(id).onclick=()=>Promise.resolve().then(fn).catch(e=>status(e.message));
   $('take').onchange=()=>{clear();selected=rows.find(row=>row.id===$('take').value)||null;controls();status('已選取待確認錄音，可先試聽。');};
   $('mode').onchange=()=>{clear();controls();status('試聽內容已變更，請按「試聽這一版」。');};
   $('audio').onplay=()=>{if(isRecording()||working){clear();controls();return;}pause();for(const audio of document.querySelectorAll('audio'))if(audio!==$('audio'))audio.pause();};
