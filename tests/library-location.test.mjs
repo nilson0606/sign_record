@@ -49,7 +49,7 @@ test('helper enforces setup, auth and idle-only changes; selected library surviv
   }
   async function stop() { if (child && child.exitCode === null) { const exited = new Promise(resolve => child.once('exit', resolve)); child.kill(); await exited; } }
   try {
-    for (const file of ['helper-local.mjs', 'native-microphone-server.mjs', 'local-jobs.mjs', 'soulx-server.mjs', 'soulx-settings.mjs', 'arrangement-server.mjs', 'arrangement-settings.mjs', 'recording-export.mjs', 'recording-archive.mjs', 'local-library.mjs', 'library-location.mjs', 'scoring.mjs', 'song-key.mjs']) await copyFile(new URL('../' + file, import.meta.url), path.join(dir, file));
+    for (const file of ['helper-local.mjs', 'native-microphone-server.mjs', 'local-jobs.mjs', 'voicelab-server.mjs', 'voicelab-settings.mjs', 'arrangement-server.mjs', 'arrangement-settings.mjs', 'recording-export.mjs', 'recording-archive.mjs', 'local-library.mjs', 'library-location.mjs', 'scoring.mjs', 'song-key.mjs']) await copyFile(new URL('../' + file, import.meta.url), path.join(dir, file));
     // Bind a random test port without exposing the helper outside loopback.
     const helper = path.join(dir, 'helper-local.mjs');
     let source = await readFile(helper, 'utf8');
@@ -57,12 +57,12 @@ test('helper enforces setup, auth and idle-only changes; selected library surviv
     await writeFile(helper, source);
     await start();
     assert.equal((await request('/library/location', 'GET', undefined, false)).status, 403);
-    assert.equal((await request('/soulx', 'GET', undefined, false)).status, 403);
+    assert.equal((await request('/voicelab', 'GET', undefined, false)).status, 403);
     assert.equal((await request('/arrangements', 'GET', undefined, false)).status, 403);
     assert.equal((await request('/arrangements/library', 'GET', undefined, false)).status, 403);
     assert.equal((await request('/arrangements/library/00000000-0000-4000-8000-000000000001', 'DELETE', undefined, false)).status, 403);
     assert.equal((await (await request('/arrangements')).json()).installed, false);
-    assert.equal((await (await request('/soulx')).json()).installed, false);
+    assert.equal((await (await request('/voicelab')).json()).installed, false);
     assert.ok((await(await request('/session')).json()).features.includes('playback-trace'));
     assert.equal((await request('/playback-trace','POST',{stage:'mic-before'},false)).status,403);
     assert.equal((await request('/playback-trace','POST',{})).status,400);

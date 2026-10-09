@@ -236,59 +236,56 @@
     </div>
     <p id="post-preview-help" class="help">「試聽」播放完整成品；「只聽人聲」播放歌唱者音軌，不加入配樂／和音，沿用這筆錄音已保存的音量、延時與柔化設定。更改後製設定後需先重新合成，才能試聽新效果。</p>
     <audio id="post-audio" controls hidden></audio>
-    <details id="soulx-panel" class="post-effects soulx-panel">
-      <summary><span class="post-effects-heading"><strong>SoulX 獨立實驗室</strong><span>歌聲／音色轉換 · 預設關閉 · 與 A／B 分開</span></span><span class="post-effects-toggle"><span class="when-closed">點此展開</span><span class="when-open">收合設定</span></span></summary>
-      <label class="soulx-enable"><input id="soulx-enable" type="checkbox" autocomplete="off"> 啟用 SoulX 實驗選項</label>
-      <p class="help">先選「待轉換的歌」，再選「要換成誰的聲音」。原曲原唱提供歌詞、旋律與演唱節奏，自選短段歌聲提供音色參考；不需要自己先唱完整首。尚未保證逐字對齊或完全重現本人聲音。速度固定，自動移調關閉。</p>
-      <p id="soulx-status" class="status" role="status">SoulX 已關閉；展開不會載入模型。</p>
-      <section id="soulx-progress" class="soulx-progress" hidden aria-label="SoulX 轉換進度">
-        <div class="soulx-progress-heading"><strong id="soulx-progress-stage">準備音訊</strong><span id="soulx-elapsed">已用時間 0:00</span></div>
-        <progress id="soulx-progress-bar" max="100" aria-labelledby="soulx-progress-stage" aria-describedby="soulx-progress-detail"></progress>
-        <p id="soulx-progress-detail" class="help">正在準備原始人聲與參考片段…</p>
+    <details id="voicelab-panel" class="post-effects soulx-panel">
+      <summary><span class="post-effects-heading"><strong>Voice Lab｜我的音色實驗室</strong><span>歌聲／音色轉換 · 預設關閉 · 與 A／B 分開</span></span><span class="post-effects-toggle"><span class="when-closed">點此展開</span><span class="when-open">收合設定</span></span></summary>
+      <label class="soulx-enable"><input id="voicelab-enable" type="checkbox" autocomplete="off"> 啟用 Voice Lab</label>
+      <p class="help">把原曲原唱或自己的錄音換成已訓練的個人音色。預設我的音色 Ver3、原八度；可只讓歌聲升／降八度，配樂保持不變。先試聽短段，滿意後再轉整首並保存。</p>
+      <p id="voicelab-status" class="status" role="status">Voice Lab 已關閉；展開不會載入模型。</p>
+      <section id="voicelab-progress" class="soulx-progress" hidden aria-label="Voice Lab 轉換進度">
+        <div class="soulx-progress-heading"><strong id="voicelab-progress-stage">準備音訊</strong><span id="voicelab-elapsed">已用時間 0:00</span></div>
+        <progress id="voicelab-progress-bar" max="100" aria-labelledby="voicelab-progress-stage" aria-describedby="voicelab-progress-detail"></progress>
+        <p id="voicelab-progress-detail" class="help">正在準備來源人聲與個人音色模型…</p>
       </section>
-      <div id="soulx-content" hidden>
-        <label for="soulx-source">① 待轉換的歌（來源）</label>
-        <select id="soulx-source" disabled><option value="original">原曲原唱（目前載入歌曲）</option><option value="recording">我的錄音（上方選取的錄音）</option></select>
-        <p class="help">要讓 SoulX 參考你的聲音唱原曲，先在歌曲庫載入歌曲，這裡選「原曲原唱」，下方選「自選參考歌聲檔」。只取分離人聲來轉換，最後配回同一首的伴奏；未分離主唱時，人聲軌可能含和聲。</p>
-        <p id="soulx-source-info" class="help">請在上方選擇保留原始人聲的錄音。</p>
-        <fieldset id="soulx-fields" disabled>
-          <p id="soulx-range-info" class="status" role="status"></p>
+      <div id="voicelab-content" hidden>
+        <label for="voicelab-source">① 待轉換的歌（來源）</label>
+        <select id="voicelab-source" disabled><option value="original">原曲原唱（目前載入歌曲）</option><option value="recording">我的錄音（上方選取的錄音）</option></select>
+        <p class="help">使用已訓練的個人音色模型換聲，不需要再提供參考音檔。先在歌曲庫載入歌曲，或選取自己的錄音。只取分離人聲來轉換，最後配回同一首的伴奏；未分離主唱時，人聲軌可能含和聲。</p>
+        <p id="voicelab-source-info" class="help">請在上方選擇保留原始人聲的錄音。</p>
+        <fieldset id="voicelab-fields" disabled>
+          <p id="voicelab-range-info" class="status" role="status"></p>
           <legend>獨立轉換設定</legend>
           <div class="soulx-grid">
-            <div><label for="soulx-start">轉換開始（秒）</label><input id="soulx-start" type="number" min="0" step="0.01" value="0"></div>
-            <div><label for="soulx-end">轉換結束（秒）</label><input id="soulx-end" type="number" min="1" step="0.01" value="20"></div>
-            <div class="soulx-actions"><button id="soulx-now" type="button" class="secondary">從目前位置取 20 秒</button><button id="soulx-full" type="button" class="secondary">整首（最多 10 分鐘）</button></div>
+            <div><label for="voicelab-start">轉換開始（秒）</label><input id="voicelab-start" type="number" min="0" step="0.01" value="0"></div>
+            <div><label for="voicelab-end">轉換結束（秒）</label><input id="voicelab-end" type="number" min="1" step="0.01" value="20"></div>
+            <div class="soulx-actions"><button id="voicelab-now" type="button" class="secondary">從目前位置取 20 秒</button><button id="voicelab-full" type="button" class="secondary">整首（最多 10 分鐘）</button></div>
           </div>
           <p class="help">原曲原唱以歌曲時間為準，不套用麥克風延時；我的錄音則沿用已保存校正。先試 10～20 秒，滿意後按「整首」再產生。變更設定後需重新產生。</p>
           <div class="soulx-grid">
-            <div><label for="soulx-reference">② 要換成誰的聲音（參考）</label><select id="soulx-reference"><option value="custom">自選參考歌聲檔</option><option value="self">我的已保存歌聲（上方選取錄音）</option><option value="original">來源歌曲的原唱音色</option><option value="zh">官方中文示範</option><option value="en">官方英文示範</option></select><p class="help">這裡提供音色參考，不決定整首歌詞與節奏。可上傳自己的清唱，擷取 3～30 秒參考，或選上方已保存的自己的歌聲；不必先錄完整首。</p><label id="soulx-upload-label" hidden>參考音檔<input id="soulx-upload" type="file" accept="audio/*"></label></div>
-            <div><label for="soulx-reference-start">參考起點（秒）</label><input id="soulx-reference-start" type="number" min="0" max="1800" step="0.1" placeholder="留白：自動選有聲片段"><p class="help">自己的／原曲原唱／自選歌聲留白時，自動挑選較有聲的片段；官方示範留白由 0 秒開始。原曲原唱的起點以分離音軌為準。</p></div>
-            <div><label for="soulx-reference-seconds">參考長度 <output id="soulx-reference-seconds-value">8 秒</output></label><input id="soulx-reference-seconds" type="range" min="3" max="30" step="1" value="8"><p class="help">只取 3～30 秒，預設 8 秒；可比較 8／15／30 秒。參考 30 秒時，檔案至少需 30 秒；若起點設 10 秒，檔案至少需 40 秒。選清楚的單人乾歌聲，少配樂、少和聲；較長不保證較好。</p></div>
+            <div><label for="voicelab-model">② 我的音色模型</label><select id="voicelab-model"><option value="ver3">我的音色 Ver3（預設）</option><option value="ver2">我的音色 Ver2</option><option value="ver1">我的音色 Ver1</option></select><p class="help">使用本機既有 .pth 與配套 .index，不需重新訓練。</p></div>
+            <div><label for="voicelab-index-rate">音色檢索比例 <output id="voicelab-index-rate-value">0.75</output></label><input id="voicelab-index-rate" type="range" min="0" max="1" step="0.05" value="0.75"><p class="help">預設 0.75。提高會更偏向訓練音色；不是相似度保證。</p></div>
+            <div><label for="voicelab-protect">子音／氣音保護 <output id="voicelab-protect-value">0.33</output></label><input id="voicelab-protect" type="range" min="0" max="0.5" step="0.01" value="0.33"><p class="help">預設 0.33；數值較小保護較強，0.5 關閉保護。</p></div>
           </div>
           <div class="soulx-grid">
-            <section class="soulx-pitch" aria-labelledby="soulx-pitch-heading">
-              <strong id="soulx-pitch-heading">③ 歌聲音高</strong><output id="soulx-pitch-value">原音高（0 半音）</output>
-              <div class="button-row" role="group" aria-label="八度快捷設定"><button id="soulx-pitch-down" data-soulx-pitch="-12" type="button" class="secondary" aria-pressed="false">降低八度 −12</button><button id="soulx-pitch-original" data-soulx-pitch="0" type="button" class="secondary" aria-pressed="true">原音高 0</button><button id="soulx-pitch-up" data-soulx-pitch="12" type="button" class="secondary" aria-pressed="false">提高八度 +12</button></div>
-              <label for="soulx-pitch">半音微調（−12～+12）</label><input id="soulx-pitch" type="number" min="-12" max="12" step="1" value="0" aria-describedby="soulx-pitch-help">
-              <p id="soulx-pitch-help" class="help">以「待轉換的歌」音高為基準，預設 0。女原唱太高可先試 −12；只調整生成歌聲，速度與配樂不變。±12 是同調的不同八度，其他半音可能與原配樂不合調。修改後需重新產生；先用 AI 100% 比較，混入原聲會同時聽到兩個音高。</p>
+            <section class="soulx-pitch" aria-labelledby="voicelab-pitch-heading">
+              <strong id="voicelab-pitch-heading">③ 我的聲音 · 八度</strong><output id="voicelab-pitch-value">原八度（預設）</output>
+              <div class="button-row" role="group" aria-label="八度快捷設定"><button id="voicelab-pitch-down" data-voicelab-pitch="-12" type="button" class="secondary" aria-pressed="false">降低八度 −12</button><button id="voicelab-pitch-original" data-voicelab-pitch="0" type="button" class="secondary" aria-pressed="true">原八度（預設）</button><button id="voicelab-pitch-up" data-voicelab-pitch="12" type="button" class="secondary" aria-pressed="false">提高八度 +12</button></div>
+              <input id="voicelab-pitch" type="number" value="0" hidden>
+              <p id="voicelab-pitch-help" class="help">只調整換成你的音色後的歌聲：低八度、原八度（預設）、高八度。配樂的 Key 與速度維持不變。修改後需重新產生；先用 AI 100% 比較，混入原聲會同時聽到兩個八度。</p>
             </section>
-            <div><label for="soulx-steps">生成步數 <output id="soulx-steps-value">32 步</output></label><input id="soulx-steps" type="range" min="8" max="64" step="1" value="32"><p class="help">8～64 步，預設 32。更多步通常更慢，不保證一定更好聽；可試 16／32／64。</p></div>
-            <div><label for="soulx-guidance">引導強度 CFG <output id="soulx-guidance-value">3</output></label><input id="soulx-guidance" type="range" min="0" max="5" step="0.1" value="3"><p class="help">預設 3。改變條件引導程度，並非情緒濃度或相似度百分比；過高可能不自然。可試 1／3／5。</p></div>
-            <div><label for="soulx-seed">隨機種子</label><input id="soulx-seed" type="number" min="0" max="2147483647" step="1" value="20261004"><button id="soulx-random" type="button" class="secondary">換一個種子</button><p class="help">相同種子方便比較其他參數；換數字探索生成差異，不是效果強度。</p></div>
           </div>
-          <div class="button-row"><button id="soulx-generate" type="button">產生 SoulX 試聽</button><button id="soulx-reset" type="button" class="secondary">設定回預設</button></div>
+          <div class="button-row"><button id="voicelab-generate" type="button">產生 Voice Lab 試聽</button><button id="voicelab-reset" type="button" class="secondary">設定回預設</button></div>
         </fieldset>
-        <button id="soulx-cancel" type="button" class="secondary" disabled>取消生成</button>
-        <section id="soulx-result" hidden aria-label="SoulX 獨立試聽結果">
-          <p id="soulx-result-info" class="help"></p>
+        <button id="voicelab-cancel" type="button" class="secondary" disabled>取消生成</button>
+        <section id="voicelab-result" hidden aria-label="Voice Lab 獨立試聽結果">
+          <p id="voicelab-result-info" class="help"></p>
           <div class="soulx-grid">
-            <div><label for="soulx-blend">AI 混合比例 <output id="soulx-blend-value">100%</output></label><input id="soulx-blend" type="range" min="0" max="100" step="5" value="100"><p class="help">0% 原聲，100% AI；中間值混合兩者，可能有疊音感。這是試聽混音，不需重新生成。</p></div>
-<div><label><input id="soulx-backing" type="checkbox" checked> 加入配樂</label><label for="soulx-backing-choice">搭配的配樂</label><select id="soulx-backing-choice"><option value="">錄音原配樂</option></select><button id="soulx-backing-refresh" class="secondary" type="button">重新整理已保存配樂</button><label><input id="soulx-match" type="checkbox" checked> 人聲音量匹配</label><label><input id="soulx-loop" type="checkbox" checked> 循環試聽</label><p class="help">可選同一首歌的已保存新配樂，不必重新生成歌聲。片段配樂需涵蓋本次歌聲範圍。</p></div>
-            <div class="soulx-actions"><button id="soulx-listen-original" type="button" class="secondary" aria-pressed="false">▶ 原聲</button><button id="soulx-listen-ai" type="button" aria-pressed="false">▶ SoulX</button></div>
+            <div><label for="voicelab-blend">AI 混合比例 <output id="voicelab-blend-value">100%</output></label><input id="voicelab-blend" type="range" min="0" max="100" step="5" value="100"><p class="help">0% 原聲，100% AI；中間值混合兩者，可能有疊音感。這是試聽混音，不需重新生成。</p></div>
+<div><label><input id="voicelab-backing" type="checkbox" checked> 加入配樂</label><label for="voicelab-backing-choice">搭配的配樂</label><select id="voicelab-backing-choice"><option value="">錄音原配樂</option></select><button id="voicelab-backing-refresh" class="secondary" type="button">重新整理已保存配樂</button><label><input id="voicelab-match" type="checkbox" checked> 人聲音量匹配</label><label><input id="voicelab-loop" type="checkbox" checked> 循環試聽</label><p class="help">可選同一首歌的已保存新配樂，不必重新生成歌聲。片段配樂需涵蓋本次歌聲範圍。</p></div>
+            <div class="soulx-actions"><button id="voicelab-listen-original" type="button" class="secondary" aria-pressed="false">▶ 原聲</button><button id="voicelab-listen-ai" type="button" aria-pressed="false">▶ Voice Lab</button></div>
           </div>
-          <audio id="soulx-audio" controls></audio>
-          <p id="soulx-listen-status" class="help" role="status"></p>
-          <div class="button-row"><button id="soulx-save" type="button">儲存到已保存錄音</button><button id="soulx-download" type="button" class="secondary">下載 SoulX 試聽 WAV</button></div>
+          <audio id="voicelab-audio" controls></audio>
+          <p id="voicelab-listen-status" class="help" role="status"></p>
+          <div class="button-row"><button id="voicelab-save" type="button">儲存到已保存錄音</button><button id="voicelab-download" type="button" class="secondary">下載 Voice Lab 試聽 WAV</button></div>
           <p class="help">保存已生成範圍及目前 AI 混合／配樂設定，另存新錄音與獨立人聲，可繼續後製。要轉完整錄音，先按「整首」再產生；只改範圍不會補轉。片段會在名稱標明秒數。</p>
         </section>
       </div>
@@ -336,7 +333,7 @@
           <audio id="arrangement-audio" controls preload="metadata"></audio><p id="arrangement-listen-status" role="status">同位置切換比較。</p>
           <div class="arrangement-switch"><button id="arrangement-save" type="button">保存配樂到本機配樂庫</button><button id="arrangement-download" type="button" class="secondary">下載新配樂試聽 WAV</button></div>
         </section>
-        <fieldset><legend>已保存配樂</legend><label>全部已保存配樂<select id="arrangement-library" aria-describedby="arrangement-library-relation"></select></label><p id="arrangement-library-relation" role="status"></p><div class="arrangement-switch"><button id="arrangement-refresh" type="button" class="secondary">重新整理</button><button id="arrangement-load" type="button" class="secondary">載入並試聽</button><button id="arrangement-delete" type="button" class="secondary" disabled>刪除選取配樂</button></div><p id="arrangement-library-path" class="help">保存後可到 SoulX「搭配的配樂」選用，與歌聲一起另存錄音。</p></fieldset>
+        <fieldset><legend>已保存配樂</legend><label>全部已保存配樂<select id="arrangement-library" aria-describedby="arrangement-library-relation"></select></label><p id="arrangement-library-relation" role="status"></p><div class="arrangement-switch"><button id="arrangement-refresh" type="button" class="secondary">重新整理</button><button id="arrangement-load" type="button" class="secondary">載入並試聽</button><button id="arrangement-delete" type="button" class="secondary" disabled>刪除選取配樂</button></div><p id="arrangement-library-path" class="help">保存後可到 Voice Lab「搭配的配樂」選用，與歌聲一起另存錄音。</p></fieldset>
       </div>
     </details>
 
@@ -371,7 +368,7 @@
     <p id="post-status" class="status" role="status">請選擇一筆錄音。</p>
     <p id="post-info" class="help"></p><p id="recording-storage-status" class="help" role="status">連接本機錄音目錄中…</p>
     <div id="post-ab-editor" class="audition-slot-b" data-slot="b" aria-labelledby="post-ab-editor-heading">
-      <div class="ab-editor-heading"><div><h3 id="post-ab-editor-heading">正在調整 B 組</h3><p class="help">另存保留 A／B 各自設定。還原只重設目前組：原音、大廳殘響 20%、回聲 10%、音量 100%、校正 200 ms（SoulX 為 0）；剪輯保留。</p></div><div class="ab-editor-switch" role="group" aria-label="切換正在編輯的設定"><button id="post-audition-a-edit" class="audition-slot-a" type="button" aria-pressed="false" disabled>A 設定</button><button id="post-audition-b-edit" class="audition-slot-b" type="button" aria-pressed="true" disabled>B 設定</button><button id="post-audition-reset" class="secondary" type="button" disabled title="還原目前組別的系統預設音量、延時與效果；另一組、剪輯與已保存錄音保留">還原 B 預設設定</button></div></div>
+      <div class="ab-editor-heading"><div><h3 id="post-ab-editor-heading">正在調整 B 組</h3><p class="help">另存保留 A／B 各自設定。還原只重設目前組：原音、大廳殘響 20%、回聲 10%、音量 100%、校正 200 ms（AI 換聲成品為 0）；剪輯保留。</p></div><div class="ab-editor-switch" role="group" aria-label="切換正在編輯的設定"><button id="post-audition-a-edit" class="audition-slot-a" type="button" aria-pressed="false" disabled>A 設定</button><button id="post-audition-b-edit" class="audition-slot-b" type="button" aria-pressed="true" disabled>B 設定</button><button id="post-audition-reset" class="secondary" type="button" disabled title="還原目前組別的系統預設音量、延時與效果；另一組、剪輯與已保存錄音保留">還原 B 預設設定</button></div></div>
     <div class="recording-levels">
       <div><label for="post-voice-level">歌唱者音量 <output id="post-voice-value" for="post-voice-level">100%</output></label><input id="post-voice-level" type="range" min="0" max="200" step="5" value="100" disabled aria-describedby="post-volume-help"></div>
       <div><label for="post-backing-level">配樂／和音音量 <output id="post-backing-value" for="post-backing-level">100%</output></label><input id="post-backing-level" type="range" min="0" max="200" step="5" value="100" disabled aria-describedby="post-volume-help"></div>

@@ -2,7 +2,7 @@ import { recordingTuningSuffix } from './recording-tune.mjs';
 import {isPostRecording} from './recording-store.mjs';
 import {createArrangement} from './arrangement-client.mjs';
 import {recordingBackingRoute} from './arrangement-settings.mjs';
-import { createSoulx } from './soulx-client.mjs';
+import { createVoiceLab } from './voicelab-client.mjs';
 import { createRecordingAudition } from './recording-audition.mjs';
 import { recordingScenes, initialRecordingEffects, matchingRecordingScene, recordingEmotions, matchingRecordingEmotion } from './recording-scenes.mjs';
 import { PITCH_DETECTOR_VERSION } from './audio.mjs';
@@ -169,6 +169,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     $('post-delay').value=selected?.postResult?.delayMs??selected?.post?.offsetMs??0;
     $('remix-delay').value=$('post-delay').value;
     $('post-info').textContent=selected?(selected.post&&selected.rawBytes?'已保存乾淨歌聲、播放位置與當次基準，可重評／重合成。':'此錄音未保存後處理來源，可轉 MP3 下載。'): '請先保存一段演唱錄音。';
+    if(selected?.voicelab)$('post-info').textContent='Voice Lab 成品已保留獨立人聲，可繼續後製；來源校正已套用，不需重複校正。';
     if(selected?.soulx)$('post-info').textContent=`SoulX 成品已保留獨立人聲，可繼續後製。來源 ${selected.soulx.range.start.toFixed(2)}～${selected.soulx.range.end.toFixed(2)} 秒；原校正 ${selected.soulx.sourceDelayMs} ms 已套用，不需再填一次。`;
     audition?.reset(selected,{preserve:preserveComparison});
     showScore();controls();
@@ -299,6 +300,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
       result.balance=structuredClone(row.balance);
       if(row.fixedMixGains)result.fixedMixGains=structuredClone(row.fixedMixGains);
       if(row.soulx)result.soulx=structuredClone(row.soulx);
+      if(row.voicelab)result.voicelab=structuredClone(row.voicelab);
       if(row.arrangement)result.arrangement=structuredClone(row.arrangement);
       result.sourceSeconds=row.sourceSeconds??row.seconds;
       await store.saveRemix(result,blob,rawBlob);refresh(await store.list());$('post-recording').value=result.id;choose({preserveComparison:true});clearAudio();url=URL.createObjectURL(blob);$('post-audio').src=url;$('post-audio').hidden=false;
@@ -326,7 +328,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     const href=URL.createObjectURL(mp3),a=document.createElement('a');a.href=href;a.download=row.title.replace(/[\\/:*?"<>|]/g,'_').slice(0,100)+recordingEffectsSuffix(row)+recordingSofteningSuffix(row)+recordingTuningSuffix(row)+recordingDelaySuffix(row)+'.mp3';a.click();setTimeout(()=>URL.revokeObjectURL(href),60000);status(savedPath?'MP3 已轉換並開始下載，同時保存至 '+savedPath+'。':'MP3 已轉換並開始下載，但尚未存入錄音目錄：'+saveError);
   }));
   audition=createRecordingAudition({run,getPosition:originalPlayhead,beforePlay:()=>{soulx?.pause();arrangement?.pause();$('post-audio').pause();pause();},
-    defaults:row=>({delayMs:row.soulx?0:200,softening:'off',volume:recordingVolume(),effects:vocalEffects(recordingScenes.hall.effects)}),
+    defaults:row=>({delayMs:(row.soulx||row.voicelab)?0:200,softening:'off',volume:recordingVolume(),effects:vocalEffects(recordingScenes.hall.effects)}),
     onEditor:name=>{const panel=$('post-ab-editor'),label=name.toUpperCase();panel.dataset.slot=name;panel.className='audition-slot-'+name;$('post-ab-editor-heading').textContent=`正在調整 ${label} 組`;$('post-audition-quick').textContent=`片段試聽目前 ${label} 設定`;$('post-remix').textContent=`重新合成 ${label}（音量／延時／音色／剪輯）`;},
     read:()=>{const delayMs=Number($('remix-delay').value);delaySeconds(delayMs);return {delayMs,softening:$('post-softening').value,volume:recordingVolume({voice:Number($('post-voice-level').value),backing:Number($('post-backing-level').value)}),effects:readEffects()};},
     apply:s=>{$('post-softening').value=s.softening;setEffects(s.effects);$('remix-delay').value=s.delayMs;$('post-delay').value=s.delayMs;$('post-voice-level').value=s.volume.voice;$('post-backing-level').value=s.volume.backing;volumeLabels();},
@@ -342,7 +344,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
       return remixRecording(previewSources.raw,solo?[]:previewSources.tracks??[],row,settings.delayMs,{...settings,edit:{...interval,fadeIn:fade,fadeOut:fade},progress:status});
     }
   });
-  soulx=createSoulx({store,getSelected:()=>selected,getReference:reference,getPosition:originalPlayhead,beforePlay:()=>{arrangement?.pause();audition?.stop();$('post-audio').pause();pause();},onSaved:async meta=>{
+  soulx=createVoiceLab({store,getSelected:()=>selected,getReference:reference,getPosition:originalPlayhead,beforePlay:()=>{arrangement?.pause();audition?.stop();$('post-audio').pause();pause();},onSaved:async meta=>{
     refresh(await store.list());select(meta.id,{scroll:false});
     $('post-status').textContent=`已另存 ${meta.title}。${meta._archiveRoot?'保存至 '+meta._archiveRoot:'已暫存此瀏覽器，待本機工具連線後搬存'}；原錄音保留，可繼續調整 EQ、殘響與剪輯。`;
     window.dispatchEvent(new Event('recording-post-saved'));

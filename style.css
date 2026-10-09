@@ -238,7 +238,7 @@ header{gap:18px;flex-wrap:wrap}
 .soulx-panel audio { width: 100%; margin: .8rem 0; }
 .soulx-panel { font-size: 14px; }
 .soulx-panel > .soulx-enable, .soulx-panel > .help, .soulx-panel > .status { margin-left: 20px; margin-right: 20px; }
-.soulx-panel #soulx-content { padding: 0 20px 20px; }
+.soulx-panel #voicelab-content { padding: 0 20px 20px; }
 .soulx-panel .help { font-size: 12px; line-height: 1.75; }
 .soulx-progress { margin: 16px 20px; padding: 16px 20px; border: 1px solid var(--soulx-accent); border-radius: 10px; background: #102322; }
 .soulx-progress-heading { display: flex; justify-content: space-between; gap: 20px; color: var(--soulx-accent); }
