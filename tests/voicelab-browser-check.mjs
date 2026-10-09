@@ -7,6 +7,7 @@ import {handleVoiceLab,stopVoiceLab} from '../voicelab-server.mjs';
 import {detectPitch} from '../audio.mjs';
 const {chromium}=createRequire('C:/Users/User/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/package.json')('playwright');
 const fixture=await readFile('.runtime/voicelab/smoke/input.wav'),site='http://localhost:4288';
+const model=process.env.VOICELAB_TEST_MODEL||'ver3';
 const backing=Buffer.from(fixture);for(let i=44;i<backing.length;i+=2)backing.writeInt16LE(Math.round(1000*Math.sin(2*Math.PI*660*(i-44)/2/48000)),i);
 const backend=http.createServer(async(req,res)=>{
  if(req.url==='/session'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({token:'fixture'}));return;}
@@ -38,6 +39,7 @@ try{
  assert.equal(await $('enable').isChecked(),false);assert.equal(requests.length,0);
  await $('panel').locator('summary').click();await $('enable').check();await page.waitForFunction(()=>document.getElementById('voicelab-status').textContent.includes('已就緒'));
  assert.equal(await $('pitch').inputValue(),'0');assert.equal(await $('model').inputValue(),'ver3');assert.equal(await page.locator('#soulx-panel').count(),0);
+ await $('model').selectOption(model);assert.equal(await $('model').inputValue(),model);
  await $('full').click();
  for(const [button,pitch] of [['pitch-original',0],['pitch-down',-12],['pitch-up',12]]){
   await $(button).click();await $('generate').click();
@@ -54,6 +56,7 @@ try{
  }
  await $('save').click();await page.waitForFunction(()=>saved.length===1);
  const meta=await page.evaluate(()=>saved[0]);assert.equal(meta.voicelab.report.settings.pitchShift,12);assert.equal(meta.post.reference.pitchShift,4);assert.equal(meta.appliedDelayMs,0);assert.deepEqual(meta.stems,['accompaniment']);
+ assert.equal(meta.voicelab.report.settings.model,model);
  assert.equal(await page.locator('#post-delay').inputValue(),'0');
  await $('panel').scrollIntoViewIfNeeded();await mkdir('test-results',{recursive:true});await $('panel').screenshot({path:'test-results/voicelab-ui.png'});
  await $('reset').click();assert.equal(await $('pitch').inputValue(),'0');assert.equal(await $('save').isDisabled(),true);

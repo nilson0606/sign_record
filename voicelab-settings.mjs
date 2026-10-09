@@ -1,5 +1,5 @@
 export const VOICELAB_DEFAULTS=Object.freeze({model:'ver3',pitchShift:0,indexRate:.75,protect:.33});
-export const VOICELAB_MODELS=Object.freeze({ver1:'我的音色 Ver1',ver2:'我的音色 Ver2',ver3:'我的音色 Ver3'});
+export const VOICELAB_MODELS=Object.freeze({ver1:'我的音色 Ver1',ver2:'我的音色 Ver2',ver3:'我的音色 Ver3',wife_ver1:'Wife Ver1'});
 export function voicelabPitchLabel(value=0){
   return value===0?'原八度（預設）':`${value===-12?'降低八度':value===12?'提高八度':'移調'}（${value>0?'+':''}${value} 半音）`;
 }

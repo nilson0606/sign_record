@@ -10,7 +10,11 @@ import {voicelabSettings,VOICELAB_MODELS} from './voicelab-settings.mjs';
 const root=fileURLToPath(new URL('./',import.meta.url)),runtime=path.join(root,'.runtime','voicelab'),jobsRoot=path.join(runtime,'jobs');
 const jobs=new Map();
 function config(){try{return JSON.parse(readFileSync(path.join(runtime,'config.json'),'utf8'));}catch{return {};}}
-function modelFiles(model,c=config()){const version=model.replace('ver','Ver');return {modelPath:path.join(c.modelsRoot||runtime,version,`myvoice_${version}_100e.pth`),indexPath:path.join(c.modelsRoot||runtime,version,`myvoice_${version}.index`)};}
+function modelFiles(model,c=config()){
+  const version=model==='wife_ver1'?'Wife_Ver1':model.replace('ver','Ver');
+  const stem=model==='wife_ver1'?'wife_voice_Ver1':`myvoice_${version}`;
+  return {modelPath:path.join(c.modelsRoot||runtime,version,`${stem}_100e.pth`),indexPath:path.join(c.modelsRoot||runtime,version,`${stem}.index`)};
+}
 
 const json=(res,code,value)=>{res.writeHead(code,{'Content-Type':'application/json'});res.end(JSON.stringify(value));};
 const finished=j=>['ready','failed','cancelled'].includes(j.stage);

@@ -4,6 +4,7 @@ import {voicelabSettings,voicelabSongSource,voicelabSavedMetadata} from '../voic
 import {validateVoiceLabRequest} from '../voicelab-server.mjs';
 test('Voice Lab permits only vocal octaves, defaults to Ver3 original octave, and excludes arbitrary paths',()=>{
  assert.deepEqual(voicelabSettings(),{model:'ver3',pitchShift:0,indexRate:.75,protect:.33});
+ assert.deepEqual(voicelabSettings({model:'wife_ver1'}),{model:'wife_ver1',pitchShift:0,indexRate:.75,protect:.33});
  for(const pitchShift of [-12,0,12])assert.equal(voicelabSettings({pitchShift}).pitchShift,pitchShift);
  for(const value of [{pitchShift:1},{pitchShift:'12'},{pitchShift:24},{indexRate:1.01},{protect:-.1},{protect:.51},{model:'../../x'}])assert.throws(()=>voicelabSettings(value));
  const s=voicelabSettings({modelPath:'bad',speed:2,autoShift:true,reference:'custom'});assert.deepEqual(s,voicelabSettings());
