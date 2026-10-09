@@ -40,7 +40,7 @@ async function recordedAnalysis(blob, progress, pitchShift=0) {
     worker.postMessage({audio,sampleRate,pitchShift},[audio.buffer]);
   });
 }
-export function createRecordingPost({store,stop,pause,download,onDelete,reference=()=>null}) {
+export function createRecordingPost({store,stop,pause,download,onDelete,reference=()=>null,isRecording=()=>false}) {
   let rows=[],selected=null,busy=false,url=null,statusTarget='post-status',audition=null,previewSources=null,soulx=null,arrangement=null;
   const status=text=>{$(statusTarget).textContent=text;};
   function clearAudio(){arrangement?.pause();audition?.stop();const a=$('post-audio');a.pause();a.removeAttribute('src');a.load();a.hidden=true;if(url)URL.revokeObjectURL(url);url=null;}
@@ -132,6 +132,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     const editable=!!(selected?.complete&&selected.rawBytes&&selected.post?.segments?.length);
     $('post-diagnostic').disabled=busy||!editable;
     for(const action of ['preview','download','delete'])$('selected-recording-'+action).disabled=busy||!selected;
+    $('post-delete-all').disabled=busy||!rows.length||isRecording();
     $('selected-recording-edit').disabled=busy||!editable;
     $('selected-recording-voice').disabled=busy||!selected||!(selected.mode==='voice'||editable);
     $('selected-recording-voice').title=selected&&selected.mode!=='voice'&&!editable?'這筆錄音未保留獨立歌聲，無法只聽人聲。':'';
@@ -212,6 +213,23 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     if(busy||!selected)return;
     if(!confirm('刪除這筆錄音、原始歌聲及其後處理資料？此操作無法復原。\n'+selected.title+' · '+new Date(selected.created).toLocaleString()))return;
     run(async row=>{clearAudio();await store.delete(row.id);await onDelete();choose();status('已刪除選取的錄音。');});
+  });
+  $('post-delete-all').addEventListener('click',()=>{
+    if(busy||!rows.length)return;
+    const receipt=$('post-clear-result'),report=text=>{receipt.hidden=false;receipt.textContent=text;};
+    if(isRecording()){report('請先結束錄音，再清除後處理清單。');return;}
+    const targets=[...rows];
+    if(!confirm(`清除錄音後處理清單的全部 ${targets.length} 筆？包含所有歌曲的已保存錄音、Voice Lab 與後製成品，以及各筆附帶的人聲和後處理資料。\n待確認錄音、分段素材、歌曲庫、配樂庫及音色模型保留。此操作無法復原。`))return;
+    run(async()=>{
+      clearAudio();let deleted=0;const errors=[];
+      report(`正在清除：0／${targets.length} 筆…`);
+      for(const row of targets){
+        try{await store.delete(row.id);deleted++;}catch(error){errors.push(error.message);}
+        report(`正在清除：${deleted+errors.length}／${targets.length} 筆，已刪除 ${deleted} 筆${errors.length?`，失敗 ${errors.length} 筆`:''}…`);
+      }
+      try{await onDelete();choose();report(`已刪除 ${deleted} 筆；後處理清單剩餘 ${rows.length} 筆。${errors.length?`${errors.length} 筆未刪除，可重試：${errors[0]}`:'待確認錄音與分段素材保留。'}`);}
+      catch(error){report(`已刪除 ${deleted} 筆；清單更新失敗，請重新整理確認：${error.message}`);}
+    });
   });
   $('post-audio').addEventListener('play',()=>{audition?.stop();pause();});
   $('post-recording').addEventListener('change',choose);

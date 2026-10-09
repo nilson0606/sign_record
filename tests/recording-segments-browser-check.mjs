@@ -321,7 +321,15 @@ try{
  for(const id of [legacy.id,mix.id]){await $('post-recording').selectOption(id);page.once('dialog',d=>d.accept());await $('selected-recording-delete').click();await page.waitForFunction(id=>![...document.getElementById('post-recording').options].some(o=>o.value===id),id);assert.ok(!(await page.evaluate(()=>fixtureStore.list())).some(r=>r.id===id));}
  await page.evaluate(async row=>{await fixtureStore.saveRemix(row,await fixtureStore.blob((await fixtureStore.list()).find(r=>r.postPending===false)),await fixtureStore.blob((await fixtureStore.list()).find(r=>r.postPending===false),'voice'));},pendingCopy);
  await $('recording-refresh').click();await page.waitForFunction(id=>document.getElementById('recording-review-take').value===id,pendingCopy.id);
- page.once('dialog',d=>d.accept());await $('recording-delete-all').click();await page.waitForFunction(()=>document.querySelectorAll('#post-recording option').length===0);
+ const postClearIds=await $('post-recording').locator('option').evaluateAll(opts=>opts.map(o=>o.value));
+ page.once('dialog',async d=>{assert.match(d.message(),new RegExp(`全部 ${postClearIds.length} 筆`));assert.match(d.message(),/所有歌曲/);assert.match(d.message(),/音色模型保留/);await d.dismiss();});await $('post-delete-all').click();
+ assert.deepEqual(await $('post-recording').locator('option').evaluateAll(opts=>opts.map(o=>o.value)),postClearIds);
+ await page.evaluate(async id=>{const {RecordingStore}=await import('/recording-store.mjs');window.postClearDelete=RecordingStore.prototype.delete;RecordingStore.prototype.delete=function(target){if(target===id)throw Error('fixture post clear failure');return postClearDelete.call(this,target);};},postClearIds[0]);
+ page.once('dialog',d=>d.accept());await $('post-delete-all').click();await page.waitForFunction(()=>document.getElementById('post-clear-result').textContent.includes('1 筆未刪除'));
+ assert.equal(await $('post-recording').locator('option').count(),1);assert.match(await $('post-clear-result').textContent(),/剩餘 1 筆/);
+ await page.evaluate(async()=>{const {RecordingStore}=await import('/recording-store.mjs');RecordingStore.prototype.delete=postClearDelete;});
+ page.once('dialog',d=>d.accept());await $('post-delete-all').click();await page.waitForFunction(()=>document.querySelectorAll('#post-recording option').length===0&&document.getElementById('post-clear-result').textContent.includes('剩餘 0 筆'));
+ assert.equal(await $('post-delete-all').isDisabled(),true);assert.equal(await $('post-clear-result').isVisible(),true);
  const retained=await page.evaluate(()=>fixtureStore.list());assert.ok(retained.some(r=>r.id===pendingCopy.id));assert.ok(retained.some(r=>r.id===first.id));assert.ok(retained.every(r=>r.postPending||r.segmentTake));
  // Song-scoped clearing never touches whole takes, approved products or another song.
  const protectedRows=await page.evaluate(async row=>{

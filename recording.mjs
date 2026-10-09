@@ -25,7 +25,7 @@ export function createSingerRecorder(options) {
     controls();try{localStorage.setItem('karaoke.recording-balance.v1',JSON.stringify(settings));}catch{}
     window.dispatchEvent(new Event('recording-balance-changed'));
   }
-  const post = createRecordingPost({store, stop:()=>stop(), reference:options.reference, pause:()=>{options.pausePlayer();$('recording-audio').pause();}, download, onDelete:async()=>{clearPreview();await render();}});
+  const post = createRecordingPost({store, stop:()=>stop(), isRecording:()=>!!active, reference:options.reference, pause:()=>{options.pausePlayer();$('recording-audio').pause();}, download, onDelete:async()=>{clearPreview();await render();}});
   const review=createRecordingReview({store,reference:options.reference,isRecording:()=>!!active,loadStem:options.loadStem,onChanged:render,pause:()=>{options.pausePlayer();post.clearAudio();$('recording-audio').pause();}});
   const status = text => { $('recording-status').textContent = text; };
   function controls() {
