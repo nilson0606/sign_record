@@ -52,6 +52,34 @@ test('coverage includes source clock gaps and moved boundaries',()=>{
  patch.meta.post.segments=[{songTime:1,offset:0,duration:.3},{songTime:2,offset:.3,duration:2}];assert.equal(missingSegmentRanges(d,[base.meta,patch.meta],0).length,1);
  assert.equal(missingSegmentRanges(d,[base.meta],0).length,1,'missing selected take is not silently replaced');
 });
+test('completed two-part recording tolerates a small player/PCM difference at song end',()=>{
+ const d=segmentDraft({cacheId:'fixture',duration:186.457});splitSegment(d,75.599);
+ d.parts[0].takeId='a';d.parts[1].takeId='b';
+ const a=source('a',.20548992752075196,77.46933333333334,.1,48000);
+ const b=source('b',70.8042238550415,115.568,.5,48000);
+ const before=structuredClone([a.meta,b.meta]);
+ assert.deepEqual(missingSegmentRanges(d,[a.meta,b.meta],200),[]);
+ const raw=composeSegmentVoice(d,new Map([['a',a],['b',b]]),{sampleRate:1000,delayMs:200});
+ assert.equal(raw.getChannelData(0)[76000],.5,'second take remains on the song clock');
+ assert.equal(raw.getChannelData(0)[186400],0,'unrecorded EOF remains silence, no stretching');
+ assert.deepEqual([a.meta,b.meta],before,'saved source metadata remains unchanged');
+});
+
+test('EOF tolerance does not hide missing takes, internal gaps, or a genuinely short ending',()=>{
+ const d=draft();splitSegment(d,2);d.parts[0].takeId='a';d.parts[1].takeId='b';
+ const a=source('a',0,3,.1),b=source('b',1,2.916,.5);
+ assert.deepEqual(missingSegmentRanges(d,[a.meta,b.meta],200),[]);
+ assert.deepEqual(missingSegmentRanges(d,[a.meta],200),[d.parts[1].name]);
+ b.meta.seconds=2.8;
+ assert.deepEqual(missingSegmentRanges(d,[a.meta,b.meta],200),[d.parts[1].name]);
+ b.meta.seconds=3;b.meta.post.segments=[{songTime:1,offset:0,duration:1.5},{songTime:2.584,offset:1.5,duration:1.416}];
+ assert.deepEqual(missingSegmentRanges(d,[a.meta,b.meta],200),[d.parts[1].name]);
+ a.meta.seconds=2.116;
+ assert.deepEqual(missingSegmentRanges(d,[a.meta,b.meta],200),d.parts.map(p=>p.name),'internal boundary still requires coverage');
+ const short=segmentDraft({cacheId:'fixture',duration:.1});
+ assert.deepEqual(missingSegmentRanges(short,[],0),[short.parts[0].name],'even a short final part requires a source');
+});
+
 test('splice stays at the selected song time after +200 ms correction, sources unchanged',()=>{
  const d=draft();splitSegment(d,2);d.baseId='base';d.parts[1].takeId='patch';
  const base=source('base',0,4,.1),patch=source('patch',1,3,.5,2000),before=base.audio.getChannelData(0).slice();

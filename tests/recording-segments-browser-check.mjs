@@ -35,7 +35,8 @@ try{
   const {createKaraokeSession}=await import('/session.mjs');
   window.fixtureMic=null;let time=0,anchor=0,state=2,muted=false;
   window.fixturePlayer={getCurrentTime:()=>state===1?Math.min(8,time+(performance.now()-anchor)/1000):time,getPlayerState:()=>state,seekTo(t){time=t;anchor=performance.now();},pauseVideo(){time=this.getCurrentTime();state=2;fixtureSession?.playerState(2);},playVideo(){if(time>=8)time=0;anchor=performance.now();state=1;fixtureSession?.playerState(1);},isMuted:()=>muted,mute(){muted=true;},unMute(){muted=false;},setPlaybackRate(){},getPlaybackRate:()=>1};
-  setInterval(()=>{if(state===1&&fixturePlayer.getCurrentTime()>=8){time=8;state=0;fixtureSession.playerState(0);}},20);
+  window.fixtureEndTime=8;
+  setInterval(()=>{if(state===1&&fixturePlayer.getCurrentTime()>=fixtureEndTime){time=fixtureEndTime;state=0;fixtureSession.playerState(0);}},20);
   window.fixtureSession=createKaraokeSession({reference:()=>null,voiced:()=>true,context:()=>fixtureMic?.context,stream:()=>fixtureMic?.stream,inputSource:()=>fixtureMic?.gain,player:()=>fixturePlayer,micReady:()=>!!fixtureMic,stopBeats(){},loadVideo:async()=>true,cancelCalibration(){},
    async startMic(){if(fixtureMic)return;const context=new AudioContext({sampleRate:48000,sinkId:{type:'none'}}),osc=context.createOscillator(),gain=context.createGain(),dest=context.createMediaStreamDestination();osc.frequency.value=443.27;gain.gain.value=.15;osc.connect(gain);gain.connect(dest);osc.start();await context.resume();fixtureMic={context,osc,gain,stream:dest.stream};fixtureSession.micStarted();},
    async stopMic(){await fixtureSession.stopRecording();if(fixtureMic){await fixtureMic.context.close();fixtureMic=null;}fixtureSession.micStopped();}
@@ -143,11 +144,11 @@ try{
  await page.waitForTimeout(100);assert.equal(await $('segment-take-audio').isHidden(),true);assert.equal(await $('segment-listen-selected').isDisabled(),true);
  await $('segment-guide-mode').selectOption('original');assert.equal(await $('segment-guide-mode').inputValue(),'original');
  const segmentGuideStarts=await page.evaluate(()=>guideEvents.filter(e=>e.action==='start').length);
- await page.evaluate(()=>fixturePlayer.mute());
+ await page.evaluate(()=>{fixturePlayer.mute();fixtureEndTime=7.915;}); // Real players may end slightly before reference duration.
  await $('segment-preroll').fill('3');await $('segment-part').selectOption('1');await $('segment-record').click();await page.waitForFunction(()=>fixturePlayer.getPlayerState()===1&&!fixturePlayer.isMuted());
  await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('本段已保存'),{},{timeout:20000});
  assert.equal(await page.evaluate(()=>guideEvents.filter(e=>e.action==='start').length),segmentGuideStarts,'original guide does not add a second accompaniment');
- assert.equal(await page.evaluate(()=>fixturePlayer.isMuted()),true,'restore previously muted player');await page.evaluate(()=>fixturePlayer.unMute());
+ assert.equal(await page.evaluate(()=>fixturePlayer.isMuted()),true,'restore previously muted player');await page.evaluate(()=>{fixturePlayer.unMute();fixtureEndTime=8;});
  // A later section uses its saved song position, not accompaniment from time zero.
  await $('segment-take-mode-selected').selectOption('mix');await $('segment-listen-selected').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);
  const laterTake=await page.evaluate(async()=>{const id=document.getElementById('segment-take').value,row=(await fixtureStore.list()).find(r=>r.id===id),c=new AudioContext({sinkId:{type:'none'}}),mix=await c.decodeAudioData(await(await fetch(document.getElementById('segment-take-audio').src)).arrayBuffer()),expected=await expectedWhole(row,'mix');await c.close();return {start:row.post.segments[0].songTime,error:audioError(mix.getChannelData(0),expected.getChannelData(0))};});assert.ok(laterTake.start>.8);assert.ok(laterTake.error<.00012,JSON.stringify(laterTake));

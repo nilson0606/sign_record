@@ -72,9 +72,13 @@ export function missingSegmentRanges(draft,rows,delayMs=200) {
   validateSegmentDraft(draft);const shift=delayMs/1000,result=[];
   for(const p of draft.parts){
     const row=rows.find(r=>r.id===(p.takeId||draft.baseId)),end=Math.min(draft.duration,p.end+shift);let cursor=Math.max(0,p.start+shift);
+    // Player end notifications and the PCM clock can differ slightly at EOF.
+    // Allow the same 150 ms clock tolerance as recording timeline sync only at
+    // the song's end; missing sources and gaps inside the song still fail.
+    const endTolerance=end===draft.duration ? .15 : .03;let covered=false;
     const intervals=(row?.rawBytes?row.post?.segments||[]:[]).map(s=>[s.songTime,s.songTime+Math.min(s.duration,Math.max(0,(row.seconds??Infinity)-s.offset))]).sort((a,b)=>a[0]-b[0]);
-    for(const [a,b]of intervals){if(b<=cursor)continue;if(a>cursor+.03)break;cursor=Math.max(cursor,b);if(cursor>=end-.03)break;}
-    if(cursor<end-.03)result.push(p.name);
+    for(const [a,b]of intervals){if(b<=cursor)continue;if(a>cursor+.03)break;covered=true;cursor=Math.max(cursor,b);if(cursor>=end-.03)break;}
+    if(cursor<end-.03&&(!covered||cursor<end-endTolerance))result.push(p.name);
   }
   return result;
 }
