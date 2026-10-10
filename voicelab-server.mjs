@@ -11,8 +11,9 @@ const root=fileURLToPath(new URL('./',import.meta.url)),runtime=path.join(root,'
 const jobs=new Map();
 function config(){try{return JSON.parse(readFileSync(path.join(runtime,'config.json'),'utf8'));}catch{return {};}}
 function modelFiles(model,c=config()){
-  const version=model==='wife_ver1'?'Wife_Ver1':model.replace('ver','Ver');
-  const stem=model==='wife_ver1'?'wife_voice_Ver1':`myvoice_${version}`;
+  const wife=model==='wife_ver1'||model==='wife_ver2';
+  const version=wife?model.replace('wife_ver','Wife_Ver'):model.replace('ver','Ver');
+  const stem=wife?model.replace('wife_ver','wife_voice_Ver'):`myvoice_${version}`;
   return {modelPath:path.join(c.modelsRoot||runtime,version,`${stem}_100e.pth`),indexPath:path.join(c.modelsRoot||runtime,version,`${stem}.index`)};
 }
 
