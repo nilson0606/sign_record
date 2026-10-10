@@ -1,4 +1,4 @@
-const base='http://localhost:4273',key='karaoke.recording-diagnostics.v1';
+const base='http://127.0.0.1:4274',key='karaoke.recording-diagnostics.v1';
 let enabled=true,busy=0,tokenPromise;
 try{enabled=localStorage.getItem(key)!=='off';}catch{}
 const $=id=>document.getElementById(id);
@@ -30,15 +30,26 @@ function encode(buffer){const bytes=new Uint8Array(buffer);let s='';for(let i=0;
 // Diagnostics may affect timing; these are comparison signals, never a repair.
 export async function prepareRecordingDiagnostics({context,mic,stream,recorder,meta,native=false}){
   if(!enabled)return null;
-  try{await context.audioWorklet.addModule(new URL('./recording-diagnostics-worklet.mjs',import.meta.url));}
-  catch(e){status('診斷未啟動，錄音仍可使用：'+e.message);return null;}
-  let started=false,recording=false,finished=false,failed='',queue=Promise.resolve(),queuedBytes=0,media,index=0,probeId=0,unsubscribe,probe,mediaDone=Promise.resolve();
   const id=meta.id,tasks=new Set(),cleanup=[],flushes=new Set();
+  busy++;controls();status('正在確認診斷可保存…');
+  let preparedMedia;
+  try{
+    await context.audioWorklet.addModule(new URL('./recording-diagnostics-worklet.mjs',import.meta.url));
+    if(!native){
+      const mime=['audio/webm;codecs=pcm','audio/webm;codecs=opus','audio/webm'].find(x=>MediaRecorder.isTypeSupported(x));
+      preparedMedia=new MediaRecorder(stream,mime?{mimeType:mime}:{});
+    }
+    await request(`/diagnostics/${id}`,'POST',{title:meta.title,recordingId:id,videoId:meta.videoId,input:meta.captureClock?.input,sampleRate:context.sampleRate,formatVersion:2});
+    meta.diagnostics={id,version:2,status:'ready'};
+  }catch(e){busy--;controls();status('診斷無法準備，尚未開始錄音：'+e.message);throw Error('診斷無法保存，尚未開始錄音。請確認已更新並啟動本機工具：'+e.message);}
+  let started=false,recording=false,finished=false,failed='',queue=Promise.resolve(),queuedBytes=0,media,index=0,probeId=0,unsubscribe,probe,mediaDone=Promise.resolve(),finishing;
   function track(p){tasks.add(p);p.finally(()=>tasks.delete(p));return p;}
-  function fail(e){if(failed)return;failed=e.message||String(e);recording=false;stopProbe();if(media&&media.state!=='inactive')media.stop();status('診斷不完整，演唱錄音仍會繼續：'+failed);}
+  let released=false;
+  function release(){if(released)return;released=true;unsubscribe?.();cleanup.forEach(fn=>fn());busy--;controls();refreshDiagnostics();}
+  function fail(e){if(failed)return;failed=e.message||String(e);meta.diagnostics={id,version:2,status:'incomplete',error:failed};recording=false;try{stopProbe();if(media&&media.state!=='inactive')media.stop();}catch{}status('診斷不完整，演唱錄音仍會繼續：'+failed);}
   function enqueue(route,data,size=0){
     if(failed)return;queuedBytes+=size;if(queuedBytes>16*1024**2){queuedBytes-=size;fail(Error('本機保存太慢，已停止診斷收集'));return;}
-    queue=queue.then(()=>request(route,'POST',data)).catch(fail).finally(()=>{queuedBytes-=size;});
+    queue=queue.then(()=>failed?undefined:request(route,'POST',data)).catch(fail).finally(()=>{queuedBytes-=size;});
   }
   function send(data,buffers=[]){if(!started||finished||failed)return;try{enqueue(`/diagnostics/${id}/events`,{...data,wall:Date.now(),contextFrame:Math.round(context.currentTime*context.sampleRate),buffers:buffers.map(encode)},buffers.reduce((n,b)=>n+b.byteLength,0));}catch(e){fail(e);}}
   function stopProbe(){
@@ -55,45 +66,55 @@ export async function prepareRecordingDiagnostics({context,mic,stream,recorder,m
     node.port.onmessage=({data})=>{if(data.flushed){dispose();return;}send({kind:'probe',probe:current,start:data.start,frames:data.frames,blocks:data.blocks},data.channels.map(x=>x.buffer));};
     node.onprocessorerror=()=>{dispose();fail(Error('診斷分析節點中斷'));};
     node.connect(mute).connect(context.destination);mic.connect(node);
-    probe={node,done,finish(){node.port.postMessage('finish');timer=setTimeout(()=>{send({kind:'event',event:'probe-tail-unconfirmed',probe:current});dispose();},500);}};
+    probe={node,done,finish(){node.port.postMessage('finish');timer=setTimeout(()=>{send({kind:'event',event:'probe-tail-unconfirmed',probe:current});dispose();fail(Error('診斷分析節點尾端未確認'));},1500);}};
   }
   function startMedia(){
     if(native){send({kind:'event',event:'direct-media-unavailable',reason:'native-input',captureId:meta.captureClock?.nativeCaptureId});return;}
     try{
-      const mime=['audio/webm;codecs=pcm','audio/webm;codecs=opus','audio/webm'].find(x=>MediaRecorder.isTypeSupported(x));
-      media=new MediaRecorder(stream,mime?{mimeType:mime}:{});mediaDone=new Promise(resolve=>media.addEventListener('stop',resolve,{once:true}));
+      media=preparedMedia;mediaDone=new Promise(resolve=>media.addEventListener('stop',resolve,{once:true}));
       media.ondataavailable=e=>{const n=index++;track(e.data.arrayBuffer().then(b=>send({kind:'media',index:n,timecode:e.timecode,mime:media.mimeType},[b])).catch(fail));};
-      media.onerror=e=>{send({kind:'event',event:'direct-media-error',message:e.error?.message});};media.start(1000);
+      media.onerror=e=>{send({kind:'event',event:'direct-media-error',message:e.error?.message});fail(Error('直接收音診斷中斷：'+(e.error?.message||'MediaRecorder error')));};media.start(1000);
       send({kind:'event',event:'direct-media-start',mime:media.mimeType});
-    }catch(e){send({kind:'event',event:'direct-media-unavailable',reason:e.message});}
+    }catch(e){send({kind:'event',event:'direct-media-unavailable',reason:e.message});fail(e);}
   }
   const api={
     start(){
       if(recording||finished||failed)return;
       try{
         if(!started){
-          started=true;busy++;controls();meta.diagnostics={id,version:1};
-          enqueue(`/diagnostics/${id}`,{title:meta.title,recordingId:meta.id,videoId:meta.videoId,input:meta.captureClock?.input,sampleRate:context.sampleRate});
+          started=true;meta.diagnostics.status='recording';
           unsubscribe=recorder.observeSamples(data=>send({kind:'pcm',start:data.start,frames:data.voice.length,recordedFrame:data.recordedFrame},[data.voice.buffer]));
           const state=()=>send({kind:'event',event:'context-state',state:context.state});context.addEventListener('statechange',state);cleanup.push(()=>context.removeEventListener('statechange',state));
           for(const t of stream.getAudioTracks())for(const name of ['mute','unmute','ended']){const fn=()=>send({kind:'event',event:'track-'+name});t.addEventListener(name,fn);cleanup.push(()=>t.removeEventListener(name,fn));}
           const settings=stream.getAudioTracks()[0]?.getSettings?.()||{};delete settings.deviceId;delete settings.groupId;
           send({kind:'event',event:'start',settings,recordingDelayMs:meta.recordingDelayMs});startMedia();
         }else if(media?.state==='paused')media.resume();
-        recording=true;startProbe();send({kind:'event',event:'resume'});status('● 錄音診斷中 · 停止錄音後自動保存');
+        if(failed)return;
+        recording=true;startProbe();send({kind:'event',event:'resume'});status('● 錄音診斷中 · 停止錄音後確認保存');
       }catch(e){fail(e);}
     },
     pause(){if(!started||finished||!recording)return;recording=false;stopProbe();if(media?.state==='recording')media.pause();send({kind:'event',event:'pause'});status('錄音暫停，診斷暫停收集。');},
-    async finish(){
-      if(finished)return;if(!started){finished=true;return;}
+    finish(){if(!finishing)finishing=finish().catch(e=>{fail(e);finished=true;release();return meta.diagnostics;});return finishing;}
+  };
+  async function finish(){
+      if(!started){
+        finished=true;
+        try{await request(`/diagnostics/${id}/finish`,'POST',{error:'錄音準備已取消',cancelled:true});}catch(e){fail(e);}
+        finally{meta.diagnostics.status=failed?'incomplete':'cancelled';release();}return meta.diagnostics;
+      }
       api.pause();if(media&&media.state!=='inactive')media.stop();
-      await Promise.race([mediaDone,new Promise(resolve=>setTimeout(resolve,1500))]);
+      let mediaTimer;
+      await Promise.race([mediaDone,new Promise(resolve=>{mediaTimer=setTimeout(()=>{fail(Error('直接收音診斷尾端未確認'));resolve();},1500);})]);clearTimeout(mediaTimer);
       await Promise.allSettled([...flushes]);while(tasks.size)await Promise.allSettled([...tasks]);
       send({kind:'event',event:'finish',recordedFrames:recorder.frames,ranges:recorder.clock.ranges});unsubscribe?.();cleanup.forEach(fn=>fn());finished=true;
       await queue;
-      try{await request(`/diagnostics/${id}/finish`,'POST',{error:failed});status(failed?'診斷不完整：'+failed:'診斷已保存 · 待命，不再收集音訊');}
-      catch(e){status('診斷未完整保存：'+e.message);}finally{busy--;controls();refreshDiagnostics();}
-    }
-  };
+      try{
+        const result=await request(`/diagnostics/${id}/finish`,'POST',{error:failed,recordedFrames:recorder.frames});
+        if(!result.saved)fail(Error(result.error||'診斷資料未完整保存'));
+        if(!failed)meta.diagnostics={id,version:2,status:'saved',frames:result.frames,finished:Date.now()};
+        status(failed?'診斷不完整：'+failed:'診斷已保存 · 待命，不再收集音訊');
+      }catch(e){fail(e);status('診斷未完整保存：'+e.message);}finally{release();}
+      return meta.diagnostics;
+  }
   return api;
 }

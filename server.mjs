@@ -1,4 +1,3 @@
-import {createDiagnosticsHandler} from './recording-diagnostics-server.mjs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,9 +13,15 @@ for(const name of ['recording-segments.mjs','recording-segment-ui.mjs'])files.se
 for(const name of ['recording-repair.mjs','recording-repair-client.mjs','recording-repair-worker.mjs'])files.set('/'+name,[name,'text/javascript']);
 for(const name of ['voicelab-client.mjs','voicelab-settings.mjs','arrangement-client.mjs','arrangement-settings.mjs'])files.set('/'+name,[name,'text/javascript']);
 for(const name of ['recording-diagnostics.mjs','recording-diagnostics-worklet.mjs'])files.set('/'+name,[name,'text/javascript']);
-const handleDiagnostics=createDiagnosticsHandler(fileURLToPath(new URL('./.runtime/recording-diagnostics',import.meta.url)));
 const server = http.createServer(async (req, res) => {
-  if(await handleDiagnostics(req,res))return;
+  // Older open pages still use 4273; only the recording helper owns diagnostic
+  // sessions and files, so both routes share one token, queue and clear guard.
+  if(req.url?.startsWith('/diagnostics')){
+    const port=Number(process.env.KARAOKE_HELPER_PORT||4274);
+    const forward=http.request({hostname:'127.0.0.1',port,path:req.url,method:req.method,headers:{...req.headers,host:`127.0.0.1:${port}`,origin:req.headers.origin||(req.headers['sec-fetch-site']==='same-origin'?'http://'+req.headers.host:'')}},upstream=>{res.writeHead(upstream.statusCode,upstream.headers);upstream.pipe(res);});
+    forward.setTimeout(10000,()=>forward.destroy());
+    forward.on('error',()=>{if(!res.headersSent){res.writeHead(503,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'錄音診斷本機工具未連線，請啟動本機工具。'}));}else res.destroy();});req.pipe(forward);return;
+  }
   if (!['GET', 'HEAD'].includes(req.method)) { res.writeHead(405); res.end(); return; }
   const pathname = new URL(req.url, 'http://localhost').pathname;
   const versioned = /^\/assets\/[a-f0-9]{16}\/([a-z-]+\.(?:mjs|css))$/.exec(pathname);

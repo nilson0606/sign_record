@@ -49,13 +49,18 @@ test('helper enforces setup, auth and idle-only changes; selected library surviv
   }
   async function stop() { if (child && child.exitCode === null) { const exited = new Promise(resolve => child.once('exit', resolve)); child.kill(); await exited; } }
   try {
-    for (const file of ['helper-local.mjs', 'native-microphone-server.mjs', 'local-jobs.mjs', 'voicelab-server.mjs', 'voicelab-settings.mjs', 'arrangement-server.mjs', 'arrangement-settings.mjs', 'recording-export.mjs', 'recording-archive.mjs', 'local-library.mjs', 'library-location.mjs', 'scoring.mjs', 'song-key.mjs']) await copyFile(new URL('../' + file, import.meta.url), path.join(dir, file));
+    for (const file of ['helper-local.mjs', 'recording-diagnostics-server.mjs', 'native-microphone-server.mjs', 'local-jobs.mjs', 'voicelab-server.mjs', 'voicelab-settings.mjs', 'arrangement-server.mjs', 'arrangement-settings.mjs', 'recording-export.mjs', 'recording-archive.mjs', 'local-library.mjs', 'library-location.mjs', 'scoring.mjs', 'song-key.mjs']) await copyFile(new URL('../' + file, import.meta.url), path.join(dir, file));
     // Bind a random test port without exposing the helper outside loopback.
     const helper = path.join(dir, 'helper-local.mjs');
     let source = await readFile(helper, 'utf8');
     source = source.replace('`127.0.0.1:${port}`, `localhost:${port}`', '`127.0.0.1:${server.address().port}`, `localhost:${server.address().port}`').replace('${port}/health', '${server.address().port}/health');
     await writeFile(helper, source);
     await start();
+    const diagnosticPreflight=await fetch(base+'/diagnostics/session',{method:'OPTIONS',headers:{Origin:origin}});
+    assert.match(diagnosticPreflight.headers.get('Access-Control-Allow-Headers'),/X-Diagnostic-Token/);
+    const diagnosticSession=await(await fetch(base+'/diagnostics/session',{headers:{Origin:origin}})).json();
+    const diagnosticInfo=await(await fetch(base+'/diagnostics',{headers:{Origin:origin,'X-Diagnostic-Token':diagnosticSession.token}})).json();
+    assert.equal(diagnosticInfo.path,path.join(dir,'.runtime','recording-diagnostics'));
     assert.equal((await request('/library/location', 'GET', undefined, false)).status, 403);
     assert.equal((await request('/voicelab', 'GET', undefined, false)).status, 403);
     assert.equal((await request('/arrangements', 'GET', undefined, false)).status, 403);

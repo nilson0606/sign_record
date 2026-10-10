@@ -23,7 +23,7 @@
       <label for="input-device">收音麥克風</label><select id="input-device"><option value="">系統預設麥克風</option></select><p class="help">第一次允許收音後可選裝置。建議先用有線耳機或 USB 麥克風測試。</p>
       <details id="recording-diagnostics-panel"><summary>錄音診斷 · 自動保存問題線索</summary>
         <label class="check-option"><input id="diagnostics-enabled" type="checkbox" checked> 錄音時自動診斷</label>
-        <p class="help">只在整首／分段錄音期間保存對照音訊。暫停與停止錄音後停止收集；開麥測試、練唱、試聽與後處理不會啟動。診斷可能影響音訊時序，不代表斷音已修好。</p>
+        <p class="help">開啟時，錄音前先確認本機工具可保存診斷；停止錄音後確認資料完整寫入。只在整首／分段錄音期間保存對照音訊，練唱與試聽不收集。診斷可能影響音訊時序，不代表斷音已修好。</p>
         <p id="diagnostics-status" class="status" role="status">診斷待命。</p>
         <p id="diagnostics-storage" class="help"></p>
         <div class="button-row"><button id="diagnostics-refresh" type="button" class="secondary">重新整理診斷狀態</button><button id="diagnostics-clear" type="button" class="secondary">清除所有診斷資料</button></div>

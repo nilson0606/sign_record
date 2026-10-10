@@ -31,3 +31,32 @@ test('diagnostic authentication, active-session clear guard, persistence, quotas
   await new Promise(r=>server.close(r));if(path.dirname(path.resolve(tmp))===path.resolve(tmpdir())&&path.basename(tmp).startsWith('karaoke-diagnostics-'))await rm(tmp,{recursive:true,force:true});
  }
 });
+
+test('v2 completion confirms continuous PCM and comparison streams before reporting saved',async()=>{
+ const tmp=await mkdtemp(path.join(tmpdir(),'karaoke-diagnostics-')),root=path.join(tmp,'diagnostics');
+ const handler=createDiagnosticsHandler(root);const server=http.createServer((req,res)=>handler(req,res));
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port,origin='https://nilson0606.github.io';
+ try{
+  const preflight=await fetch(base+'/diagnostics/session',{method:'OPTIONS',headers:{Origin:origin}});
+  assert.match(preflight.headers.get('Access-Control-Allow-Headers'),/X-Diagnostic-Token/);
+  const {token}=await(await fetch(base+'/diagnostics/session',{headers:{Origin:origin}})).json();
+  const call=(url,data)=>fetch(base+url,{method:'POST',headers:{Origin:origin,'X-Diagnostic-Token':token,'Content-Type':'application/json'},body:JSON.stringify(data)});
+  const begin=async(input='browser-media-stream')=>{const id=randomUUID();assert.equal((await call('/diagnostics/'+id,{recordingId:id,formatVersion:2,input})).status,200);return id;};
+  const pcm=(id,recordedFrame=0)=>call('/diagnostics/'+id+'/events',{kind:'pcm',recordedFrame,frames:480,buffers:[Buffer.alloc(480*4).toString('base64')]});
+  const finish=(id,frames=480)=>call('/diagnostics/'+id+'/finish',{recordedFrames:frames});
+  const full=await begin();await pcm(full);
+  await call('/diagnostics/'+full+'/events',{kind:'probe',frames:480,buffers:[Buffer.alloc(480*4).toString('base64')]});
+  await call('/diagnostics/'+full+'/events',{kind:'media',buffers:[Buffer.from('comparison').toString('base64')]});
+  await call('/diagnostics/'+full+'/events',{kind:'event',event:'finish',recordedFrames:480});
+  assert.equal((await(await finish(full)).json()).saved,true);
+  assert.equal(JSON.parse(await readFile(path.join(root,full,'metadata.json'))).frames,480);
+  const missing=await begin();const result=await(await finish(missing)).json();assert.equal(result.saved,false);assert.match(result.error,/PCM/);
+  assert.equal(JSON.parse(await readFile(path.join(root,missing,'metadata.json'))).status,'incomplete');
+  const broken=await begin();assert.equal((await pcm(broken,480)).status,400);assert.match((await(await finish(broken)).json()).error,/不連續/);
+  const noMedia=await begin();await pcm(noMedia);await call('/diagnostics/'+noMedia+'/events',{kind:'probe',frames:480,buffers:[Buffer.alloc(1920).toString('base64')]});await call('/diagnostics/'+noMedia+'/events',{kind:'event',event:'finish',recordedFrames:480});
+  assert.match((await(await finish(noMedia)).json()).error,/直接收音/);
+  const cancelled=await begin();await call('/diagnostics/'+cancelled+'/finish',{cancelled:true});assert.equal(JSON.parse(await readFile(path.join(root,cancelled,'metadata.json'))).status,'cancelled');
+ }finally{
+  await new Promise(r=>server.close(r));if(path.dirname(path.resolve(tmp))===path.resolve(tmpdir())&&path.basename(tmp).startsWith('karaoke-diagnostics-'))await rm(tmp,{recursive:true,force:true});
+ }
+});

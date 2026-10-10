@@ -33,7 +33,7 @@ export function createRecordingReview({store,pause,loadStem,onChanged,isRecordin
     const id=rows.some(row=>row.id===savedId)?savedId:selected?.id;
     const next=rows.find(row=>row.id===id)||rows[0]||null;
     if(next?.id!==selected?.id){clear();status('');}selected=next;
-    $('take').replaceChildren(...rows.map(row=>new Option(`${row.title} · ${new Date(row.created).toLocaleString()} · ${row.seconds.toFixed(1)} 秒${row.complete?'':' · 未完整結束'}`,row.id)));
+    $('take').replaceChildren(...rows.map(row=>new Option(`${row.title} · ${new Date(row.created).toLocaleString()} · ${row.seconds.toFixed(1)} 秒${row.complete?'':' · 未完整結束'}${row.diagnostics?.status==='incomplete'?' · 診斷未完整保存：'+row.diagnostics.error:row.diagnostics?.status==='saved'?' · 診斷已保存':''}`,row.id)));
     if(selected)$('take').value=selected.id;
     document.getElementById('recording-review').hidden=!rows.length;
     controls();

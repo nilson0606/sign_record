@@ -148,7 +148,7 @@ export function createSegmentRecording(options) {
     $('delete-selected').disabled=locked||!take;
     for(const id of takeModeIds){$(id).value=takeMode;$(id).disabled=locked||!draft;}
     for(const id of guideModeIds){$(id).value=guideMode;$(id).disabled=locked||!draft;}
-    $('take-info').textContent=take?`本段錄音：${takeName(take)} · ${new Date(take.created).toLocaleTimeString()} · ${takeModeLabel()} · 歌聲校正 ${$('delay').value} ms（含起唱與尾音餘量）`:'本段尚未選用錄音；錄完保存後即可試聽，也可在右側挑選已錄版本。';
+    $('take-info').textContent=take?`本段錄音：${takeName(take)} · ${new Date(take.created).toLocaleTimeString()} · ${takeModeLabel()} · 歌聲校正 ${$('delay').value} ms（含起唱與尾音餘量）${take.diagnostics?.status==='incomplete'?' · 診斷未完整保存：'+take.diagnostics.error:take.diagnostics?.status==='saved'?' · 診斷已保存':''}`:'本段尚未選用錄音；錄完保存後即可試聽，也可在右側挑選已錄版本。';
     if(!draft)return;
     const p=part();$('song').textContent=ref?.title||'';$('seek').max=draft.duration;
     $('selected-summary').textContent=`${p.name} · ${fmt(p.start)}–${fmt(p.end)}`;
@@ -218,7 +218,7 @@ export function createSegmentRecording(options) {
     capture=null;c.armed=false;work=true;stopMonitor(c);options.player()?.pauseVideo?.();
     const stopped=options.recording.stop(error); // Drain PCM before microphone/context is released.
     ending=(async()=>{
-      try{const row=await stopped;if(row?.segmentTake?.captureId===c.captureId&&draft?.key===c.key){rows=[row,...rows.filter(r=>r.id!==row.id)];const p=draft.parts.find(p=>p.id===c.partId);if(p)p.takeId=row.id;persist();invalidate();status('本段已保存，可按「試聽本段錄音」立即聽這一版，也可切換演唱版本；原先錄音保留。');}else status(error?'本段收音中斷，請查看錄音狀態中的保留片段。':'沒有完成新的錄音；既有版本保留。');}
+      try{const row=await stopped;if(row?.segmentTake?.captureId===c.captureId&&draft?.key===c.key){rows=[row,...rows.filter(r=>r.id!==row.id)];const p=draft.parts.find(p=>p.id===c.partId);if(p)p.takeId=row.id;persist();invalidate();status(row.diagnostics?.status==='incomplete'?`本段錄音已保留，但診斷未完整保存：${row.diagnostics.error}。`:'本段已保存，可按「試聽本段錄音」立即聽這一版，也可切換演唱版本；原先錄音保留。'+(row.diagnostics?.status==='saved'?' 診斷已確認保存。':''));}else status(error?'本段收音中斷，請查看錄音狀態中的保留片段。':'沒有完成新的錄音；既有版本保留。');}
       catch(e){status('錄音已停止；草稿／保存狀態請確認：'+e.message);}
       finally{if(c.monitor)await c.monitor.close().catch(()=>{});if(c.wasMuted)c.player.mute?.();else c.player.unMute?.();work=false;render();options.changed();}
     })();return ending;

@@ -135,8 +135,10 @@ export function createSingerRecorder(options) {
     meta.captureClock={version:1,source:'audio-worklet-pcm',sampleRate:context.sampleRate,input:direct?'native-worklet-v2':'browser-media-stream'};
     if(direct?.nativeCapturePolicy)meta.captureClock.nativeCapturePolicy=direct.nativeCapturePolicy;
     if(direct?.nativeCaptureId)meta.captureClock.nativeCaptureId=direct.nativeCaptureId;
-    const diagnostics=await prepareRecordingDiagnostics({context,mic,stream,recorder,meta,native:!!direct});
-    if(request!==operation||options.context()!==context){recorder.dispose();mix.disconnect();destination.disconnect();throw new Error('錄音準備已取消。');}
+    let diagnostics;
+    try{diagnostics=await prepareRecordingDiagnostics({context,mic,stream,recorder,meta,native:!!direct});}
+    catch(error){recorder.dispose();mix.disconnect();destination.disconnect();throw error;}
+    if(request!==operation||options.context()!==context){await diagnostics?.finish();recorder.dispose();mix.disconnect();destination.disconnect();throw new Error('錄音準備已取消。');}
     const a = { diagnostics, recorder, rawRecorder, rawCount:0, segment:null, context, mic, mix, destination, buffers, meta, chunks: [], queue: Promise.resolve(), count: 0, backing: [], error: null };
     active = a; controls();
     rawRecorder.ondataavailable = event => {
@@ -197,7 +199,9 @@ export function createSingerRecorder(options) {
     })));
     stopping = (async () => {
       await ended;
-      a.diagnostics?.finish().catch(()=>{});
+      // PCM observers must drain before finishing diagnostics, and their result
+      // must be part of the final durable recording metadata.
+      await a.diagnostics?.finish();
       await a.queue;
       a.recorder.dispose();a.mix.disconnect();a.destination.disconnect();
       if (!wasStarted || !a.meta.bytes) { status('未開始播放，沒有保存空白錄音。'); return; }
@@ -205,7 +209,7 @@ export function createSingerRecorder(options) {
       a.meta.seconds=a.recorder.frames/a.context.sampleRate;
       a.meta.captureClock.frames=a.recorder.frames;
       a.chunks[0]=a.recorder.header();
-      let savedId=null,partialSaved=false;
+      let savedId=null,partialSaved=false,completionStatus='';
       try {
         await store.save(a.meta,a.recorder.header(),0);
         await store.save(a.meta,a.recorder.voiceHeader(),0,'voice');
@@ -223,7 +227,8 @@ export function createSingerRecorder(options) {
           }catch(error){correctionError=error.message;}finally{await decoder.close().catch(()=>{});}
         }
         a.meta.complete=true;await store.save(a.meta);savedId=a.meta.id;
-        status(correctionError?'延時校正未完成，已保留待確認錄音：'+correctionError:a.meta.segmentTake?'分段錄音已保存於分段區。':`錄音已保留為待確認版本 · 歌聲校正 ${a.meta.appliedDelayMs} ms。請先試聽，滿意再存到錄音後處理。`);
+        const diagnosticWarning=a.meta.diagnostics?.status==='incomplete'?` 診斷未完整保存：${a.meta.diagnostics.error}。`:a.meta.diagnostics?.status==='saved'?' 診斷已確認保存。':'';
+        completionStatus=(correctionError?'延時校正未完成，已保留待確認錄音：'+correctionError:a.meta.segmentTake?'分段錄音已保存於分段區。':`錄音已保留為待確認版本 · 歌聲校正 ${a.meta.appliedDelayMs} ms。請先試聽，滿意再存到錄音後處理。`)+diagnosticWarning;
       } catch (error) {
         const panel = $('recording-rescue'); panel.hidden = false;
         const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob(a.chunks,{type:a.recorder.mimeType})); link.download = '演唱錄音.wav';
@@ -232,6 +237,7 @@ export function createSingerRecorder(options) {
         status(retained?'收音中斷，已保留錄音片段，可下載備份：'+error.message:'錄音未完整保存，請先按「下載未保存錄音」備份：'+error.message);
       }
       await render(savedId).catch(error=>status('無法讀取錄音清單：'+error.message));
+      if(completionStatus)status(completionStatus);
       if(a.meta.segmentTake)window.dispatchEvent(new CustomEvent('segment-capture-stopped',{detail:{captureId:a.meta.segmentTake.captureId}}));
       return savedId ? a.meta : null;
     })();

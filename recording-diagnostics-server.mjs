@@ -49,22 +49,37 @@ export function createDiagnosticsHandler(directory,{maxBytes=2*1024**3}={}){
         if(total===null)total=(await inventory()).bytes;
         if(!match[2]){
           if(total>=maxBytes)throw Error('診斷已達 2 GB，請先清除舊診斷');
-          await mkdir(dir);const metadata={id,title:String(input.title||'').slice(0,300),created:Date.now(),input:input.input,sampleRate:input.sampleRate,videoId:input.videoId,recordingId:input.recordingId,status:'recording',formatVersion:1};
-          const text=JSON.stringify(metadata,null,2);await writeFile(path.join(dir,'metadata.json'),text);total+=Buffer.byteLength(text);active.set(id,{metadata,touched:Date.now(),sequence:0,bytes:0});return {id};
+          await mkdir(dir);const metadata={id,title:String(input.title||'').slice(0,300),created:Date.now(),input:input.input,sampleRate:input.sampleRate,videoId:input.videoId,recordingId:input.recordingId,status:'recording',formatVersion:input.formatVersion===2?2:1};
+          const text=JSON.stringify(metadata,null,2);await writeFile(path.join(dir,'metadata.json'),text);total+=Buffer.byteLength(text);active.set(id,{metadata,touched:Date.now(),sequence:0,bytes:0,pcmFrames:0,probeFrames:0,mediaBytes:0,finishFrames:null,error:''});return {id};
         }
         const session=active.get(id);if(!session)throw Error('診斷已結束或服務已重啟');session.touched=Date.now();
         if(match[2]==='finish'){
-          session.metadata.status=input.error?'incomplete':'saved';session.metadata.error=String(input.error||'').slice(0,500);session.metadata.finished=Date.now();session.metadata.bytes=session.bytes;
-          await writeFile(path.join(dir,'metadata.json'),JSON.stringify(session.metadata,null,2));active.delete(id);return {saved:true};
+          let error=String(input.error||session.error||'');
+          if(session.metadata.formatVersion===2&&!input.cancelled&&!error){
+            if(!Number.isSafeInteger(input.recordedFrames)||input.recordedFrames<=0||session.pcmFrames!==input.recordedFrames||session.finishFrames!==input.recordedFrames)error='診斷 PCM 未完整涵蓋錄音';
+            else if(!session.probeFrames)error='缺少收音分析診斷';
+            else if(session.metadata.input==='browser-media-stream'&&!session.mediaBytes)error='缺少瀏覽器直接收音診斷';
+          }
+          session.metadata.status=input.cancelled?'cancelled':error?'incomplete':'saved';session.metadata.error=error.slice(0,500);session.metadata.finished=Date.now();session.metadata.bytes=session.bytes;
+          session.metadata.frames=session.pcmFrames;
+          await writeFile(path.join(dir,'metadata.json'),JSON.stringify(session.metadata,null,2));active.delete(id);return {saved:session.metadata.status==='saved',error:session.metadata.error,frames:session.pcmFrames};
         }
         if(!['event','media','probe','pcm'].includes(input.kind))throw Error('Invalid event kind');
         const event={...input,sequence:++session.sequence};let bytes=0;const files=[];
         const buffers=(input.buffers||[]).map(value=>{if(typeof value!=='string'||!/^[A-Za-z0-9+/]*={0,2}$/.test(value))throw Error('Invalid sample data');const b=Buffer.from(value,'base64');bytes+=b.length;return b;});
         for(let i=0;i<buffers.length;i++)files.push(`${String(event.sequence).padStart(8,'0')}-${i}.bin`);
+        if(session.metadata.formatVersion===2&&input.kind==='pcm'){
+          if(!Number.isSafeInteger(input.frames)||input.frames<=0||buffers.length!==1||buffers[0].length!==input.frames*4||input.recordedFrame!==session.pcmFrames){session.error='診斷 PCM 取樣不連續或資料長度錯誤';throw Error(session.error);}
+        }
         delete event.buffers;event.files=files;const line=JSON.stringify(event)+'\n',lineBytes=Buffer.byteLength(line);
         if(lineBytes>65536||buffers.length>8||session.sequence>50000||session.bytes+bytes+lineBytes>512*1024**2||total+bytes+lineBytes>maxBytes)throw Error('診斷容量已滿，錄音仍會繼續；請停止後清除舊診斷');
         for(let i=0;i<buffers.length;i++)await writeFile(path.join(dir,files[i]),buffers[i]);
-        total+=bytes+lineBytes;session.bytes+=bytes+lineBytes;await appendFile(path.join(dir,'events.jsonl'),line);return {saved:true};
+        total+=bytes+lineBytes;session.bytes+=bytes+lineBytes;await appendFile(path.join(dir,'events.jsonl'),line);
+        if(input.kind==='pcm')session.pcmFrames+=input.frames||0;
+        if(input.kind==='probe'&&buffers.length)session.probeFrames+=input.frames||0;
+        if(input.kind==='media')session.mediaBytes+=bytes;
+        if(input.kind==='event'&&input.event==='finish')session.finishFrames=input.recordedFrames;
+        return {saved:true};
       });reply(res,200,result);
     }catch(error){reply(res,400,{error:error.message});}
     return true;

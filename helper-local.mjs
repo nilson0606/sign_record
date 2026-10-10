@@ -1,4 +1,5 @@
 import {stopNativeMicrophone} from './native-microphone-server.mjs';
+import {createDiagnosticsHandler} from './recording-diagnostics-server.mjs';
 // Loopback-only service. Recording export receives audio locally; nothing is uploaded to cloud.
 import http from 'node:http';
 import { handleLocalJobs, clearAllJobs, clearStaleJobs } from './local-jobs.mjs';
@@ -8,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('./', import.meta.url));
 const python = fileURLToPath(new URL('./.runtime/venv/Scripts/python.exe', import.meta.url));
 const port = Number(process.env.KARAOKE_HELPER_PORT || 4274);
+const handleDiagnostics=createDiagnosticsHandler(fileURLToPath(new URL('./.runtime/recording-diagnostics',import.meta.url)));
 const origins = new Set(['https://nilson0606.github.io', 'http://localhost:4273', 'http://127.0.0.1:4273']);
 function check(command, args) {
   return new Promise(resolve => {
@@ -42,6 +44,7 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   if (!new Set([`127.0.0.1:${port}`, `localhost:${port}`]).has(req.headers.host)) { res.writeHead(403); res.end(); return; }
   if (!origins.has(req.headers.origin)) { res.writeHead(403); res.end(); return; }
+  if(await handleDiagnostics(req,res))return;
   res.setHeader('Access-Control-Allow-Origin', req.headers.origin); res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Private-Network', 'true');
   if (req.method === 'OPTIONS') { res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS'); res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Karaoke-Token'); res.writeHead(204); res.end(); return; }
