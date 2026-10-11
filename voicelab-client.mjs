@@ -56,12 +56,13 @@ export function createVoiceLab({store,getSelected,getPosition,getReference=()=>n
     for(const id of ['listen-original','listen-ai','download','save'])$(id).disabled=!result||busy||saving||externalBusy;
     $('save').disabled||=!!result&&result.draft!==draft();
     $('enable').disabled=saving;
-    for(const id of ['blend','match','loop','backing-choice','backing-refresh'])$(id).disabled=saving;
+    for(const id of ['blend','match','loop','backing-choice','backing-refresh','voice-volume','backing-volume'])$(id).disabled=saving;
     $('backing').disabled=saving||!result||result.row.mode!=='mix';
   }
   function labels(){
     for(const id of ['index-rate','protect'])$(id+'-value').textContent=Number($(id).value).toFixed(2);
     $('blend-value').textContent=$('blend').value+'%';
+    for(const id of ['voice-volume','backing-volume'])$(id+'-value').textContent=$(id).value+'%';
     const pitch=$('pitch').valueAsNumber;$('pitch-value').textContent=Number.isInteger(pitch)&&pitch>=-12&&pitch<=12?voicelabPitchLabel(pitch):'請輸入 −12～+12 的整數';
     for(const button of document.querySelectorAll('[data-voicelab-pitch]'))button.setAttribute('aria-pressed',String(Number(button.dataset.voicelabPitch)===pitch));
   }
@@ -121,7 +122,7 @@ export function createVoiceLab({store,getSelected,getPosition,getReference=()=>n
       try{const [original,converted]=await Promise.all(blobs.map(async b=>context.decodeAudioData(await b.arrayBuffer())));if(rev!==revision)return;
         if(original.length!==converted.length||converted.length!==state.result.outputSamples||Math.abs(converted.duration-(input.interval.end-input.interval.start))>1/48000)throw Error('輸出長度與選取範圍不符，未接受結果。');
         result={row,original,converted,report:state.result,interval:input.interval,delayMs:input.delayMs,tracks:null,draft:generatedDraft};}finally{await context.close();}
-      $('result').hidden=false;$('blend').value=100;$('backing').checked=row.mode==='mix';labels();
+      $('result').hidden=false;$('blend').value=100;$('backing').checked=row.mode==='mix';$('voice-volume').value=$('backing-volume').value=100;labels();
       const s=result.report.settings;$('result-info').textContent=`已轉換：${row.voicelabSource==='original'?'原曲原唱':'我的錄音'} → ${VOICELAB_MODELS[s.model]} · ${voicelabRangeLabel(input.interval,row.sourceSeconds??row.seconds)} · ${voicelabPitchLabel(s.pitchShift)} · 檢索比例 ${s.indexRate} · 子音保護 ${s.protect} · 校正 ${input.delayMs} ms。請試聽確認音色與對嘴。`;
       say('已完成。按「原聲／Voice Lab」同位置切換比較；原錄音與 A／B 設定保留。');
       showProgress('ready','音檔長度檢查通過，可以試聽。');
@@ -131,10 +132,11 @@ export function createVoiceLab({store,getSelected,getPosition,getReference=()=>n
   async function buildMixes(){
     if(!result)throw Error('請先產生 Voice Lab。');const snapshot=result,rev=revision,pass=++rendering;
     const useBacking=$('backing').checked&&snapshot.row.mode==='mix',match=$('match').checked,blend=Number($('blend').value)/100;
+    const voiceVolume=Number($('voice-volume').value),backingVolume=Number($('backing-volume').value);
     const chosen=$('backing-choice').value,custom=chosen?savedBackings.find(m=>m.id===chosen):null;
     if(useBacking&&chosen&&(!custom||!arrangementCovers(custom,snapshot.row,snapshot.interval)))throw Error('所選配樂未涵蓋這段歌聲，請選整首或範圍相符的配樂。');
     const arrangement=useBacking?(custom??snapshot.row.arrangement??null):null;
-    const key=JSON.stringify([useBacking,match,blend,arrangement?.id]);if(mixes?.key===key)return mixes;
+    const key=JSON.stringify([useBacking,match,blend,arrangement?.id,voiceVolume,backingVolume]);if(mixes?.key===key)return mixes;
     $('listen-status').textContent='準備試聽音訊…';
     if(useBacking&&(!snapshot.tracks||snapshot.tracksKey!==(arrangement?.id??'original'))){
       const context=new AudioContext({sampleRate:48000,sinkId:{type:'none'}});
@@ -142,7 +144,7 @@ export function createVoiceLab({store,getSelected,getPosition,getReference=()=>n
     }
     const gain=match?Math.min(4,rms(snapshot.original)/Math.max(rms(snapshot.converted),.00001)):1;
     async function render(ai){
-      const context=new OfflineAudioContext(2,snapshot.original.length,48000),balance=snapshot.row.balance??{},voiceGain=(balance.voice??70)/100,backGain=(balance.backing??50)/100;
+      const context=new OfflineAudioContext(2,snapshot.original.length,48000),balance=snapshot.row.balance??{},voiceGain=(balance.voice??70)/100*voiceVolume/100,backGain=(balance.backing??50)/100*backingVolume/100;
       const add=(buffer,level,when=0,offset=0,duration)=>{if(level===0||duration===0)return;const node=context.createBufferSource(),g=context.createGain();node.buffer=buffer;g.gain.value=level;node.connect(g);g.connect(context.destination);node.start(when,offset,duration);};
       add(snapshot.original,voiceGain*(ai?1-blend:1));if(ai)add(snapshot.converted,voiceGain*blend*gain);
       if(useBacking)for(const segment of snapshot.row.post.segments)for(const track of snapshot.tracks){
@@ -161,7 +163,7 @@ export function createVoiceLab({store,getSelected,getPosition,getReference=()=>n
     for(let i=0;i<out.length;i++)out[i]=original[i]*(1-blend)+converted[i]*blend*gain;
     // Preserve the blended dry vocal without PCM clipping; fold its scale into the saved bus gain.
     let voicePeak=1;for(const x of out)voicePeak=Math.max(voicePeak,Math.abs(x));if(voicePeak>1)for(let i=0;i<out.length;i++)out[i]/=voicePeak;
-    mixes={key,blobs,urls,voice:wavBlob(voice),voiceScale:voicePeak,useBacking,match,blend:Math.round(blend*100),commonGain,arrangement};$('listen-status').textContent=`${useBacking?(arrangement?'已保存的新配樂':'同一份配樂'):'只聽人聲'} · AI ${Math.round(blend*100)}%${match?' · 音量匹配':''}；切換保留目前播放位置。`;return mixes;
+    mixes={key,blobs,urls,voice:wavBlob(voice),voiceScale:voicePeak,useBacking,match,blend:Math.round(blend*100),commonGain,arrangement,voiceVolume,backingVolume};$('listen-status').textContent=`${useBacking?(arrangement?'已保存的新配樂':'同一份配樂'):'只聽人聲'} · 人聲 ${voiceVolume}% · 配樂 ${useBacking?backingVolume:0}% · AI ${Math.round(blend*100)}%${match?' · 音量匹配':''}；切換保留目前播放位置。`;return mixes;
   }
   async function play(next){
     if(!result)return;const position=player.currentTime||0;side=next;beforePlay();
@@ -170,7 +172,7 @@ export function createVoiceLab({store,getSelected,getPosition,getReference=()=>n
     }catch(e){$('listen-status').textContent=e.message;}
   }
   $('listen-original').addEventListener('click',()=>void play('original'));$('listen-ai').addEventListener('click',()=>void play('ai'));
-  for(const id of ['blend','backing','match','backing-choice'])$(id).addEventListener('input',()=>{labels();mixes=null;rendering++;player.pause();$('listen-status').textContent='試聽混音已改，按「原聲／Voice Lab」聽新效果；不需重新生成。';});
+  for(const id of ['blend','backing','match','backing-choice','voice-volume','backing-volume'])$(id).addEventListener('input',()=>{labels();mixes=null;rendering++;player.pause();$('listen-status').textContent='試聽混音已改，按「原聲／Voice Lab」聽新效果；不需重新生成。';});
   $('loop').addEventListener('change',()=>{player.loop=$('loop').checked;});
   $('download').addEventListener('click',async()=>{
     try{const mix=await buildMixes(),s=result.report.settings,a=document.createElement('a'),pitch=s.pitchShift??0;a.href=mix.urls[1];a.download=`${result.row.title}_Voice Lab_${VOICELAB_MODELS[s.model]}_${result.interval.start}-${result.interval.end}秒${pitch?`_移調${pitch>0?'+':''}${pitch}半音`:''}_AI${$('blend').value}%_試聽.wav`.replace(/[\\/:*?"<>|]/g,'_');a.click();}catch(e){$('listen-status').textContent=e.message;}

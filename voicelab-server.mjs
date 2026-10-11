@@ -11,6 +11,8 @@ const root=fileURLToPath(new URL('./',import.meta.url)),runtime=path.join(root,'
 const jobs=new Map();
 function config(){try{return JSON.parse(readFileSync(path.join(runtime,'config.json'),'utf8'));}catch{return {};}}
 function modelFiles(model,c=config()){
+  const added={mosi_ver1:'Mosi_Ver1',n_1_ver1:'N_1_Ver1'}[model];
+  if(added)return {modelPath:path.join(c.modelsRoot||runtime,added,`${added}_100e.pth`),indexPath:path.join(c.modelsRoot||runtime,added,`${added}.index`)};
   const wife=model==='wife_ver1'||model==='wife_ver2';
   const version=wife?model.replace('wife_ver','Wife_Ver'):model.replace('ver','Ver');
   const stem=wife?model.replace('wife_ver','wife_voice_Ver'):`myvoice_${version}`;

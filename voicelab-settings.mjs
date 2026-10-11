@@ -1,5 +1,5 @@
 export const VOICELAB_DEFAULTS=Object.freeze({model:'ver3',pitchShift:0,indexRate:.75,protect:.33});
-export const VOICELAB_MODELS=Object.freeze({ver1:'我的音色 Ver1',ver2:'我的音色 Ver2',ver3:'我的音色 Ver3',wife_ver1:'Wife Ver1',wife_ver2:'Wife Ver2'});
+export const VOICELAB_MODELS=Object.freeze({ver1:'我的音色 Ver1',ver2:'我的音色 Ver2',ver3:'我的音色 Ver3',wife_ver1:'Wife Ver1',wife_ver2:'Wife Ver2',mosi_ver1:'Mosi Ver1',n_1_ver1:'N_1 Ver1'});
 export function voicelabPitchLabel(value=0){
   return value===0?'原八度（預設）':`${value===-12?'降低八度':value===12?'提高八度':'移調'}（${value>0?'+':''}${value} 半音）`;
 }
@@ -33,7 +33,7 @@ export function voicelabRangeLabel(interval,duration){
   const full=Math.abs(interval.start)<1/48000&&Math.abs(interval.end-duration)<1/48000;
   return `${full?'整首':'片段'} ${interval.start.toFixed(2)}～${interval.end.toFixed(2)} 秒（${(interval.end-interval.start).toFixed(2)} 秒／原始 ${duration.toFixed(2)} 秒）`;
 }
-export function voicelabSavedMetadata({row,interval,report,delayMs,blend,match,useBacking,arrangement=null,commonGain=1,bytes,rawBytes}){
+export function voicelabSavedMetadata({row,interval,report,delayMs,blend,match,useBacking,arrangement=null,commonGain=1,voiceVolume=100,backingVolume=100,bytes,rawBytes}){
   const duration=report.outputSamples/report.sampleRate;
   if(report.sourceSamples!==report.outputSamples||Math.abs(duration-(interval.end-interval.start))>1/48000)throw Error('生成長度與選取範圍不符，未保存。');
   const segments=(row.post?.segments??[]).flatMap(s=>{
@@ -46,10 +46,10 @@ export function voicelabSavedMetadata({row,interval,report,delayMs,blend,match,u
   const result={id:crypto.randomUUID(),created:Date.now(),title:row.title.slice(0,500-suffix.length)+suffix,...(row.voicelabSource==='original'?{}:{parentId:row.id}),
     videoId:row.videoId,mode:useBacking?'mix':'voice',stems:useBacking?(arrangement??row.arrangement?['arrangement']:structuredClone(row.stems??[])):[],mime:'audio/wav',rawMime:'audio/wav',
     complete:true,seconds:duration,sourceSeconds:duration,bytes,rawBytes,appliedDelayMs:0,delayMs:0,
-    balance:{manual:true,voice:(row.balance?.voice??70)*commonGain,backing:(row.balance?.backing??50)*commonGain},
+    balance:{manual:true,voice:(row.balance?.voice??70)*voiceVolume/100*commonGain,backing:(row.balance?.backing??50)*backingVolume/100*commonGain},
     postVolume:{voice:100,backing:100},vocalSoftening:{version:2,strength:'off'},vocalEffects:{version:1,reverb:0},
     postEdit:{version:1,start:0,end:null,fadeIn:0,fadeOut:0},
-    voicelab:{version:1,sourceKind:row.voicelabSource==='original'?'original':'recording',sourceCacheId:row.post?.reference?.cacheId,report:structuredClone(report),range:structuredClone(interval),sourceSeconds:row.sourceSeconds??row.seconds,sourceDelayMs:delayMs,blend,match,useBacking,commonGain}};
+    voicelab:{version:1,sourceKind:row.voicelabSource==='original'?'original':'recording',sourceCacheId:row.post?.reference?.cacheId,report:structuredClone(report),range:structuredClone(interval),sourceSeconds:row.sourceSeconds??row.seconds,sourceDelayMs:delayMs,blend,match,useBacking,commonGain,voiceVolume,backingVolume}};
   if(useBacking&&(arrangement??row.arrangement))result.arrangement=structuredClone(arrangement??row.arrangement);
   if(row.post)result.post={version:row.post.version??1,reference:structuredClone(row.post.reference),scoring:structuredClone(row.post.scoring),segments,samples:[],offsetMs:0};
   return result;
