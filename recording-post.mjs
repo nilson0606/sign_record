@@ -3,6 +3,7 @@ import {isPostRecording} from './recording-store.mjs';
 import {createArrangement} from './arrangement-client.mjs';
 import {recordingBackingRoute} from './arrangement-settings.mjs';
 import { createVoiceLab } from './voicelab-client.mjs';
+import {createMV} from './mv-client.mjs';
 import { createRecordingAudition } from './recording-audition.mjs';
 import { recordingScenes, initialRecordingEffects, matchingRecordingScene, recordingEmotions, matchingRecordingEmotion } from './recording-scenes.mjs';
 import { PITCH_DETECTOR_VERSION } from './audio.mjs';
@@ -42,6 +43,8 @@ async function recordedAnalysis(blob, progress, pitchShift=0) {
 }
 export function createRecordingPost({store,stop,pause,download,onDelete,reference=()=>null,isRecording=()=>false}) {
   let rows=[],selected=null,busy=false,url=null,statusTarget='post-status',audition=null,previewSources=null,soulx=null,arrangement=null;
+  const mv=createMV({beforePlay:()=>{clearAudio();soulx?.pause();pause();}});
+  $('selected-recording-mv').addEventListener('click',()=>run(async row=>{clearAudio();soulx?.pause();mv.open({title:row.title,blob:await store.blob(row)});}));
   const status=text=>{$(statusTarget).textContent=text;};
   function clearAudio(){arrangement?.pause();audition?.stop();const a=$('post-audio');a.pause();a.removeAttribute('src');a.load();a.hidden=true;if(url)URL.revokeObjectURL(url);url=null;}
   function effectLabels(){
@@ -131,7 +134,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     audition?.controls(busy);
     const editable=!!(selected?.complete&&selected.rawBytes&&selected.post?.segments?.length);
     $('post-diagnostic').disabled=busy||!editable;
-    for(const action of ['preview','download','delete'])$('selected-recording-'+action).disabled=busy||!selected;
+    for(const action of ['preview','download','delete','mv'])$('selected-recording-'+action).disabled=busy||!selected;
     $('post-delete-all').disabled=busy||!rows.length||isRecording();
     $('selected-recording-edit').disabled=busy||!editable;
     $('selected-recording-voice').disabled=busy||!selected||!(selected.mode==='voice'||editable);
@@ -362,7 +365,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
       return remixRecording(previewSources.raw,solo?[]:previewSources.tracks??[],row,settings.delayMs,{...settings,edit:{...interval,fadeIn:fade,fadeOut:fade},progress:status});
     }
   });
-  soulx=createVoiceLab({store,getSelected:()=>selected,getReference:reference,getPosition:originalPlayhead,beforePlay:()=>{arrangement?.pause();audition?.stop();$('post-audio').pause();pause();},onSaved:async meta=>{
+  soulx=createVoiceLab({store,getSelected:()=>selected,getReference:reference,getPosition:originalPlayhead,onMakeMV:data=>mv.open(data),beforePlay:()=>{mv.pause();arrangement?.pause();audition?.stop();$('post-audio').pause();pause();},onSaved:async meta=>{
     refresh(await store.list());select(meta.id,{scroll:false});
     $('post-status').textContent=`已另存 ${meta.title}。${meta._archiveRoot?'保存至 '+meta._archiveRoot:'已暫存此瀏覽器，待本機工具連線後搬存'}；原錄音保留，可繼續調整 EQ、殘響與剪輯。`;
     window.dispatchEvent(new Event('recording-post-saved'));

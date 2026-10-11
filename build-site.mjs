@@ -10,6 +10,7 @@ assets.push('library-recordings.mjs');
 assets.push('recording-segments.mjs','recording-segment-ui.mjs');
 assets.push('recording-repair.mjs','recording-repair-client.mjs','recording-repair-worker.mjs');
 assets.push('voicelab-client.mjs','voicelab-settings.mjs','arrangement-client.mjs','arrangement-settings.mjs');
+assets.push('mv-client.mjs');
 const root = fileURLToPath(new URL('./',import.meta.url));
 export async function buildSite(output = path.join(root,'_site'), source = root) {
   const files = new Map();

@@ -18,7 +18,7 @@ export async function voicelabSlice(buffer,start,end){
   if(duration>0)node.start(when,offset,duration);return c.startRendering();
 }
 function rms(buffer){const a=buffer.getChannelData(0);let sum=0;for(const x of a)sum+=x*x;return Math.sqrt(sum/a.length);}
-export function createVoiceLab({store,getSelected,getPosition,getReference=()=>null,beforePlay,onSaved=async()=>{}}){
+export function createVoiceLab({store,getSelected,getPosition,getReference=()=>null,beforePlay,onSaved=async()=>{},onMakeMV=()=>{}}){
   // Start disabled even if the browser restored controls from the previous visit.
   $('panel').open=false;$('enable').checked=false;
   let savedBackings=[];
@@ -53,7 +53,8 @@ export function createVoiceLab({store,getSelected,getPosition,getReference=()=>n
     $('content').hidden=!enabled();$('fields').disabled=!enabled()||!eligible()||busy||saving||externalBusy;
     $('source').disabled=!enabled()||busy||saving||externalBusy;
     $('cancel').disabled=!busy||!active;
-    for(const id of ['listen-original','listen-ai','download','save'])$(id).disabled=!result||busy||saving||externalBusy;
+    for(const id of ['listen-original','listen-ai','download','save','mv'])$(id).disabled=!result||busy||saving||externalBusy;
+    $('mv').disabled||=!!result&&result.draft!==draft();
     $('save').disabled||=!!result&&result.draft!==draft();
     $('enable').disabled=saving;
     for(const id of ['blend','match','loop','backing-choice','backing-refresh','voice-volume','backing-volume'])$(id).disabled=saving;
@@ -189,6 +190,11 @@ export function createVoiceLab({store,getSelected,getPosition,getReference=()=>n
       say('已另存 Voice Lab 至錄音清單；原錄音保留。');
     }catch(e){say('Voice Lab 保存未完成：'+e.message);}
     finally{saving=false;controls();}
+  });
+  $('mv').addEventListener('click',async()=>{
+    if(!result||busy||saving||externalBusy||result.draft!==draft())return;
+    const snapshot=result;saving=true;controls();player.pause();
+    try{const mix=await buildMixes();if(snapshot!==result)throw Error('來源已變更，請重新選取。');onMakeMV({title:snapshot.row.title,blob:mix.blobs[1],label:`${snapshot.row.title} · Voice Lab · ${VOICELAB_MODELS[snapshot.report.settings.model]} · ${snapshot.interval.start.toFixed(2)}～${snapshot.interval.end.toFixed(2)} 秒 · 人聲 ${mix.voiceVolume}%／配樂 ${mix.useBacking?mix.backingVolume:0}%`});}catch(e){$('listen-status').textContent=e.message;}finally{saving=false;controls();}
   });
   window.addEventListener('pagehide',()=>{void cancel();clear();});
   function syncSource(){

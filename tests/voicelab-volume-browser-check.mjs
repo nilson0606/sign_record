@@ -27,7 +27,7 @@ try{
  await page.goto(site);await page.evaluate(async()=>{
   const {createVoiceLab}=await import('/voicelab-client.mjs');window.saved=[];window.savedBlobs=[];
   document.getElementById('voicelab-source').value='original';
-  createVoiceLab({store:{saveRemix:async(meta,mix,voice)=>{saved.push(meta);savedBlobs.push({mix,voice});}},getSelected:()=>null,getPosition:()=>0,getReference:()=>({cacheId:'fixture',title:'Volume fixture',duration:2,hasPreview:true}),beforePlay(){}});
+  createVoiceLab({store:{saveRemix:async(meta,mix,voice)=>{saved.push(meta);savedBlobs.push({mix,voice});}},getSelected:()=>null,getPosition:()=>0,getReference:()=>({cacheId:'fixture',title:'Volume fixture',duration:2,hasPreview:true}),beforePlay(){},onMakeMV:data=>{window.mvInput=data;}});
   window.measure=async blob=>{const c=new AudioContext({sampleRate:48000,sinkId:{type:'none'}}),b=await c.decodeAudioData(await blob.arrayBuffer());await c.close();const x=b.getChannelData(0),amp=hz=>Math.abs(x.reduce((n,v,i)=>n+v*Math.sin(2*Math.PI*hz*i/48000),0)*2/x.length);return{voice:amp(880),original:amp(440),backing:amp(660),peak:Math.max(...x.subarray(0,96000)),length:x.length};};
   HTMLAnchorElement.prototype.click=function(){window.downloadBlob=fetch(this.href).then(r=>r.blob());};
  });
@@ -46,6 +46,7 @@ try{
  await volume('voice-volume',0);const muted=await listen();assert.ok(muted.voice<.0001&&Math.abs(muted.backing-.08)<.0001);
  await volume('voice-volume',50);await volume('backing-volume',0);const vocal=await listen();assert.ok(Math.abs(vocal.voice-.1)<.0001&&vocal.backing<.0001);
  await volume('backing-volume',150);const adjusted=await listen();assert.ok(Math.abs(adjusted.voice-.1)<.0001&&Math.abs(adjusted.backing-.12)<.0001);
+ await $('mv').click();await page.waitForFunction(()=>!!window.mvInput);const mv=await page.evaluate(async()=>measure(mvInput.blob));assert.ok(Math.abs(mv.voice-adjusted.voice)<.00001&&Math.abs(mv.backing-adjusted.backing)<.00001,'MV receives the exact adjusted Voice Lab mix');
  const compare=await listen('original');assert.ok(Math.abs(compare.original-.05)<.0001&&Math.abs(compare.backing-.12)<.0001);
  await $('download').click();await page.waitForFunction(()=>!!window.downloadBlob);const download=await page.evaluate(async()=>measure(await downloadBlob));assert.ok(Math.abs(download.voice-adjusted.voice)<.00001&&Math.abs(download.backing-adjusted.backing)<.00001);
  await $('save').click();await page.waitForFunction(()=>saved.length===1);
