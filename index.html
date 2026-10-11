@@ -267,6 +267,11 @@
             <div><label for="voicelab-index-rate">音色檢索比例 <output id="voicelab-index-rate-value">0.75</output></label><input id="voicelab-index-rate" type="range" min="0" max="1" step="0.05" value="0.75"><p class="help">預設 0.75。提高會更偏向訓練音色；不是相似度保證。</p></div>
             <div><label for="voicelab-protect">子音／氣音保護 <output id="voicelab-protect-value">0.33</output></label><input id="voicelab-protect" type="range" min="0" max="0.5" step="0.01" value="0.33"><p class="help">預設 0.33；數值較小保護較強，0.5 關閉保護。</p></div>
           </div>
+          <div class="soulx-grid" aria-label="Voice Lab 人聲與配樂音量">
+            <div><label for="voicelab-voice-volume">人聲音量 <output id="voicelab-voice-volume-value">100%</output></label><input id="voicelab-voice-volume" type="range" min="0" max="200" step="5" value="100"></div>
+            <div><label for="voicelab-backing-volume">配樂音量 <output id="voicelab-backing-volume-value">100%</output></label><input id="voicelab-backing-volume" type="range" min="0" max="200" step="5" value="100"></div>
+          </div>
+          <p class="help">可先設定人聲／配樂音量。100% 沿用來源音量比例，0% 靜音，最高 200%。生成後也能調整，再按試聽即可，不需重新生成；下載與保存會套用相同音量。</p>
           <div class="soulx-grid">
             <section class="soulx-pitch" aria-labelledby="voicelab-pitch-heading">
               <strong id="voicelab-pitch-heading">③ 我的聲音 · 八度</strong><output id="voicelab-pitch-value">原八度（預設）</output>
@@ -285,11 +290,6 @@
 <div><label><input id="voicelab-backing" type="checkbox" checked> 加入配樂</label><label for="voicelab-backing-choice">搭配的配樂</label><select id="voicelab-backing-choice"><option value="">錄音原配樂</option></select><button id="voicelab-backing-refresh" class="secondary" type="button">重新整理已保存配樂</button><label><input id="voicelab-match" type="checkbox" checked> 人聲音量匹配</label><label><input id="voicelab-loop" type="checkbox" checked> 循環試聽</label><p class="help">可選同一首歌的已保存新配樂，不必重新生成歌聲。片段配樂需涵蓋本次歌聲範圍。</p></div>
             <div class="soulx-actions"><button id="voicelab-listen-original" type="button" class="secondary" aria-pressed="false">▶ 原聲</button><button id="voicelab-listen-ai" type="button" aria-pressed="false">▶ Voice Lab</button></div>
           </div>
-          <div class="soulx-grid">
-            <div><label for="voicelab-voice-volume">人聲音量 <output id="voicelab-voice-volume-value">100%</output></label><input id="voicelab-voice-volume" type="range" min="0" max="200" step="5" value="100"></div>
-            <div><label for="voicelab-backing-volume">配樂音量 <output id="voicelab-backing-volume-value">100%</output></label><input id="voicelab-backing-volume" type="range" min="0" max="200" step="5" value="100"></div>
-          </div>
-          <p class="help">100% 沿用來源音量比例，0% 靜音，最高 200%。調整後再按試聽，不需重新生成；下載與保存會套用相同音量。</p>
           <audio id="voicelab-audio" controls></audio>
           <p id="voicelab-listen-status" class="help" role="status"></p>
           <div class="button-row"><button id="voicelab-save" type="button">儲存到已保存錄音</button><button id="voicelab-download" type="button" class="secondary">下載 Voice Lab 試聽 WAV</button></div>

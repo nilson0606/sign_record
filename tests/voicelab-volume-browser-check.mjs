@@ -34,9 +34,14 @@ try{
  const $=id=>page.locator('#voicelab-'+id);
  await $('panel').locator('summary').click();await $('enable').check();await page.waitForFunction(()=>document.getElementById('voicelab-status').textContent.includes('已就緒'));
  for(const model of ['mosi_ver1','n_1_ver1']){await $('model').selectOption(model);assert.equal(await $('model').inputValue(),model);}
+ assert.equal(await $('voice-volume').isVisible(),true);assert.equal(await $('backing-volume').isVisible(),true);
+ await $('voice-volume').fill('50');await $('backing-volume').fill('150');
  await $('generate').click();await page.waitForFunction(()=>!document.getElementById('voicelab-result').hidden);await $('match').uncheck();
+ assert.equal(await $('voice-volume').inputValue(),'50');assert.equal(await $('backing-volume').inputValue(),'150');
  async function volume(id,value){await $(id).fill(String(value));await $(id).dispatchEvent('input');}
  async function listen(side='ai'){await $('listen-'+side).click();await page.waitForFunction(()=>!document.getElementById('voicelab-audio').paused);return page.evaluate(async()=>measure(await(await fetch(document.getElementById('voicelab-audio').src)).blob()));}
+ const preset=await listen();assert.ok(Math.abs(preset.voice-.1)<.0001&&Math.abs(preset.backing-.12)<.0001);
+ await volume('voice-volume',100);await volume('backing-volume',100);
  const full=await listen();assert.ok(Math.abs(full.voice-.2)<.0001&&Math.abs(full.backing-.08)<.0001);
  await volume('voice-volume',0);const muted=await listen();assert.ok(muted.voice<.0001&&Math.abs(muted.backing-.08)<.0001);
  await volume('voice-volume',50);await volume('backing-volume',0);const vocal=await listen();assert.ok(Math.abs(vocal.voice-.1)<.0001&&vocal.backing<.0001);

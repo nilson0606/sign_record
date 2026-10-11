@@ -122,7 +122,7 @@ export function createVoiceLab({store,getSelected,getPosition,getReference=()=>n
       try{const [original,converted]=await Promise.all(blobs.map(async b=>context.decodeAudioData(await b.arrayBuffer())));if(rev!==revision)return;
         if(original.length!==converted.length||converted.length!==state.result.outputSamples||Math.abs(converted.duration-(input.interval.end-input.interval.start))>1/48000)throw Error('輸出長度與選取範圍不符，未接受結果。');
         result={row,original,converted,report:state.result,interval:input.interval,delayMs:input.delayMs,tracks:null,draft:generatedDraft};}finally{await context.close();}
-      $('result').hidden=false;$('blend').value=100;$('backing').checked=row.mode==='mix';$('voice-volume').value=$('backing-volume').value=100;labels();
+      $('result').hidden=false;$('blend').value=100;$('backing').checked=row.mode==='mix';labels();
       const s=result.report.settings;$('result-info').textContent=`已轉換：${row.voicelabSource==='original'?'原曲原唱':'我的錄音'} → ${VOICELAB_MODELS[s.model]} · ${voicelabRangeLabel(input.interval,row.sourceSeconds??row.seconds)} · ${voicelabPitchLabel(s.pitchShift)} · 檢索比例 ${s.indexRate} · 子音保護 ${s.protect} · 校正 ${input.delayMs} ms。請試聽確認音色與對嘴。`;
       say('已完成。按「原聲／Voice Lab」同位置切換比較；原錄音與 A／B 設定保留。');
       showProgress('ready','音檔長度檢查通過，可以試聽。');
