@@ -41,6 +41,7 @@ try{
  assert.equal(await $('pitch').inputValue(),'0');assert.equal(await $('model').inputValue(),'ver3');assert.equal(await page.locator('#soulx-panel').count(),0);
  await $('model').selectOption(model);assert.equal(await $('model').inputValue(),model);
  await $('full').click();
+ await $('advanced').locator(':scope > summary').click();
  for(const [button,pitch] of [['pitch-original',0],['pitch-down',-12],['pitch-up',12]]){
   await $(button).click();await $('generate').click();
   await page.waitForFunction(()=>!document.getElementById('voicelab-result').hidden||document.getElementById('voicelab-progress-stage').textContent==='未完成',null,{timeout:180000});

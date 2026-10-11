@@ -16,8 +16,8 @@ try{
   const req=r.request(),p=new URL(req.url()).pathname;let json;
   if(p==='/session')json={token:'fixture'};
   else if(p==='/arrangements/library')json={records:[]};
-  else if(p==='/voicelab')json={installed:true,models:['mosi_ver1','n_1_ver1','n2_ver','n3_ver','n4_ver'].map(id=>({id})),pitchShiftRange:[-12,12]};
-  else if(p==='/voicelab/jobs'){settings=req.postDataJSON().settings;generated++;json={id:'fixture',stage:'ready',result:{settings,pitchShift:0,sampleRate:48000,sourceSamples:96000,outputSamples:96000}};}
+  else if(p==='/voicelab')json={installed:true,models:['ver3','mosi_ver1','n_1_ver1','n2_ver','n3_ver','n4_ver'].map(id=>({id})),pitchShiftRange:[-12,12],advancedSettingsVersion:1,f0Methods:['rmvpe','fcpe','crepe']};
+  else if(p==='/voicelab/jobs'){settings=req.postDataJSON().settings;generated++;json={id:'fixture',stage:'ready',result:{settings,pitchShift:settings.pitchShift,sampleRate:48000,sourceSamples:96000,outputSamples:96000}};}
   else if(p.endsWith('/vocals')||p.endsWith('/source'))return r.fulfill({body:original,contentType:'audio/wav'});
   else if(p.endsWith('/result'))return r.fulfill({body:converted,contentType:'audio/wav'});
   else if(p.endsWith('/accompaniment'))return r.fulfill({body:backing,contentType:'audio/wav'});
@@ -34,10 +34,15 @@ try{
  const $=id=>page.locator('#voicelab-'+id);
  await $('panel').locator(':scope > summary').click();await $('enable').check();await page.waitForFunction(()=>document.getElementById('voicelab-status').textContent.includes('已就緒'));
  for(const model of ['mosi_ver1','n_1_ver1','n2_ver','n3_ver','n4_ver']){await $('model').selectOption(model);assert.equal(await $('model').inputValue(),model);}
+ assert.equal(await $('advanced').evaluate(e=>e.open),false,'advanced settings start collapsed');assert.equal(await $('index-rate').isVisible(),false);
+ await $('advanced').locator(':scope > summary').click();assert.equal(await $('autotune-strength').isDisabled(),true);
+ await $('volume-envelope').fill('0.4');await $('f0-method').selectOption('fcpe');await $('pitch').fill('3');await $('autotune').check();await $('autotune-strength').fill('0.5');await $('index-rate').fill('0.6');await $('protect').fill('0.2');
+ await $('advanced').locator(':scope > summary').click();assert.match(await $('advanced-summary').textContent(),/FCPE.*\+3.*包絡 0.4.*修音50%/);
  assert.equal(await $('voice-volume').isVisible(),true);assert.equal(await $('backing-volume').isVisible(),true);
  await $('voice-volume').fill('50');await $('backing-volume').fill('150');
  await $('generate').click();await page.waitForFunction(()=>!document.getElementById('voicelab-result').hidden);await $('match').uncheck();
  assert.equal(await $('voice-volume').inputValue(),'50');assert.equal(await $('backing-volume').inputValue(),'150');
+ assert.deepEqual(settings,{model:'n4_ver',pitchShift:3,indexRate:.6,protect:.2,volumeEnvelope:.4,f0Method:'fcpe',autotune:true,autotuneStrength:.5});
  async function volume(id,value){await $(id).fill(String(value));await $(id).dispatchEvent('input');}
  async function listen(side='ai'){await $('listen-'+side).click();await page.waitForFunction(()=>!document.getElementById('voicelab-audio').paused);return page.evaluate(async()=>measure(await(await fetch(document.getElementById('voicelab-audio').src)).blob()));}
  const preset=await listen();assert.ok(Math.abs(preset.voice-.1)<.0001&&Math.abs(preset.backing-.12)<.0001);
@@ -52,9 +57,13 @@ try{
  await $('save').click();await page.waitForFunction(()=>saved.length===1);
  const saved=await page.evaluate(async()=>({meta:saved[0],mix:await measure(savedBlobs[0].mix),voice:await measure(savedBlobs[0].voice)}));
  assert.equal(saved.meta.voicelab.voiceVolume,50);assert.equal(saved.meta.voicelab.backingVolume,150);assert.equal(saved.meta.fixedMixGains.voice,.5);assert.equal(saved.meta.fixedMixGains.backing,1.5);
+ assert.deepEqual(saved.meta.voicelab.report.settings,settings,'saved recording retains advanced conversion settings');
  assert.ok(Math.abs(saved.mix.voice-.1)<.0001&&Math.abs(saved.mix.backing-.12)<.0001);assert.ok(Math.abs(saved.voice.voice-.2)<.0001,'dry voice retains original gain');
  await volume('voice-volume',0);await volume('backing-volume',0);const silent=await listen();assert.equal(silent.peak,0);assert.equal(silent.length,96000);
  await $('save').click();await page.waitForFunction(()=>saved.length===2);assert.equal(await page.evaluate(async()=>{const a=new Uint8Array(await savedBlobs[0].voice.arrayBuffer()),b=new Uint8Array(await savedBlobs[1].voice.arrayBuffer());return a.length===b.length&&a.every((v,i)=>v===b[i]);}),true,'volume never rewrites dry vocal');
- assert.equal(generated,1,'all volume changes reuse generated voice');assert.deepEqual(errors,[]);
+ assert.equal(generated,1,'all volume changes reuse generated voice');
+ await $('advanced').locator(':scope > summary').click();await $('volume-envelope').fill('0.5');assert.equal(await $('save').isDisabled(),true);assert.equal(await $('mv').isDisabled(),true);
+ await $('reset').click();assert.equal(await $('pitch').inputValue(),'0');assert.equal(await $('f0-method').inputValue(),'rmvpe');assert.equal(await $('volume-envelope').inputValue(),'1');assert.equal(await $('autotune').isChecked(),false);assert.equal(await $('autotune-strength').isDisabled(),true);
+ assert.deepEqual(errors,[]);
  console.log('PASS: all added models selectable; independent volume, mute, original/AI comparison, download/save parity, dry vocal preservation and no regeneration.');
 }finally{await browser?.close();server.kill();}

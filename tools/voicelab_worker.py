@@ -1,5 +1,5 @@
 """Local RVC conversion using existing personal models; no capture dependencies changed."""
-import argparse,json,os,sys,time
+import argparse,json,os,sys,time,math
 from pathlib import Path
 
 def emit(stage,message,**extra):
@@ -8,10 +8,16 @@ def emit(stage,message,**extra):
 def convert(request):
     settings=json.loads(request.read_text(encoding='utf-8'));job=request.parent
     pitch=settings['pitchShift'];index_rate=settings['indexRate'];protect=settings['protect']
-    if type(pitch) is not int or pitch not in (-12,0,12):raise ValueError('歌聲只可選低八度、原八度或高八度。')
-    if not 0<=index_rate<=1 or not 0<=protect<=.5:raise ValueError('檢索／保護設定無效。')
+    for key,default in dict(volumeEnvelope=1.0,f0Method='rmvpe',autotune=False,autotuneStrength=1.0).items():settings.setdefault(key,default)
+    envelope=settings['volumeEnvelope'];method=settings['f0Method'];autotune=settings['autotune'];strength=settings['autotuneStrength']
+    if type(pitch) is not int or not -12<=pitch<=12:raise ValueError('歌聲移調需為 −12～+12 的整數半音。')
+    for value,maximum in [(index_rate,1),(protect,.5),(envelope,1),(strength,1)]:
+        if type(value) not in (int,float) or not math.isfinite(value) or not 0<=value<=maximum:raise ValueError('RVC 進階設定超出範圍。')
+    if method not in ('rmvpe','fcpe','crepe') or type(autotune) is not bool:raise ValueError('音高擷取／自動修音設定無效。')
     home=Path(settings['applioHome']);model=Path(settings['modelPath']);index=Path(settings['indexPath'])
-    for file in [model,index,home/'rvc/models/embedders/contentvec/pytorch_model.bin',home/'rvc/models/embedders/contentvec/config.json',home/'rvc/models/predictors/rmvpe.pt']:
+    required=[model,index,home/'rvc/models/embedders/contentvec/pytorch_model.bin',home/'rvc/models/embedders/contentvec/config.json']
+    if method in ('rmvpe','fcpe'):required.append(home/f'rvc/models/predictors/{method}.pt')
+    for file in required:
         if not file.is_file():raise ValueError(f'本機模型檔案不存在：{file.name}')
     os.environ['HF_HUB_OFFLINE']='1';os.environ['TRANSFORMERS_OFFLINE']='1'
     os.chdir(home);sys.path.insert(0,str(home))
@@ -29,8 +35,8 @@ def convert(request):
     started=time.monotonic();converter=VoiceConverter()
     emit('converting','正在轉換歌聲，維持來源節奏；長段落需要較多時間…')
     converter.convert_audio(audio_input_path=str(job/'input.wav'),audio_output_path=str(job/'converted.wav'),
-        model_path=str(model),index_path=str(index),pitch=pitch,f0_method='rmvpe',index_rate=index_rate,
-        volume_envelope=1.0,protect=protect,split_audio=False,f0_autotune=False,proposed_pitch=False,
+        model_path=str(model),index_path=str(index),pitch=pitch,f0_method=method,index_rate=index_rate,
+        volume_envelope=envelope,protect=protect,split_audio=False,f0_autotune=autotune,f0_autotune_strength=strength,proposed_pitch=False,
         clean_audio=False,post_process=False,resample_sr=0,export_format='WAV')
     emit('finalizing','檢查音訊長度並整理試聽成品…')
     result,native_rate=sf.read(job/'converted.wav',dtype='float32',always_2d=True)
@@ -44,7 +50,7 @@ def convert(request):
     if peak<.0001:raise ValueError('轉換結果接近靜音，請調整來源或模型。')
     scale=min(1,.98/peak)
     sf.write(job/'source.wav',a,rate,subtype='PCM_16');sf.write(job/'result.wav',result*scale,rate,subtype='PCM_16')
-    public={k:settings[k] for k in ['model','pitchShift','indexRate','protect']}
+    public={k:settings[k] for k in ['model','pitchShift','indexRate','protect','volumeEnvelope','f0Method','autotune','autotuneStrength']}
     report=dict(model='RVC-v2',settings=public,sampleRate=rate,nativeSampleRate=native_rate,
         sourceSamples=len(a),outputSamples=len(result),tailAdjustmentSamples=-difference,
         seconds=len(a)/rate,elapsedSeconds=round(time.monotonic()-started,2),pitchShift=pitch,

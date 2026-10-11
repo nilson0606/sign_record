@@ -1,14 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {voicelabSettings,voicelabSongSource,voicelabSavedMetadata} from '../voicelab-settings.mjs';
+import {VOICELAB_DEFAULTS,voicelabSettings,voicelabSongSource,voicelabSavedMetadata} from '../voicelab-settings.mjs';
 import {validateVoiceLabRequest} from '../voicelab-server.mjs';
-test('Voice Lab permits only vocal octaves, defaults to Ver3 original octave, and excludes arbitrary paths',()=>{
- assert.deepEqual(voicelabSettings(),{model:'ver3',pitchShift:0,indexRate:.75,protect:.33});
- assert.deepEqual(voicelabSettings({model:'wife_ver1'}),{model:'wife_ver1',pitchShift:0,indexRate:.75,protect:.33});
- assert.deepEqual(voicelabSettings({model:'wife_ver2'}),{model:'wife_ver2',pitchShift:0,indexRate:.75,protect:.33});
+test('Voice Lab keeps legacy defaults and validates semitone and advanced settings',()=>{
+ assert.deepEqual(voicelabSettings(),{model:'ver3',pitchShift:0,indexRate:.75,protect:.33,volumeEnvelope:1,f0Method:'rmvpe',autotune:false,autotuneStrength:1});
+ assert.deepEqual(voicelabSettings({model:'wife_ver1'}),{...VOICELAB_DEFAULTS,model:'wife_ver1'});
+ assert.deepEqual(voicelabSettings({model:'wife_ver2'}),{...VOICELAB_DEFAULTS,model:'wife_ver2'});
  for(const model of ['mosi_ver1','n_1_ver1','n2_ver','n3_ver','n4_ver'])assert.equal(voicelabSettings({model}).model,model);
- for(const pitchShift of [-12,0,12])assert.equal(voicelabSettings({pitchShift}).pitchShift,pitchShift);
- for(const value of [{pitchShift:1},{pitchShift:'12'},{pitchShift:24},{indexRate:1.01},{protect:-.1},{protect:.51},{model:'../../x'}])assert.throws(()=>voicelabSettings(value));
+ for(const pitchShift of [-12,-3,0,2,12])assert.equal(voicelabSettings({pitchShift}).pitchShift,pitchShift);
+ for(const f0Method of ['rmvpe','fcpe','crepe'])assert.equal(voicelabSettings({f0Method}).f0Method,f0Method);
+ assert.deepEqual(voicelabSettings({volumeEnvelope:.4,autotune:true,autotuneStrength:.5}),{...VOICELAB_DEFAULTS,volumeEnvelope:.4,autotune:true,autotuneStrength:.5});
+ for(const value of [{pitchShift:1.5},{pitchShift:'12'},{pitchShift:24},{indexRate:1.01},{protect:-.1},{protect:.51},{model:'../../x'},{volumeEnvelope:-1},{volumeEnvelope:NaN},{autotuneStrength:1.1},{autotune:'false'},{f0Method:'../../x'}])assert.throws(()=>voicelabSettings(value));
  const s=voicelabSettings({modelPath:'bad',speed:2,autoShift:true,reference:'custom'});assert.deepEqual(s,voicelabSettings());
 });
 test('Voice Lab accepts 48 kHz mono PCM with no reference upload',()=>{

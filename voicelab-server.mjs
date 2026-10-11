@@ -6,7 +6,7 @@ import {mkdir,writeFile,readFile,stat,rm} from 'node:fs/promises';
 import {pipeline} from 'node:stream/promises';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
-import {voicelabSettings,VOICELAB_MODELS} from './voicelab-settings.mjs';
+import {voicelabSettings,VOICELAB_MODELS,VOICELAB_F0_METHODS} from './voicelab-settings.mjs';
 const root=fileURLToPath(new URL('./',import.meta.url)),runtime=path.join(root,'.runtime','voicelab'),jobsRoot=path.join(runtime,'jobs');
 const jobs=new Map();
 function config(){try{return JSON.parse(readFileSync(path.join(runtime,'config.json'),'utf8'));}catch{return {};}}
@@ -56,7 +56,7 @@ async function erase(job){
 export async function stopVoiceLab(){await Promise.allSettled([...jobs.values()].map(erase));}
 export async function handleVoiceLab(req,res,{gpuBusy=()=>false}={}){
   try{
-    if(req.url==='/voicelab'&&req.method==='GET'){json(res,200,{installed:available(),models:installedModels().map(id=>({id,label:VOICELAB_MODELS[id]})),maxSeconds:600,pitchShiftRange:[-12,12]});return;}
+    if(req.url==='/voicelab'&&req.method==='GET'){json(res,200,{installed:available(),models:installedModels().map(id=>({id,label:VOICELAB_MODELS[id]})),maxSeconds:600,pitchShiftRange:[-12,12],advancedSettingsVersion:1,f0Methods:Object.keys(VOICELAB_F0_METHODS)});return;}
     if(req.url==='/voicelab/jobs'&&req.method==='POST'){
       if(!available()){json(res,409,{error:'Voice Lab 尚未安裝完成，請確認本機 Applio 與個人模型設定。'});return;}
       if(gpuBusy()||voicelabBusy()){json(res,409,{error:'目前有音訊工作進行中，完成後再產生 Voice Lab。'});return;}

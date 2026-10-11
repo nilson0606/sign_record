@@ -241,7 +241,7 @@
     <details id="voicelab-panel" class="post-effects soulx-panel">
       <summary><span class="post-effects-heading"><strong>Voice Lab｜我的音色實驗室</strong><span>歌聲／音色轉換 · 預設關閉 · 與 A／B 分開</span></span><span class="post-effects-toggle"><span class="when-closed">點此展開</span><span class="when-open">收合設定</span></span></summary>
       <label class="soulx-enable"><input id="voicelab-enable" type="checkbox" autocomplete="off"> 啟用 Voice Lab</label>
-      <p class="help">把原曲原唱或自己的錄音換成已訓練的個人音色。預設我的音色 Ver3、原八度；可只讓歌聲升／降八度，配樂保持不變。先試聽短段，滿意後再轉整首並保存。</p>
+      <p class="help">把原曲原唱或自己的錄音換成已訓練的個人音色。預設我的音色 Ver3、原八度；展開「RVC 進階設定」可調整換聲參數與歌聲半音，配樂保持不變。先試聽短段，滿意後再轉整首並保存。</p>
       <p id="voicelab-status" class="status" role="status">Voice Lab 已關閉；展開不會載入模型。</p>
       <section id="voicelab-progress" class="soulx-progress" hidden aria-label="Voice Lab 轉換進度">
         <div class="soulx-progress-heading"><strong id="voicelab-progress-stage">準備音訊</strong><span id="voicelab-elapsed">已用時間 0:00</span></div>
@@ -264,22 +264,31 @@
           <p class="help">原曲原唱以歌曲時間為準，不套用麥克風延時；我的錄音則沿用已保存校正。先試 10～20 秒，滿意後按「整首」再產生。變更設定後需重新產生。</p>
           <div class="soulx-grid">
             <div><label for="voicelab-model">② 音色模型</label><select id="voicelab-model"><option value="ver3">我的音色 Ver3（預設）</option><option value="ver2">我的音色 Ver2</option><option value="ver1">我的音色 Ver1</option><option value="mosi_ver1">Mosi Ver1</option><option value="n_1_ver1">N_1 Ver1</option><option value="n2_ver">N2_VER</option><option value="n3_ver">N3_VER</option><option value="n4_ver">N4_VER</option><option value="wife_ver2">Wife Ver2</option><option value="wife_ver1">Wife Ver1</option></select><p class="help">使用本機既有 .pth 與配套 .index，不需重新訓練。</p></div>
-            <div><label for="voicelab-index-rate">音色檢索比例 <output id="voicelab-index-rate-value">0.75</output></label><input id="voicelab-index-rate" type="range" min="0" max="1" step="0.05" value="0.75"><p class="help">預設 0.75。提高會更偏向訓練音色；不是相似度保證。</p></div>
-            <div><label for="voicelab-protect">子音／氣音保護 <output id="voicelab-protect-value">0.33</output></label><input id="voicelab-protect" type="range" min="0" max="0.5" step="0.01" value="0.33"><p class="help">預設 0.33；數值較小保護較強，0.5 關閉保護。</p></div>
           </div>
           <div class="soulx-grid" aria-label="Voice Lab 人聲與配樂音量">
             <div><label for="voicelab-voice-volume">人聲音量 <output id="voicelab-voice-volume-value">100%</output></label><input id="voicelab-voice-volume" type="range" min="0" max="200" step="5" value="100"></div>
             <div><label for="voicelab-backing-volume">配樂音量 <output id="voicelab-backing-volume-value">100%</output></label><input id="voicelab-backing-volume" type="range" min="0" max="200" step="5" value="100"></div>
           </div>
           <p class="help">可先設定人聲／配樂音量。100% 沿用來源音量比例，0% 靜音，最高 200%。生成後也能調整，再按試聽即可，不需重新生成；下載與保存會套用相同音量。</p>
+          <details id="voicelab-advanced" class="post-effects">
+            <summary><strong>RVC 進階設定 · 展開可調整</strong><span id="voicelab-advanced-summary" class="help">RMVPE · 原八度 · 檢索 0.75 · 保護 0.33 · 包絡 1 · 修音關閉</span></summary>
+            <p class="help">預設收合，直接使用原有設定即可。調整後需重新產生翻唱；先用同一段 10～20 秒，每次只改一項比較。</p>
+            <div class="soulx-grid">
+              <div><label for="voicelab-index-rate">音色檢索比例 <output id="voicelab-index-rate-value">0.75</output></label><input id="voicelab-index-rate" type="range" min="0" max="1" step="0.05" value="0.75"><p class="help">預設 0.75。提高會更依賴模型音色索引，太高可能失真。可比較 0.60／0.75／0.90。</p></div>
+              <div><label for="voicelab-protect">子音／氣音保護 <output id="voicelab-protect-value">0.33</output></label><input id="voicelab-protect" type="range" min="0" max="0.5" step="0.01" value="0.33"><p class="help">預設 0.33；越低保護越強，0.5 關閉。咬字或氣音破碎時，可比較 0.33／0.20／0.10。</p></div>
+              <div><label for="voicelab-volume-envelope">音量包絡 <output id="voicelab-volume-envelope-value">1.00</output></label><input id="voicelab-volume-envelope" type="range" min="0" max="1" step="0.05" value="1"><p class="help">預設 1.0，使用換聲後的音量起伏；越接近 0，越跟隨來源人聲的輕重強弱。</p></div>
+              <div><label for="voicelab-f0-method">音高擷取方法</label><select id="voicelab-f0-method"><option value="rmvpe">RMVPE（預設）</option><option value="fcpe">FCPE</option><option value="crepe">CREPE</option></select><p class="help">影響音高辨識。先保留 RMVPE；高低音辨識不穩時，再以同一片段比較其他方法。</p></div>
+              <div><label class="check-option"><input id="voicelab-autotune" type="checkbox" autocomplete="off"> 啟用自動修音（預設關閉）</label><label for="voicelab-autotune-strength">修音強度 <output id="voicelab-autotune-strength-value">100%</output></label><input id="voicelab-autotune-strength" type="range" min="0" max="1" step="0.05" value="1" disabled><p class="help">將音高拉近半音音階；強度越高影響越大，也可能改變滑音與唱腔。</p></div>
+            </div>
           <div class="soulx-grid">
             <section class="soulx-pitch" aria-labelledby="voicelab-pitch-heading">
-              <strong id="voicelab-pitch-heading">③ 我的聲音 · 八度</strong><output id="voicelab-pitch-value">原八度（預設）</output>
+              <strong id="voicelab-pitch-heading">歌聲移調 · 半音／八度</strong><output id="voicelab-pitch-value">原八度（預設）</output>
               <div class="button-row" role="group" aria-label="八度快捷設定"><button id="voicelab-pitch-down" data-voicelab-pitch="-12" type="button" class="secondary" aria-pressed="false">降低八度 −12</button><button id="voicelab-pitch-original" data-voicelab-pitch="0" type="button" class="secondary" aria-pressed="true">原八度（預設）</button><button id="voicelab-pitch-up" data-voicelab-pitch="12" type="button" class="secondary" aria-pressed="false">提高八度 +12</button></div>
-              <input id="voicelab-pitch" type="number" value="0" hidden>
-              <p id="voicelab-pitch-help" class="help">只調整換成你的音色後的歌聲：低八度、原八度（預設）、高八度。配樂的 Key 與速度維持不變。修改後需重新產生；先用 AI 100% 比較，混入原聲會同時聽到兩個八度。</p>
+              <label for="voicelab-pitch">半音微調（−12～+12，每次 1 半音）</label><input id="voicelab-pitch" type="number" min="-12" max="12" step="1" value="0">
+              <p id="voicelab-pitch-help" class="help">只調整換聲後的歌聲，配樂的 Key 與速度不變。預設 0；±12 為升降一個八度。修改後需重新產生；先用 AI 100% 比較，混入原聲可能聽到不同音高。</p>
             </section>
           </div>
+          </details>
           <div class="button-row"><button id="voicelab-generate" type="button">產生 Voice Lab 試聽</button><button id="voicelab-reset" type="button" class="secondary">設定回預設</button></div>
         </fieldset>
         <button id="voicelab-cancel" type="button" class="secondary" disabled>取消生成</button>

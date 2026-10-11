@@ -1,4 +1,5 @@
-export const VOICELAB_DEFAULTS=Object.freeze({model:'ver3',pitchShift:0,indexRate:.75,protect:.33});
+export const VOICELAB_DEFAULTS=Object.freeze({model:'ver3',pitchShift:0,indexRate:.75,protect:.33,volumeEnvelope:1,f0Method:'rmvpe',autotune:false,autotuneStrength:1});
+export const VOICELAB_F0_METHODS=Object.freeze({rmvpe:'RMVPE',fcpe:'FCPE',crepe:'CREPE'});
 export const VOICELAB_MODELS=Object.freeze({ver1:'我的音色 Ver1',ver2:'我的音色 Ver2',ver3:'我的音色 Ver3',wife_ver1:'Wife Ver1',wife_ver2:'Wife Ver2',mosi_ver1:'Mosi Ver1',n_1_ver1:'N_1 Ver1',n2_ver:'N2_VER',n3_ver:'N3_VER',n4_ver:'N4_VER'});
 export function voicelabPitchLabel(value=0){
   return value===0?'原八度（預設）':`${value===-12?'降低八度':value===12?'提高八度':'移調'}（${value>0?'+':''}${value} 半音）`;
@@ -19,8 +20,9 @@ export function voicelabSongSource(reference){
 export function voicelabSettings(v={}){
   const s={...VOICELAB_DEFAULTS,...v};
   if(!Object.hasOwn(VOICELAB_MODELS,s.model))throw Error('請選擇已安裝的個人音色模型。');
-  if(![-12,0,12].includes(s.pitchShift))throw Error('歌聲只可選低八度、原八度或高八度。');
-  for(const [key,min,max,integer] of [['pitchShift',-12,12,true],['indexRate',0,1,false],['protect',0,.5,false]]){
+  if(!Object.hasOwn(VOICELAB_F0_METHODS,s.f0Method))throw Error('請選擇支援的音高擷取方法。');
+  if(typeof s.autotune!=='boolean')throw Error('自動修音設定無效。');
+  for(const [key,min,max,integer] of [['pitchShift',-12,12,true],['indexRate',0,1,false],['protect',0,.5,false],['volumeEnvelope',0,1,false],['autotuneStrength',0,1,false]]){
     if(!Number.isFinite(s[key])||s[key]<min||s[key]>max||(integer&&!Number.isInteger(s[key])))throw Error(`${key} 超出允許範圍。`);
   }
   return Object.fromEntries(Object.keys(VOICELAB_DEFAULTS).map(key=>[key,s[key]]));
