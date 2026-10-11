@@ -37,7 +37,7 @@ try{
  });
  const $=id=>page.locator('#voicelab-'+id);
  assert.equal(await $('enable').isChecked(),false);assert.equal(requests.length,0);
- await $('panel').locator('summary').click();await $('enable').check();await page.waitForFunction(()=>document.getElementById('voicelab-status').textContent.includes('已就緒'));
+ await $('panel').locator(':scope > summary').click();await $('enable').check();await page.waitForFunction(()=>document.getElementById('voicelab-status').textContent.includes('已就緒'));
  assert.equal(await $('pitch').inputValue(),'0');assert.equal(await $('model').inputValue(),'ver3');assert.equal(await page.locator('#soulx-panel').count(),0);
  await $('model').selectOption(model);assert.equal(await $('model').inputValue(),model);
  await $('full').click();

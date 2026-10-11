@@ -44,7 +44,6 @@ async function recordedAnalysis(blob, progress, pitchShift=0) {
 export function createRecordingPost({store,stop,pause,download,onDelete,reference=()=>null,isRecording=()=>false}) {
   let rows=[],selected=null,busy=false,url=null,statusTarget='post-status',audition=null,previewSources=null,soulx=null,arrangement=null;
   const mv=createMV({beforePlay:()=>{clearAudio();soulx?.pause();pause();}});
-  $('selected-recording-mv').addEventListener('click',()=>run(async row=>{clearAudio();soulx?.pause();mv.open({title:row.title,blob:await store.blob(row)});}));
   const status=text=>{$(statusTarget).textContent=text;};
   function clearAudio(){arrangement?.pause();audition?.stop();const a=$('post-audio');a.pause();a.removeAttribute('src');a.load();a.hidden=true;if(url)URL.revokeObjectURL(url);url=null;}
   function effectLabels(){
@@ -134,7 +133,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     audition?.controls(busy);
     const editable=!!(selected?.complete&&selected.rawBytes&&selected.post?.segments?.length);
     $('post-diagnostic').disabled=busy||!editable;
-    for(const action of ['preview','download','delete','mv'])$('selected-recording-'+action).disabled=busy||!selected;
+    for(const action of ['preview','download','delete'])$('selected-recording-'+action).disabled=busy||!selected;
     $('post-delete-all').disabled=busy||!rows.length||isRecording();
     $('selected-recording-edit').disabled=busy||!editable;
     $('selected-recording-voice').disabled=busy||!selected||!(selected.mode==='voice'||editable);

@@ -11,10 +11,10 @@ export function createMV({beforePlay=()=>{}}={}){
   function controls(){for(const id of ['title','artist'])$(id).disabled=busy;$('generate').disabled=busy||!source;$('cancel').disabled=!busy||!active;}
   function clearVideo(){$('video').pause();$('video').removeAttribute('src');$('video').load();$('result').hidden=true;if(url)URL.revokeObjectURL(url);url=null;}
   function open({title,blob,label=title}){
-    $('panel').open=true;$('panel').scrollIntoView({behavior:'smooth',block:'center'});
+    $('panel').hidden=false;$('panel').open=true;$('panel').scrollIntoView({behavior:'smooth',block:'center'});
     if(busy){say('目前 MV 正在製作，請先完成或取消，再更換來源。');return false;}
     if(!(blob instanceof Blob)||!blob.size)throw Error('沒有可用的翻唱音檔。');
-    source={blob,label};$('source').textContent='製作來源：'+label;$('title').value=[...title].slice(0,60).join('');clearVideo();$('progress').hidden=true;say('填寫歌名與翻唱者，再按「產生節奏 MV」。');controls();return true;
+    source={blob,label};$('source').textContent='翻唱來源：'+label;$('title').value=[...title].slice(0,60).join('');clearVideo();$('progress').hidden=true;say('填寫歌名與翻唱者，再按「開始製作翻唱 MV」。');controls();return true;
   }
   $('generate').addEventListener('click',async()=>{
     if(busy||!source)return;

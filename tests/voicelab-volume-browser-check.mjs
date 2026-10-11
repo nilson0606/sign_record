@@ -32,7 +32,7 @@ try{
   HTMLAnchorElement.prototype.click=function(){window.downloadBlob=fetch(this.href).then(r=>r.blob());};
  });
  const $=id=>page.locator('#voicelab-'+id);
- await $('panel').locator('summary').click();await $('enable').check();await page.waitForFunction(()=>document.getElementById('voicelab-status').textContent.includes('已就緒'));
+ await $('panel').locator(':scope > summary').click();await $('enable').check();await page.waitForFunction(()=>document.getElementById('voicelab-status').textContent.includes('已就緒'));
  for(const model of ['mosi_ver1','n_1_ver1']){await $('model').selectOption(model);assert.equal(await $('model').inputValue(),model);}
  assert.equal(await $('voice-volume').isVisible(),true);assert.equal(await $('backing-volume').isVisible(),true);
  await $('voice-volume').fill('50');await $('backing-volume').fill('150');

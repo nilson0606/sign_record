@@ -17,6 +17,10 @@ try{
     const req=route.request(),url=new URL(req.url());
     if(url.hostname==='127.0.0.1'&&url.port==='4274'){
       if(url.pathname==='/session')return route.fulfill({json:{token:'test'}});
+      if(url.pathname==='/arrangements/library')return route.fulfill({json:{records:[]}});
+      if(url.pathname==='/voicelab')return route.fulfill({json:{installed:true,models:[{id:'ver3'}]}});
+      if(url.pathname==='/voicelab/jobs')return route.fulfill({json:{id:'fixture',stage:'ready',result:{settings:req.postDataJSON().settings,sampleRate:48000,sourceSamples:n,outputSamples:n}}});
+      if(url.pathname.startsWith('/voicelab/jobs/')||url.pathname.startsWith('/library/'))return route.fulfill({body:wav,contentType:'audio/wav'});
       const response=await fetch(base+url.pathname+url.search,{method:req.method(),headers:{'Content-Type':'application/octet-stream'},...(req.method()==='POST'?{body:req.postDataBuffer()}: {})});
       return route.fulfill({status:response.status,contentType:response.headers.get('content-type'),body:Buffer.from(await response.arrayBuffer())});
     }
@@ -25,8 +29,14 @@ try{
     return route.abort();
   });
   await page.goto('http://mv.test/');
-  await page.evaluate(async audio=>{const {createRecordingPost}=await import('/recording-post.mjs');const bytes=Uint8Array.from(atob(audio),c=>c.charCodeAt(0)),blob=new Blob([bytes],{type:'audio/wav'});const row={id:'fixture',title:'親愛的你怎麼不在身邊',created:Date.now(),complete:true,mode:'mix',seconds:4,bytes:blob.size};window.post=createRecordingPost({store:{blob:async()=>blob},stop:async()=>{},pause(){},download(){},onDelete(){}});post.refresh([row]);},wav.toString('base64'));
-  await page.locator('#selected-recording-mv').click();await page.waitForFunction(()=>document.getElementById('mv-title').value==='親愛的你怎麼不在身邊');
+  await page.evaluate(async()=>{const {createRecordingPost}=await import('/recording-post.mjs');window.post=createRecordingPost({store:{},stop:async()=>{},pause(){},download(){},onDelete(){},reference:()=>({cacheId:'fixture',title:'親愛的你怎麼不在身邊',duration:4,hasPreview:true})});post.refresh([]);});
+  assert.equal(await page.locator('#selected-recording-mv').count(),0);
+  assert.equal(await page.locator('#voicelab-panel #mv-panel').count(),1);
+  await page.locator('#voicelab-panel > summary').click();await page.locator('#voicelab-enable').check();await page.waitForFunction(()=>document.getElementById('voicelab-status').textContent.includes('已就緒'));
+  await page.locator('#voicelab-generate').click();await page.waitForFunction(()=>!document.getElementById('voicelab-result').hidden);
+  await page.locator('#voicelab-backing').uncheck();
+  await page.locator('#voicelab-mv').click();await page.waitForFunction(()=>document.getElementById('mv-title').value==='親愛的你怎麼不在身邊');
+  assert.match(await page.locator('#mv-source').textContent(),/Voice Lab/);
   await page.locator('#mv-generate').click();assert.match(await page.locator('#mv-status').textContent(),/請填寫/);assert.equal(mvBusy(),false);
   await page.locator('#mv-artist').fill('測試翻唱者');await page.locator('#mv-generate').click();
   await page.waitForFunction(()=>!document.getElementById('mv-result').hidden||document.getElementById('mv-status').textContent.includes('失敗'),null,{timeout:120000});
@@ -37,7 +47,7 @@ try{
   const run=args=>{const p=spawnSync('ffmpeg',['-v','error',...args],{maxBuffer:10*1024*1024,windowsHide:true});assert.equal(p.status,0,p.stderr?.toString());return p.stdout;};
   const a=run(['-ss','1','-i',file,'-frames:v','1','-vf','crop=1600:300:160:610,scale=160:30','-f','rawvideo','-pix_fmt','rgb24','pipe:1']);
   const b=run(['-ss','3','-i',file,'-frames:v','1','-vf','crop=1600:300:160:610,scale=160:30','-f','rawvideo','-pix_fmt','rgb24','pipe:1']);assert.notDeepEqual(a,b,'spectrum must react to actual audio');
-  const pcm=run(['-i',file,'-vn','-ac','1','-ar','48000','-f','f32le','pipe:1']);let squares=0;for(let i=0;i<pcm.length;i+=4)squares+=pcm.readFloatLE(i)**2;const rms=Math.sqrt(squares/(pcm.length/4)),expected=Math.sqrt((.06**2+.4**2)/4);assert.ok(Math.abs(rms-expected)<.008,`audio level ${rms} vs ${expected}`);
+  const pcm=run(['-i',file,'-vn','-af','pan=mono|c0=c0','-ar','48000','-f','f32le','pipe:1']);let squares=0;for(let i=0;i<pcm.length;i+=4)squares+=pcm.readFloatLE(i)**2;const rms=Math.sqrt(squares/(pcm.length/4)),expected=Math.sqrt((.06**2+.4**2)/4);assert.ok(Math.abs(rms-expected)<.008,`audio level ${rms} vs ${expected}`);
   run(['-y','-ss','3','-i',file,'-frames:v','1',path.join(root,'preview.png')]);
   await page.locator('#mv-video').evaluate(v=>v.play());await page.waitForFunction(()=>document.getElementById('mv-video').currentTime>.1);await page.locator('#mv-video').evaluate(v=>v.pause());
   const downloadPromise=page.waitForEvent('download');await page.locator('#mv-download').click();const download=await downloadPromise;assert.match(download.suggestedFilename(),/\.mp4$/);
