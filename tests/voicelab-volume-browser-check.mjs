@@ -16,7 +16,7 @@ try{
   const req=r.request(),p=new URL(req.url()).pathname;let json;
   if(p==='/session')json={token:'fixture'};
   else if(p==='/arrangements/library')json={records:[]};
-  else if(p==='/voicelab')json={installed:true,models:['mosi_ver1','n_1_ver1','n2_ver'].map(id=>({id})),pitchShiftRange:[-12,12]};
+  else if(p==='/voicelab')json={installed:true,models:['mosi_ver1','n_1_ver1','n2_ver','n3_ver','n4_ver'].map(id=>({id})),pitchShiftRange:[-12,12]};
   else if(p==='/voicelab/jobs'){settings=req.postDataJSON().settings;generated++;json={id:'fixture',stage:'ready',result:{settings,pitchShift:0,sampleRate:48000,sourceSamples:96000,outputSamples:96000}};}
   else if(p.endsWith('/vocals')||p.endsWith('/source'))return r.fulfill({body:original,contentType:'audio/wav'});
   else if(p.endsWith('/result'))return r.fulfill({body:converted,contentType:'audio/wav'});
@@ -33,7 +33,7 @@ try{
  });
  const $=id=>page.locator('#voicelab-'+id);
  await $('panel').locator(':scope > summary').click();await $('enable').check();await page.waitForFunction(()=>document.getElementById('voicelab-status').textContent.includes('已就緒'));
- for(const model of ['mosi_ver1','n_1_ver1','n2_ver']){await $('model').selectOption(model);assert.equal(await $('model').inputValue(),model);}
+ for(const model of ['mosi_ver1','n_1_ver1','n2_ver','n3_ver','n4_ver']){await $('model').selectOption(model);assert.equal(await $('model').inputValue(),model);}
  assert.equal(await $('voice-volume').isVisible(),true);assert.equal(await $('backing-volume').isVisible(),true);
  await $('voice-volume').fill('50');await $('backing-volume').fill('150');
  await $('generate').click();await page.waitForFunction(()=>!document.getElementById('voicelab-result').hidden);await $('match').uncheck();
