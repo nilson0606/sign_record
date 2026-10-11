@@ -6,7 +6,7 @@ test('Voice Lab permits only vocal octaves, defaults to Ver3 original octave, an
  assert.deepEqual(voicelabSettings(),{model:'ver3',pitchShift:0,indexRate:.75,protect:.33});
  assert.deepEqual(voicelabSettings({model:'wife_ver1'}),{model:'wife_ver1',pitchShift:0,indexRate:.75,protect:.33});
  assert.deepEqual(voicelabSettings({model:'wife_ver2'}),{model:'wife_ver2',pitchShift:0,indexRate:.75,protect:.33});
- for(const model of ['mosi_ver1','n_1_ver1'])assert.equal(voicelabSettings({model}).model,model);
+ for(const model of ['mosi_ver1','n_1_ver1','n2_ver'])assert.equal(voicelabSettings({model}).model,model);
  for(const pitchShift of [-12,0,12])assert.equal(voicelabSettings({pitchShift}).pitchShift,pitchShift);
  for(const value of [{pitchShift:1},{pitchShift:'12'},{pitchShift:24},{indexRate:1.01},{protect:-.1},{protect:.51},{model:'../../x'}])assert.throws(()=>voicelabSettings(value));
  const s=voicelabSettings({modelPath:'bad',speed:2,autoShift:true,reference:'custom'});assert.deepEqual(s,voicelabSettings());
