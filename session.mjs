@@ -24,6 +24,9 @@ export async function seekPlayerToStart(player, cancelled = () => false, timeout
 }
 
 export function createKaraokeSession(options) {
+  const preparationDefaults={'clip-seconds':'0','pitch-method':'rmvpe','separation-model':'demucs','separation-method':'single','vocal-mode':'all'};
+  for(const [id,value]of Object.entries(preparationDefaults))$(id).value=value;
+  $('keep-preview').checked=true;$('preparation-advanced').open=false;
   let reference = null, displayReference = null, excluded = [], maskBusy = false, masksSupported = false, take = null, jobId = null, token = null, generation = 0, timer;
   let requestedVocalMode = $('vocal-mode').value, requestedModel = $('separation-model').value, requestedPitch = $('pitch-method').value, requestedMethod = $('separation-method').value;
   const methodName = method => method === 'residual' ? '伴奏二次分離＋反向相減' : '單次分離';
@@ -113,6 +116,9 @@ export function createKaraokeSession(options) {
   function showTakeDifficulty() { $('take-difficulty').textContent = `本輪評分難度：${take.profile.label}（本輪固定）`; }
 
   function controls() {
+    $('preparation-fields').disabled=!!take||segmented?.busy()||['preparing','finishing','restarting'].includes(phase);
+    $('preparation-summary').textContent=['clip-seconds','separation-model','separation-method','vocal-mode','pitch-method'].map(id=>$(id).selectedOptions[0]?.textContent??'').join(' · ')+($('keep-preview').checked?' · 保留音軌':' · 不保留音軌');
+    $('preparation-reset').disabled=!!take||['preparing','finishing','restarting'].includes(phase);
     for(const [element,disabled]of segmentLocks)element.disabled=disabled;segmentLocks.clear();
     if (phase === 'finishing') { $('mic-start').disabled = true; $('mic-stop').disabled = true; }
     $('prepare-song').disabled = maskBusy || locationBusy || libraryLocation?.configured === false || ['preparing', 'finishing', 'restarting'].includes(phase);
@@ -220,6 +226,8 @@ export function createKaraokeSession(options) {
   });
   $('library-choose').addEventListener('click', () => chooseLocation(true));
   $('library-use-path').addEventListener('click', () => chooseLocation(false));
+  for(const id of [...Object.keys(preparationDefaults),'keep-preview'])$(id).addEventListener('change',controls);
+  $('preparation-reset').addEventListener('click',()=>{for(const [id,value]of Object.entries(preparationDefaults))$(id).value=value;$('keep-preview').checked=true;stopPreview();controls();$('prepare-status').textContent='已還原分離預設；按「準備歌曲基準」才會套用，已保存版本保留。';});
   $('pitch-method').addEventListener('change', () => {
     if (reference && $('pitch-method').value !== reference.pitchMethod) $('prepare-status').textContent = '音高擷取方式已變更，尚未套用。請按「準備歌曲基準」。有保存相同分離版本的音軌時會直接重用，不需重新分離。';
   });
@@ -255,6 +263,7 @@ export function createKaraokeSession(options) {
     $('url').value = `https://www.youtube.com/watch?v=${reference.videoId}`;
     $('clip-seconds').value = String(reference.rangeSeconds);
     $('song-key').value=String(reference.pitchShift || 0);
+    $('vocal-mode').value=reference.vocalMode||'all';$('separation-model').value=reference.separationModel||'demucs';$('pitch-method').value=reference.pitchMethod||'yin';$('separation-method').value=reference.separationMethod||'single';
     prepareSong(true, true);
   });
   $('preview-build').addEventListener('click', () => {
@@ -476,12 +485,9 @@ export function createKaraokeSession(options) {
     const id = youtubeId($('url').value.trim());
     if (maskBusy) return;
     if (!id) { $('prepare-status').textContent = '請先填入有效的 YouTube 影片網址。'; return; }
-    // New preparations use the fixed UI preset. Explicit library/rebuild actions
-    // retain the saved version, including old ranges, models and four-stem audio.
-    if (!preserveVersion) {
-      for (const [control, value] of Object.entries({ 'clip-seconds': '0', 'pitch-method': 'rmvpe', 'separation-model': 'demucs', 'separation-method': 'single', 'vocal-mode': 'all' })) $(control).value = value;
-    }
-    $('keep-preview').checked = true;
+    // Normal preparations honor the visible controls; library/rebuild actions
+    // supply the saved version and retain audio for preview and Voice Lab.
+    if(preserveVersion)$('keep-preview').checked = true;
     requestedKey=keyShift(Number($('song-key').value));
     requestedVocalMode = $('vocal-mode').value; requestedModel = $('separation-model').value; requestedPitch = $('pitch-method').value; requestedMethod = $('separation-method').value;
     const clearing = clear('正在連接本機工具…');

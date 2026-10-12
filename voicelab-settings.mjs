@@ -2,6 +2,10 @@ export const VOICELAB_DEFAULTS=Object.freeze({model:'ver3',pitchShift:0,indexRat
 export const VOICELAB_F0_METHODS=Object.freeze({rmvpe:'RMVPE',fcpe:'FCPE',crepe:'CREPE'});
 export const VOICELAB_MODELS=Object.freeze({ver1:'我的音色 Ver1',ver2:'我的音色 Ver2',ver3:'我的音色 Ver3',wife_ver1:'Wife Ver1',wife_ver2:'Wife Ver2',mosi_ver1:'Mosi Ver1',n_1_ver1:'N_1 Ver1',n2_ver:'N2_VER',n3_ver:'N3_VER',n4_ver:'N4_VER'});
 export const voicelabModelLabel=report=>report.modelLabel||VOICELAB_MODELS[report.settings.model]||report.settings.model;
+export function voicelabBackingStems(row,arrangement=null){
+  const harmony=row.post?.reference?.vocalMode==='lead'||row.stems?.includes('backing');
+  return arrangement?['arrangement',...(harmony?['backing']:[])]:[...new Set([...(row.stems??[]).filter(s=>!['vocals','lead'].includes(s)),...(harmony?['backing']:[])])];
+}
 export function voicelabPitchLabel(value=0){
   return value===0?'原八度（預設）':`${value===-12?'降低八度':value===12?'提高八度':'移調'}（${value>0?'+':''}${value} 半音）`;
 }
@@ -47,7 +51,7 @@ export function voicelabSavedMetadata({row,interval,report,delayMs,blend,match,u
   const pitch=s.pitchShift??0;
   const suffix=`_VoiceLab_${row.voicelabSource==='original'?'原唱換聲_':''}${voicelabModelLabel(report)}_${range.startsWith('整首')?'整首':`片段${interval.start}-${interval.end}秒`}${pitch?`_移調${pitch>0?'+':''}${pitch}半音`:''}_AI${blend}%${useBacking&&(arrangement??row.arrangement)?'_新配樂':''}`;
   const result={id:crypto.randomUUID(),created:Date.now(),title:row.title.slice(0,500-suffix.length)+suffix,...(row.voicelabSource==='original'?{}:{parentId:row.id}),
-    videoId:row.videoId,mode:useBacking?'mix':'voice',stems:useBacking?(arrangement??row.arrangement?['arrangement']:structuredClone(row.stems??[])):[],mime:'audio/wav',rawMime:'audio/wav',
+    videoId:row.videoId,mode:useBacking?'mix':'voice',stems:useBacking?voicelabBackingStems(row,arrangement??row.arrangement):[],mime:'audio/wav',rawMime:'audio/wav',
     complete:true,seconds:duration,sourceSeconds:duration,bytes,rawBytes,appliedDelayMs:0,delayMs:0,
     balance:{manual:true,voice:(row.balance?.voice??70)*voiceVolume/100*commonGain,backing:(row.balance?.backing??50)*backingVolume/100*commonGain},
     postVolume:{voice:100,backing:100},vocalSoftening:{version:2,strength:'off'},vocalEffects:{version:1,reverb:0},

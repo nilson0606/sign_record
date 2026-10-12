@@ -92,7 +92,7 @@ try {
   assert.equal(await page.locator('#prepare-settings #preview-panel').count(),1);
   assert.equal(await page.locator('#player-section #mask-panel').count(),0);
   for(const id of ['sing-start','finish-song','total-score','pitch-score','rhythm-score','coverage-score','score-status','recording-status'])assert.equal(await page.locator('#player-section #'+id).count(),1);
-  assert.equal(await page.locator('#score-section').evaluate(el=>el.previousElementSibling.classList.contains('clock-row')),true);
+  assert.ok(await page.evaluate(()=>document.querySelector('.clock-row').compareDocumentPosition(document.getElementById('score-section'))&Node.DOCUMENT_POSITION_FOLLOWING));
   assert.ok(await page.locator('#recording-mode').isHidden());
   assert.ok(await page.locator('#capture-mode').isHidden());
   assert.equal(await page.locator('#prepare-section #library-panel').count(),0);
@@ -106,6 +106,7 @@ try {
   await page.locator('#prepare-settings > summary').click();
   assert.ok(await page.locator('#preview-vocals').isVisible());assert.ok(await page.locator('#mask-start').isVisible());
   assert.equal(await page.locator('#prepare-settings select:visible').count(),0);
+  assert.equal(await page.locator('#preparation-advanced').evaluate(e=>e.open),false);
   await page.locator('#url').fill('https://www.youtube.com/watch?v=M7lc1UVf-VE');
   await page.locator('#prepare-song').click();
   await page.waitForFunction(()=>document.querySelector('#prepare-progress-label').textContent.includes('100%'));
@@ -142,9 +143,22 @@ try {
   }
   await page.locator('#rebuild-song').click();await page.waitForFunction(()=>document.querySelector('#prepare-status').textContent.startsWith('已就緒'));
   assert.equal(requests.at(-1).force,true);assert.equal(requests.at(-1).seconds,30);assert.equal(requests.at(-1).separationModel,'mel-roformer');
-  // A normal preparation returns to the agreed preset after viewing a legacy version.
+  // Reset explicitly returns to the unchanged defaults after viewing a legacy version.
+  await page.locator('#preparation-advanced > summary').click();await page.locator('#preparation-reset').click();await page.locator('#preparation-advanced > summary').click();
   await page.locator('#prepare-song').click();await page.waitForFunction(()=>document.querySelector('#prepare-status').textContent.startsWith('已就緒'));
   assert.equal(requests.at(-1).seconds,0);assert.equal(requests.at(-1).pitchMethod,'rmvpe');assert.equal(requests.at(-1).separationModel||'demucs','demucs');
+  await page.locator('#preparation-advanced > summary').click();
+  for(const model of ['bs-roformer','mel-roformer']){
+    await page.locator('#separation-model').selectOption(model);await page.locator('#separation-method').selectOption('residual');await page.locator('#vocal-mode').selectOption('lead');await page.locator('#pitch-method').selectOption('yin');await page.locator('#clip-seconds').selectOption('15');
+    await page.locator('#preparation-advanced > summary').click();assert.match(await page.locator('#preparation-summary').textContent(),/主唱／和音/);
+    await page.locator('#prepare-song').click();await page.waitForFunction(()=>document.querySelector('#prepare-status').textContent.startsWith('已就緒'));
+    const r=requests.at(-1);assert.equal(r.separationModel,model);assert.equal(r.separationMethod,'residual');assert.equal(r.vocalMode,'lead');assert.equal(r.pitchMethod||'yin','yin');assert.equal(r.seconds,15);assert.equal(r.preview,true);assert.equal(r.force,undefined);
+    await page.locator('#preparation-advanced > summary').click();
+  }
+  // Rebuild uses the loaded version even if the new-preparation selectors were changed.
+  await page.locator('#separation-model').selectOption('demucs');await page.locator('#vocal-mode').selectOption('all');await page.locator('#rebuild-song').click();await page.waitForFunction(()=>document.querySelector('#prepare-status').textContent.startsWith('已就緒'));
+  assert.equal(requests.at(-1).separationModel,'mel-roformer');assert.equal(requests.at(-1).vocalMode,'lead');assert.equal(requests.at(-1).force,true);
+  await page.locator('#preparation-reset').click();await page.locator('#preparation-advanced > summary').click();await page.locator('#prepare-song').click();await page.waitForFunction(()=>document.querySelector('#prepare-status').textContent.startsWith('已就緒'));
   await page.locator('.section-nav a[href="#timing-section"]').click();assert.equal(await page.locator('#timing-section').evaluate(el=>el.open),true);
   await page.locator('#timing-section > summary').click();
   await page.locator('#score-settings > summary').focus();await page.keyboard.press('Enter');assert.ok(await page.locator('#score-difficulty').isVisible());
@@ -165,11 +179,11 @@ try {
   for(const theme of ['current','warm'])for(const width of [1440]){
     await page.setViewportSize({width,height:1100});await page.locator('#theme-select').selectOption(theme);
     const order=['player-section','voice-section','prepare-section','library-section','recording-post','timing-section','recording-section'];
-    assert.deepEqual(await page.locator('.layout > [id]').evaluateAll(nodes=>nodes.map(n=>n.id)),order);
+    assert.deepEqual(await page.locator('.layout > [id]:not([hidden])').evaluateAll(nodes=>nodes.map(n=>n.id)),order);
     const playerBox=await page.locator('#player-section').boundingBox(),voiceBox=await page.locator('#voice-section').boundingBox();
     assert.ok(Math.abs(playerBox.y-voiceBox.y)<1);
     assert.ok(voiceBox.x>=playerBox.x+playerBox.width);
-    assert.ok(Math.abs(playerBox.width-voiceBox.width)<1);
+    assert.ok(Math.abs(playerBox.width-voiceBox.width*2)<2);
     let bottom=Math.max(playerBox.y+playerBox.height,voiceBox.y+voiceBox.height);
     for(const id of order.slice(2)){const box=await page.locator('#'+id).boundingBox();assert.ok(box.y>=bottom);assert.ok(Math.abs(box.x-playerBox.x)<1);assert.ok(Math.abs(box.width-(voiceBox.x+voiceBox.width-playerBox.x))<1);bottom=box.y+box.height;}
     await page.locator('#player-section').evaluate(el=>el.scrollIntoView({block:'start',behavior:'instant'}));
@@ -178,11 +192,13 @@ try {
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     await page.screenshot({path:`test-results/ui-v15-${theme}-${width}-closed.png`});
     await page.locator('#prepare-settings > summary').click();
+    await page.locator('#preparation-advanced > summary').click();
     await page.locator('#prepare-section').evaluate(el=>el.scrollIntoView({block:'start',behavior:'instant'}));
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     await page.locator('#prepare-settings').screenshot({path:`test-results/ui-v15-${theme}-${width}-open.png`});
+    await page.locator('#preparation-advanced > summary').click();
     await page.locator('#prepare-settings > summary').click();
   }
   assert.deepEqual(errors,[]);assert.deepEqual(bareRequests,[]);
-  console.log('UI folds, fixed preparation preset, visible progress, preview continuity, masks and failed saves, six legacy model/flow versions, legacy rebuild, keyboard/deep-link navigation, recording continuity and both desktop themes passed.');
+  console.log('UI folds, unchanged defaults and selectable advanced separation, visible progress, preview continuity, masks, legacy rebuild, keyboard/deep-link navigation, recording continuity and both desktop themes passed.');
 } finally {await browser?.close();server.kill();await rm(fixture,{force:true});}

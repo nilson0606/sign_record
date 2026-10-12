@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {VOICELAB_DEFAULTS,voicelabSettings,voicelabSongSource,voicelabSavedMetadata} from '../voicelab-settings.mjs';
+import {VOICELAB_DEFAULTS,voicelabSettings,voicelabSongSource,voicelabSavedMetadata,voicelabOriginalReference,voicelabBackingStems} from '../voicelab-settings.mjs';
+import {recordingBackingRoute} from '../arrangement-settings.mjs';
 import {validateVoiceLabRequest} from '../voicelab-server.mjs';
 test('Voice Lab keeps legacy defaults and validates semitone and advanced settings',()=>{
  assert.deepEqual(voicelabSettings(),{model:'ver3',pitchShift:0,indexRate:.75,protect:.33,volumeEnvelope:1,f0Method:'rmvpe',autotune:false,autotuneStrength:1});
@@ -26,4 +27,12 @@ test('AI vocal octave does not alter backing key or timestamps; saved clips pres
   assert.deepEqual(meta.post.segments,[{offset:0,songTime:5,duration:5}]);
   assert.deepEqual(meta.stems,['accompaniment','backing']);assert.equal(meta.voicelab.report.settings.pitchShift,pitchShift);assert.equal(meta.soulx,undefined);
  }
+});
+test('lead conversion preserves backing vocals with original or replacement accompaniment and saved postprocessing routes',()=>{
+ const row=voicelabSongSource({cacheId:'song',hasPreview:true,duration:20,title:'Song',vocalMode:'lead'}),arrangement={id:'new-backing',cacheId:'song',start:0,end:20};
+ assert.equal(voicelabOriginalReference(row),'/library/song/lead');assert.deepEqual(voicelabBackingStems(row),['accompaniment','backing']);
+ const meta=voicelabSavedMetadata({row,arrangement,interval:{start:5,end:10},report:{settings:voicelabSettings(),sampleRate:48000,sourceSamples:240000,outputSamples:240000},delayMs:0,blend:100,match:false,useBacking:true,bytes:1,rawBytes:1});
+ assert.deepEqual(meta.stems,['arrangement','backing']);assert.equal(recordingBackingRoute(meta,'arrangement'),'/arrangements/library/new-backing/audio');assert.equal(recordingBackingRoute(meta,'backing'),'/library/song/backing');assert.deepEqual(meta.post.segments,[{offset:0,songTime:5,duration:5}]);
+ const legacy={...row,stems:['arrangement'],arrangement};assert.deepEqual(voicelabBackingStems(legacy,arrangement),['arrangement','backing']);
+ assert.deepEqual(voicelabBackingStems({...row,stems:['vocals','lead','accompaniment','backing','backing']}),['accompaniment','backing']);
 });

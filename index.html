@@ -172,7 +172,7 @@
     <section id="prepare-section" tabindex="-1" class="card prepare-card">
       <div class="section-top"><h2>聲曲分離與音高旋律擷取</h2><span class="subtle">本機分析與歌曲庫</span></div>
       <details id="prepare-settings" class="settings-fold" tabindex="-1"><summary>分離與音高設定 · 遮罩與試聽</summary>
-        <div class="preset-heading"><h3>新歌固定設定</h3><span class="pill">保留分離音軌</span></div>
+        <div class="preset-heading"><h3>新歌預設設定</h3><span class="pill">可展開進階設定調整</span></div>
         <dl class="preparation-preset">
           <div><dt>分析範圍</dt><dd>完整歌曲，最長 15 分鐘</dd></div>
           <div><dt>基準音高擷取</dt><dd>RMVPE</dd></div>
@@ -181,14 +181,22 @@
           <div><dt>分離模式</dt><dd>人聲／伴奏分離</dd></div>
           <div><dt>分離音軌</dt><dd>保留人聲、伴奏，供本機試聽</dd></div>
         </dl>
-        <p class="help">按「準備歌曲基準」使用這組設定。歌曲庫的既有版本仍依原設定載入；「重新分離並覆蓋」與「補建試聽音軌」沿用該版本。下方會顯示目前試聽來源。</p>
-        <div hidden aria-hidden="true" id="preparation-state">
-<select id="clip-seconds"><option value="0">完整歌曲（最長 15 分鐘）</option><option value="15">先試前 15 秒</option><option value="30">先試前 30 秒</option><option value="60">先試前 60 秒</option></select>
-<select id="pitch-method"><option value="rmvpe" selected>RMVPE（歌聲音高模型，預設）</option><option value="yin">YIN（原有方式）</option></select>
-<select id="separation-model"><option value="demucs" selected>Demucs／htdemucs（預設）</option><option value="bs-roformer">BS-RoFormer／Viperx 1297（比較試聽）</option><option value="mel-roformer">Mel-Band RoFormer／Kim 人聲（比較試聽）</option></select>
-<select id="separation-method"><option value="single" selected>單次分離（預設）</option><option value="residual">伴奏二次分離＋反向相減（實驗選用）</option></select>
-<select id="vocal-mode"><option value="all" selected>人聲／伴奏分離（預設）</option><option value="lead">主唱／和音分離（進階選用）</option></select><input id="keep-preview" type="checkbox" checked>
-        </div>
+        <p class="help">未調整時沿用以上預設。按「準備歌曲基準」套用目前選項，變更模型／模式會另存歌曲版本；「重新分離並覆蓋」與「補建試聽音軌」沿用已載入版本。下方會顯示目前試聽來源。</p>
+        <details id="preparation-advanced" class="post-effects">
+          <summary><strong>進階分離設定 · 展開可調整</strong><span id="preparation-summary" class="help"></span></summary>
+          <fieldset id="preparation-fields"><legend>準備歌曲時使用</legend>
+          <div class="soulx-grid">
+            <label>分析範圍<select id="clip-seconds"><option value="0">完整歌曲（最長 15 分鐘，預設）</option><option value="15">先試前 15 秒</option><option value="30">先試前 30 秒</option><option value="60">先試前 60 秒</option></select></label>
+            <label>基準音高擷取<select id="pitch-method"><option value="rmvpe" selected>RMVPE（預設）</option><option value="yin">YIN（原有方式）</option></select></label>
+            <label>聲曲分離模型<select id="separation-model"><option value="demucs" selected>Demucs／htdemucs（預設）</option><option value="bs-roformer">BS-RoFormer／Viperx 1297</option><option value="mel-roformer">Mel-Band RoFormer／Kim 人聲</option></select></label>
+            <label>處理流程<select id="separation-method"><option value="single" selected>單次分離（預設）</option><option value="residual">伴奏二次分離＋反向相減</option></select></label>
+            <label>分離模式<select id="vocal-mode"><option value="all" selected>人聲／伴奏分離（預設）</option><option value="lead">主唱／和音分離（供主唱換聲）</option></select></label>
+          </div>
+          <label><input id="keep-preview" type="checkbox" checked> 保留分離音軌（Voice Lab 與試聽需要）</label>
+          <p class="help">想在 Voice Lab 只換主唱、保留其他聲音，選「主唱／和音分離」並保留音軌，再按「準備歌曲基準」。只有人聲／伴奏的舊歌需要建立這個新版本；已有主唱／和音版本可直接載入。分離模型可能誤判，先試聽主唱與和音確認。</p>
+          <button id="preparation-reset" type="button" class="secondary">還原分離預設</button>
+          </fieldset>
+        </details>
       <section id="preview-panel" class="settings-subsection" tabindex="-1" aria-labelledby="preview-heading"><h3 id="preview-heading">分離結果試聽</h3><p id="preview-source" class="preview-source" aria-live="polite">尚未載入試聽版本。</p>
         <p class="help">準備歌曲時會保留試聽音軌。試聽會暫停 YouTube，不參與評分；音檔只在本機。</p>
         <div class="button-row"><button id="preview-vocals" class="secondary" disabled>試聽人聲</button><button id="preview-accompaniment" class="secondary" disabled>試聽伴奏</button></div>
@@ -270,6 +278,8 @@
         <select id="voicelab-source" disabled><option value="original">原曲原唱（目前載入歌曲）</option><option value="recording">我的錄音（上方選取的錄音）</option></select>
         <p class="help">使用已訓練的個人音色模型換聲，不需要再提供參考音檔。先在歌曲庫載入歌曲，或選取自己的錄音。只取分離人聲來轉換，最後配回同一首的伴奏；未分離主唱時，人聲軌可能含和聲。</p>
         <p id="voicelab-source-info" class="help">請在上方選擇保留原始人聲的錄音。</p>
+        <p id="voicelab-source-routing" class="help" role="status"></p>
+        <p class="help">需要建立主唱版本時，前往<a href="#preparation-advanced">進階分離設定</a>選「主唱／和音分離」，再按「準備歌曲基準」。新版本完成後再回來產生翻唱。</p>
         <div class="soulx-grid">
           <div><label for="voicelab-model">② 音色模型</label><select id="voicelab-model" disabled><option value="">請啟用 Voice Lab 讀取本機模型</option></select></div>
           <div class="soulx-actions"><button id="voicelab-model-refresh" type="button" class="secondary" disabled>自行加入／重新掃描模型</button></div>

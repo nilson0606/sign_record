@@ -1,7 +1,7 @@
 import {arrangementCovers,recordingBackingRoute} from './arrangement-settings.mjs';
 import {wavBlob} from './recording-process.mjs';
 import {createVoiceLabStorage} from './voicelab-storage-client.mjs';
-import {VOICELAB_DEFAULTS,VOICELAB_MODELS,VOICELAB_F0_METHODS,voicelabSettings,voicelabInterval,voicelabRangeLabel,voicelabSavedMetadata,voicelabOriginalReference,voicelabSongSource,voicelabPitchLabel,voicelabModelLabel} from './voicelab-settings.mjs';
+import {VOICELAB_DEFAULTS,VOICELAB_MODELS,VOICELAB_F0_METHODS,voicelabSettings,voicelabInterval,voicelabRangeLabel,voicelabSavedMetadata,voicelabOriginalReference,voicelabSongSource,voicelabPitchLabel,voicelabModelLabel,voicelabBackingStems} from './voicelab-settings.mjs';
 const BASE='http://127.0.0.1:4274';
 const $=id=>document.getElementById('voicelab-'+id);
 async function request(path,options={}){
@@ -170,7 +170,7 @@ export function createVoiceLab({store,getSelected,getPosition,getReference=()=>n
     $('listen-status').textContent='準備試聽音訊…';
     if(useBacking&&(!snapshot.tracks||snapshot.tracksKey!==(arrangement?.id??'original'))){
       const context=new AudioContext({sampleRate:48000,sinkId:{type:'none'}});
-      try{const tracks=[],routes=arrangement?[`/arrangements/library/${arrangement.id}/audio`]:(snapshot.row.stems??[]).map(stem=>recordingBackingRoute(snapshot.row,stem));for(const route of routes){const blob=await(await request(route)).blob();tracks.push(await context.decodeAudioData(await blob.arrayBuffer()));}snapshot.tracks=tracks;snapshot.tracksKey=arrangement?.id??'original';}finally{await context.close();}
+      try{const tracks=[],routes=voicelabBackingStems(snapshot.row,arrangement).map(stem=>recordingBackingRoute({...snapshot.row,arrangement},stem));for(const route of routes){const blob=await(await request(route)).blob();tracks.push(await context.decodeAudioData(await blob.arrayBuffer()));}snapshot.tracks=tracks;snapshot.tracksKey=arrangement?.id??'original';}finally{await context.close();}
     }
     const gain=match?Math.min(4,rms(snapshot.original)/Math.max(rms(snapshot.converted),.00001)):1;
     async function render(ai){
@@ -193,7 +193,7 @@ export function createVoiceLab({store,getSelected,getPosition,getReference=()=>n
     for(let i=0;i<out.length;i++)out[i]=original[i]*(1-blend)+converted[i]*blend*gain;
     // Preserve the blended dry vocal without PCM clipping; fold its scale into the saved bus gain.
     let voicePeak=1;for(const x of out)voicePeak=Math.max(voicePeak,Math.abs(x));if(voicePeak>1)for(let i=0;i<out.length;i++)out[i]/=voicePeak;
-    mixes={key,blobs,urls,voice:wavBlob(voice),voiceScale:voicePeak,useBacking,match,blend:Math.round(blend*100),commonGain,arrangement,voiceVolume,backingVolume};$('listen-status').textContent=`${useBacking?(arrangement?'已保存的新配樂':'同一份配樂'):'只聽人聲'} · 人聲 ${voiceVolume}% · 配樂 ${useBacking?backingVolume:0}% · AI ${Math.round(blend*100)}%${match?' · 音量匹配':''}；切換保留目前播放位置。`;return mixes;
+    mixes={key,blobs,urls,voice:wavBlob(voice),voiceScale:voicePeak,useBacking,match,blend:Math.round(blend*100),commonGain,arrangement,voiceVolume,backingVolume};$('listen-status').textContent=`${useBacking?(arrangement?'已保存的新配樂':'同一份配樂')+(voicelabBackingStems(snapshot.row,arrangement).includes('backing')?'＋原和音':''):'只聽人聲'} · 人聲 ${voiceVolume}% · 配樂 ${useBacking?backingVolume:0}% · AI ${Math.round(blend*100)}%${match?' · 音量匹配':''}；切換保留目前播放位置。`;return mixes;
   }
   async function play(next){
     if(!result)return;const position=player.currentTime||0;side=next;beforePlay();
@@ -230,6 +230,7 @@ export function createVoiceLab({store,getSelected,getPosition,getReference=()=>n
     const row=source();
     if((row?.id??null)!==selectedId){selectedId=row?.id??null;void cancel();clear();$('backing-choice').replaceChildren(new Option('錄音原配樂',''));savedBackings=[];if(enabled())void refreshBackings();$('start').value=0;$('end').value=Math.min(20,row?.sourceSeconds??row?.seconds??20);}
     $('source-info').textContent=row?`待轉換：${row.voicelabSource==='original'?'原曲原唱':'我的錄音'} · ${row.title} · ${Number(row.sourceSeconds??row.seconds).toFixed(2)} 秒 · 校正 ${row.appliedDelayMs??row.recordingDelayMs??row.post?.offsetMs??0} ms`:$('source').value==='original'?'請先從歌曲庫載入含分離音軌的歌曲，不需要先錄音。':'請在上方選擇保留原始人聲的錄音。';
+    $('source-routing').textContent=!row?'':row.voicelabSource==='original'?(row.post?.reference?.vocalMode==='lead'?'已載入主唱／和音版本：只轉換主唱，原和音與配樂一起混回，跟隨配樂音量；改用新配樂仍保留原和音。':'目前是人聲／伴奏兩軌：人聲中的和音也會一起換聲。要保留非主唱聲音，請先建立並載入主唱／和音版本。'):'轉換自己的錄音人聲；有獨立和音音軌時，會與配樂一起保留。';
     $('now').textContent=row?.voicelabSource==='original'?'從 Voice Lab 試聽位置取 20 秒':'從目前位置取 20 秒';rangeLabel();controls();
   }
   async function refreshBackings(){

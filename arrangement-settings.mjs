@@ -38,4 +38,4 @@ export function arrangementCovers(meta,row,interval){
   const segments=(row.post.segments??[]).map(s=>({start:Math.max(s.offset,interval.start),end:Math.min(s.offset+s.duration,interval.end),offset:s.offset,song:s.songTime})).filter(s=>s.end>s.start);
   return segments.length>0&&segments.every(s=>s.song+s.start-s.offset>=meta.start-.001&&s.song+s.end-s.offset<=meta.end+.001);
 }
-export function recordingBackingRoute(row,stem){return row.arrangement?`/arrangements/library/${row.arrangement.id}/audio`:`/library/${row.post.reference.cacheId}/${stem}`;}
+export function recordingBackingRoute(row,stem){return row.arrangement&&stem!=='backing'?`/arrangements/library/${row.arrangement.id}/audio`:`/library/${row.post.reference.cacheId}/${stem}`;}
