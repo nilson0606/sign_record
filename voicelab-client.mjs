@@ -1,6 +1,6 @@
 import {arrangementCovers,recordingBackingRoute} from './arrangement-settings.mjs';
 import {wavBlob} from './recording-process.mjs';
-import {VOICELAB_DEFAULTS,VOICELAB_MODELS,VOICELAB_F0_METHODS,voicelabSettings,voicelabInterval,voicelabRangeLabel,voicelabSavedMetadata,voicelabOriginalReference,voicelabSongSource,voicelabPitchLabel} from './voicelab-settings.mjs';
+import {VOICELAB_DEFAULTS,VOICELAB_MODELS,VOICELAB_F0_METHODS,voicelabSettings,voicelabInterval,voicelabRangeLabel,voicelabSavedMetadata,voicelabOriginalReference,voicelabSongSource,voicelabPitchLabel,voicelabModelLabel} from './voicelab-settings.mjs';
 const BASE='http://127.0.0.1:4274';
 const $=id=>document.getElementById('voicelab-'+id);
 async function request(path,options={}){
@@ -21,7 +21,7 @@ function rms(buffer){const a=buffer.getChannelData(0);let sum=0;for(const x of a
 export function createVoiceLab({store,getSelected,getPosition,getReference=()=>null,beforePlay,onSaved=async()=>{},onMakeMV=()=>{}}){
   // Start disabled even if the browser restored controls from the previous visit.
   $('panel').open=false;$('enable').checked=false;$('advanced').open=false;
-  let savedBackings=[];
+  let savedBackings=[],models=[],scanning=false,modelsReady=false;
   let selectedId=null,externalBusy=false,busy=false,saving=false,revision=0,active=null,result=null,urls=[],mixes=null,rendering=0,side='ai';
   const say=text=>{$('status').textContent=text;};
   let progressTimer=null,progressStarted=0;
@@ -50,7 +50,10 @@ export function createVoiceLab({store,getSelected,getPosition,getReference=()=>n
   const player=$('audio');
   function clear(){player.pause();player.removeAttribute('src');player.load();for(const u of urls)URL.revokeObjectURL(u);urls=[];mixes=null;result=null;rendering++;$('result').hidden=true;}
   function controls(){
-    $('content').hidden=!enabled();$('fields').disabled=!enabled()||!eligible()||busy||saving||externalBusy;
+    $('content').hidden=!enabled();$('fields').disabled=!enabled()||!eligible()||busy||saving||externalBusy||scanning;
+    $('model').disabled=!enabled()||busy||saving||externalBusy||scanning;
+    $('model-refresh').disabled=!enabled()||busy||saving||externalBusy||scanning;
+    $('generate').disabled=!modelsReady||!$('model').value;
     $('source').disabled=!enabled()||busy||saving||externalBusy;
     $('cancel').disabled=!busy||!active;
     for(const id of ['listen-original','listen-ai','download','save','mv'])$(id).disabled=!result||busy||saving||externalBusy;
@@ -71,13 +74,31 @@ export function createVoiceLab({store,getSelected,getPosition,getReference=()=>n
     $('advanced-summary').textContent=`${VOICELAB_F0_METHODS[$('f0-method').value]} · ${voicelabPitchLabel(pitch)} · 檢索 ${$('index-rate').value} · 保護 ${$('protect').value} · 包絡 ${$('volume-envelope').value} · 修音${$('autotune').checked?Math.round(Number($('autotune-strength').value)*100)+'%':'關閉'}`;
   }
   function settings(){return voicelabSettings({model:$('model').value,pitchShift:$('pitch').valueAsNumber,indexRate:Number($('index-rate').value),protect:Number($('protect').value),volumeEnvelope:Number($('volume-envelope').value),f0Method:$('f0-method').value,autotune:$('autotune').checked,autotuneStrength:Number($('autotune-strength').value)});}
-  function reset(){for(const [id,key] of [['model','model'],['index-rate','indexRate'],['protect','protect'],['pitch','pitchShift'],['volume-envelope','volumeEnvelope'],['f0-method','f0Method'],['autotune-strength','autotuneStrength']])$(id).value=VOICELAB_DEFAULTS[key];$('autotune').checked=VOICELAB_DEFAULTS.autotune;labels();}
+  function reset(){for(const [id,key] of [['index-rate','indexRate'],['protect','protect'],['pitch','pitchShift'],['volume-envelope','volumeEnvelope'],['f0-method','f0Method'],['autotune-strength','autotuneStrength']])$(id).value=VOICELAB_DEFAULTS[key];$('model').value=models.find(m=>m.id===VOICELAB_DEFAULTS.model)?.id??models[0]?.id??'';$('autotune').checked=VOICELAB_DEFAULTS.autotune;labels();}
   async function cancel(){revision++;player.pause();if(busy)showProgress('cancelled','已取消轉換；原始音檔保留。');else{stopProgress();$('progress').hidden=true;}if(active)try{await request('/voicelab/jobs/'+active,{method:'DELETE'});}catch{}say(enabled()?'已取消 Voice Lab；原始錄音保留。':'Voice Lab 已關閉。');}
   $('enable').addEventListener('change',async()=>{
     controls();if(!enabled()){void cancel();return;}
-    void refreshBackings();const rev=revision;say('檢查本機 Voice Lab 環境…');
-    try{const state=await(await request('/voicelab')).json();if(enabled()&&revision===rev){for(const option of $('model').options)option.disabled=!state.models?.some(m=>m.id===option.value);say(state.installed?'Voice Lab 已就緒。選個人模型與範圍，再按「產生 Voice Lab 試聽」。':'找不到本機模型，請確認 Applio 與個人模型設定。');}}catch(e){if(enabled()&&revision===rev)say(e.message);}
+    void refreshBackings();void refreshModels();
   });
+  async function refreshModels(){
+    if(scanning||busy||saving||externalBusy)return;
+    scanning=true;modelsReady=false;controls();$('model-status').textContent='正在掃描本機音色資料夾…';
+    try{
+      const state=await(await request('/voicelab')).json(),previous=$('model').value;
+      models=(state.models??[]).map(m=>({id:m.id,label:m.label||VOICELAB_MODELS[m.id]||m.id}));
+      $('model').replaceChildren(...models.map(m=>new Option(m.label+(m.id===VOICELAB_DEFAULTS.model?'（預設）':''),m.id)));
+      if(!models.length)$('model').add(new Option('未找到完整模型',''));
+      $('model').value=models.find(m=>m.id===previous)?.id??models.find(m=>m.id===VOICELAB_DEFAULTS.model)?.id??models[0]?.id??'';
+      $('model-root').textContent=state.modelsRoot||'本機設定的模型目錄';
+      const issues=state.modelIssues??[];$('model-issues').replaceChildren(...issues.map(issue=>{const li=document.createElement('li');li.textContent=(issue.folder?issue.folder+'：':'')+issue.message;return li;}));$('model-issues').hidden=!issues.length;
+      modelsReady=!!state.installed&&models.length>0;
+      $('model-status').textContent=`已找到 ${models.length} 個音色模型。${issues.length?`${issues.length} 個資料夾需整理，詳見下方。`:''}${state.modelDiscoveryVersion===1?'新增資料夾後可再次掃描，不需重啟。':'本機工具尚未支援自動發現新模型，請更新並重新啟動本機工具。'}${previous&&previous!==$('model').value?'原選模型已不在清單，請確認目前選擇。':''}`;
+      dirty();if(enabled()&&(!result||result.draft===draft()))say(modelsReady?'Voice Lab 已就緒。選個人模型與範圍，再按「產生 Voice Lab 試聽」。':'找不到可用模型或換聲環境，請確認 Applio 與下方模型掃描結果。');
+    }catch(e){$('model-status').textContent='掃描未完成：'+e.message;if(enabled())say(e.message);}
+    finally{scanning=false;controls();}
+  }
+  $('model-refresh').addEventListener('click',()=>void refreshModels());
+  $('model').addEventListener('change',dirty);
   $('panel').addEventListener('toggle',()=>{if(!$('panel').open)player.pause();});
   $('cancel').addEventListener('click',()=>void cancel());
   $('reset').addEventListener('click',()=>{reset();dirty();});
@@ -103,7 +124,7 @@ export function createVoiceLab({store,getSelected,getPosition,getReference=()=>n
     }finally{await context.close();}
   }
   $('generate').addEventListener('click',async()=>{
-    if(!enabled()||busy||externalBusy||!eligible())return;
+    if(!enabled()||busy||externalBusy||scanning||!modelsReady||!eligible())return;
     if(document.getElementById('mic-stop')&&!document.getElementById('mic-stop').disabled){say('請先停止收音，再生成 Voice Lab，避免影響錄製。');return;}
     const rev=++revision,row=structuredClone(source()),generatedDraft=draft();busy=true;clear();controls();startProgress();
     try{
@@ -123,13 +144,14 @@ export function createVoiceLab({store,getSelected,getPosition,getReference=()=>n
       if(state.stage!=='ready')throw Error('生成逾時，請重新嘗試。');
       if((state.result.pitchShift??0)!==input.payload.settings.pitchShift)throw Error('模型回報的移調值與設定不符，未接受結果；請更新本機工具後重試。');
       const applied=voicelabSettings(state.result.settings);if(Object.keys(VOICELAB_DEFAULTS).some(k=>applied[k]!==config[k]))throw Error('模型回報的 RVC 參數與設定不符，未接受結果；請更新本機工具後重試。');
+      state.result.modelLabel||=models.find(m=>m.id===config.model)?.label??config.model;
       const blobs=await Promise.all(['source','result'].map(async name=>(await request('/voicelab/jobs/'+active+'/'+name)).blob()));if(rev!==revision)return;
       const context=new AudioContext({sampleRate:48000,sinkId:{type:'none'}});
       try{const [original,converted]=await Promise.all(blobs.map(async b=>context.decodeAudioData(await b.arrayBuffer())));if(rev!==revision)return;
         if(original.length!==converted.length||converted.length!==state.result.outputSamples||Math.abs(converted.duration-(input.interval.end-input.interval.start))>1/48000)throw Error('輸出長度與選取範圍不符，未接受結果。');
         result={row,original,converted,report:state.result,interval:input.interval,delayMs:input.delayMs,tracks:null,draft:generatedDraft};}finally{await context.close();}
       $('result').hidden=false;$('blend').value=100;$('backing').checked=row.mode==='mix';labels();
-      const s=applied;$('result-info').textContent=`已轉換：${row.voicelabSource==='original'?'原曲原唱':'我的錄音'} → ${VOICELAB_MODELS[s.model]} · ${voicelabRangeLabel(input.interval,row.sourceSeconds??row.seconds)} · ${voicelabPitchLabel(s.pitchShift)} · ${VOICELAB_F0_METHODS[s.f0Method]} · 檢索比例 ${s.indexRate} · 子音保護 ${s.protect} · 音量包絡 ${s.volumeEnvelope} · 修音${s.autotune?Math.round(s.autotuneStrength*100)+'%':'關閉'} · 校正 ${input.delayMs} ms。請試聽確認音色與對嘴。`;
+      const s=applied;$('result-info').textContent=`已轉換：${row.voicelabSource==='original'?'原曲原唱':'我的錄音'} → ${voicelabModelLabel(result.report)} · ${voicelabRangeLabel(input.interval,row.sourceSeconds??row.seconds)} · ${voicelabPitchLabel(s.pitchShift)} · ${VOICELAB_F0_METHODS[s.f0Method]} · 檢索比例 ${s.indexRate} · 子音保護 ${s.protect} · 音量包絡 ${s.volumeEnvelope} · 修音${s.autotune?Math.round(s.autotuneStrength*100)+'%':'關閉'} · 校正 ${input.delayMs} ms。請試聽確認音色與對嘴。`;
       say('已完成。按「原聲／Voice Lab」同位置切換比較；原錄音與 A／B 設定保留。');
       showProgress('ready','音檔長度檢查通過，可以試聽。');
     }catch(e){if(rev===revision){say(e.message);showProgress('failed',e.message);}if(active)await request('/voicelab/jobs/'+active,{method:'DELETE'}).catch(()=>{});}
@@ -181,7 +203,7 @@ export function createVoiceLab({store,getSelected,getPosition,getReference=()=>n
   for(const id of ['blend','backing','match','backing-choice','voice-volume','backing-volume'])$(id).addEventListener('input',()=>{labels();mixes=null;rendering++;player.pause();$('listen-status').textContent='試聽混音已改，按「原聲／Voice Lab」聽新效果；不需重新生成。';});
   $('loop').addEventListener('change',()=>{player.loop=$('loop').checked;});
   $('download').addEventListener('click',async()=>{
-    try{const mix=await buildMixes(),s=result.report.settings,a=document.createElement('a'),pitch=s.pitchShift??0;a.href=mix.urls[1];a.download=`${result.row.title}_Voice Lab_${VOICELAB_MODELS[s.model]}_${result.interval.start}-${result.interval.end}秒${pitch?`_移調${pitch>0?'+':''}${pitch}半音`:''}_AI${$('blend').value}%_試聽.wav`.replace(/[\\/:*?"<>|]/g,'_');a.click();}catch(e){$('listen-status').textContent=e.message;}
+    try{const mix=await buildMixes(),s=result.report.settings,a=document.createElement('a'),pitch=s.pitchShift??0;a.href=mix.urls[1];a.download=`${result.row.title}_Voice Lab_${voicelabModelLabel(result.report)}_${result.interval.start}-${result.interval.end}秒${pitch?`_移調${pitch>0?'+':''}${pitch}半音`:''}_AI${$('blend').value}%_試聽.wav`.replace(/[\\/:*?"<>|]/g,'_');a.click();}catch(e){$('listen-status').textContent=e.message;}
   });
   $('save').addEventListener('click',async()=>{
     if(!result||busy||saving||externalBusy||result.draft!==draft())return;
@@ -199,7 +221,7 @@ export function createVoiceLab({store,getSelected,getPosition,getReference=()=>n
   $('mv').addEventListener('click',async()=>{
     if(!result||busy||saving||externalBusy||result.draft!==draft())return;
     const snapshot=result;saving=true;controls();player.pause();
-    try{const mix=await buildMixes();if(snapshot!==result)throw Error('來源已變更，請重新選取。');onMakeMV({title:snapshot.row.title,blob:mix.blobs[1],label:`${snapshot.row.title} · Voice Lab · ${VOICELAB_MODELS[snapshot.report.settings.model]} · ${snapshot.interval.start.toFixed(2)}～${snapshot.interval.end.toFixed(2)} 秒 · 人聲 ${mix.voiceVolume}%／配樂 ${mix.useBacking?mix.backingVolume:0}%`});}catch(e){$('listen-status').textContent=e.message;}finally{saving=false;controls();}
+    try{const mix=await buildMixes();if(snapshot!==result)throw Error('來源已變更，請重新選取。');onMakeMV({title:snapshot.row.title,blob:mix.blobs[1],label:`${snapshot.row.title} · Voice Lab · ${voicelabModelLabel(snapshot.report)} · ${snapshot.interval.start.toFixed(2)}～${snapshot.interval.end.toFixed(2)} 秒 · 人聲 ${mix.voiceVolume}%／配樂 ${mix.useBacking?mix.backingVolume:0}%`});}catch(e){$('listen-status').textContent=e.message;}finally{saving=false;controls();}
   });
   window.addEventListener('pagehide',()=>{void cancel();clear();});
   function syncSource(){

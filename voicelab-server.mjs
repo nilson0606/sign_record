@@ -6,24 +6,16 @@ import {mkdir,writeFile,readFile,stat,rm} from 'node:fs/promises';
 import {pipeline} from 'node:stream/promises';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
-import {voicelabSettings,VOICELAB_MODELS,VOICELAB_F0_METHODS} from './voicelab-settings.mjs';
+import {voicelabSettings,VOICELAB_F0_METHODS} from './voicelab-settings.mjs';
+import {scanVoiceLabModels,findVoiceLabModel} from './voicelab-models.mjs';
 const root=fileURLToPath(new URL('./',import.meta.url)),runtime=path.join(root,'.runtime','voicelab'),jobsRoot=path.join(runtime,'jobs');
 const jobs=new Map();
 function config(){try{return JSON.parse(readFileSync(path.join(runtime,'config.json'),'utf8'));}catch{return {};}}
-function modelFiles(model,c=config()){
-  const added={mosi_ver1:'Mosi_Ver1',n_1_ver1:'N_1_Ver1',n2_ver:'N2_VER',n3_ver:'N3_VER',n4_ver:'N4_VER'}[model];
-  if(added)return {modelPath:path.join(c.modelsRoot||runtime,added,`${added}_100e.pth`),indexPath:path.join(c.modelsRoot||runtime,added,`${added}.index`)};
-  const wife=model==='wife_ver1'||model==='wife_ver2';
-  const version=wife?model.replace('wife_ver','Wife_Ver'):model.replace('ver','Ver');
-  const stem=wife?model.replace('wife_ver','wife_voice_Ver'):`myvoice_${version}`;
-  return {modelPath:path.join(c.modelsRoot||runtime,version,`${stem}_100e.pth`),indexPath:path.join(c.modelsRoot||runtime,version,`${stem}.index`)};
-}
+const engineAvailable=c=>[c.python,c.applioHome&&path.join(c.applioHome,'rvc/infer/infer.py')].every(p=>p&&existsSync(p));
 
 const json=(res,code,value)=>{res.writeHead(code,{'Content-Type':'application/json'});res.end(JSON.stringify(value));};
 const finished=j=>['ready','failed','cancelled'].includes(j.stage);
 export const voicelabBusy=()=>[...jobs.values()].some(j=>j.running||!finished(j));
-function installedModels(){const c=config();return Object.keys(VOICELAB_MODELS).filter(model=>{const f=modelFiles(model,c);return [c.python,c.applioHome&&path.join(c.applioHome,'rvc/infer/infer.py'),f.modelPath,f.indexPath].every(p=>p&&existsSync(p));});}
-const available=()=>installedModels().length>0;
 export function validateVoiceLabWav(value,maxSeconds=600){
   if(typeof value!=='string'||value.length>(maxSeconds*96000+44)*4/3+8||value.length%4||!/^[A-Za-z0-9+/]*={0,2}$/.test(value))throw Error('人聲 WAV 格式或大小無效。');
   const b=Buffer.from(value,'base64');
@@ -56,22 +48,22 @@ async function erase(job){
 export async function stopVoiceLab(){await Promise.allSettled([...jobs.values()].map(erase));}
 export async function handleVoiceLab(req,res,{gpuBusy=()=>false}={}){
   try{
-    if(req.url==='/voicelab'&&req.method==='GET'){json(res,200,{installed:available(),models:installedModels().map(id=>({id,label:VOICELAB_MODELS[id]})),maxSeconds:600,pitchShiftRange:[-12,12],advancedSettingsVersion:1,f0Methods:Object.keys(VOICELAB_F0_METHODS)});return;}
+    if(req.url==='/voicelab'&&req.method==='GET'){const c=config(),catalog=scanVoiceLabModels(c.modelsRoot);json(res,200,{installed:engineAvailable(c)&&catalog.models.length>0,models:catalog.models.map(({id,label,folder})=>({id,label,folder})),modelDiscoveryVersion:1,modelsRoot:c.modelsRoot??'',modelIssues:catalog.issues,maxSeconds:600,pitchShiftRange:[-12,12],advancedSettingsVersion:1,f0Methods:Object.keys(VOICELAB_F0_METHODS)});return;}
     if(req.url==='/voicelab/jobs'&&req.method==='POST'){
-      if(!available()){json(res,409,{error:'Voice Lab 尚未安裝完成，請確認本機 Applio 與個人模型設定。'});return;}
+      const environment=config();
+      if(!engineAvailable(environment)){json(res,409,{error:'Voice Lab 尚未安裝完成，請確認本機 Applio 與個人模型設定。'});return;}
       if(gpuBusy()||voicelabBusy()){json(res,409,{error:'目前有音訊工作進行中，完成後再產生 Voice Lab。'});return;}
       let size=0;const chunks=[];
       for await(const chunk of req){size+=chunk.length;if(size>80*1024*1024)throw Error('音訊太大，每次最多 10 分鐘。');chunks.push(chunk);}
       const value=validateVoiceLabRequest(JSON.parse(Buffer.concat(chunks).toString('utf8')));
-      if(!installedModels().includes(value.settings.model))throw Error('此音色模型或配套索引未安裝。');
-      const environment=config();
+      const selected=findVoiceLabModel(scanVoiceLabModels(environment.modelsRoot),value.settings.model);
       if(gpuBusy()||voicelabBusy()){json(res,409,{error:'另一個音訊工作已開始，請稍後再試。'});return;}
       const id=randomUUID(),dir=path.join(jobsRoot,id),job={id,stage:'starting',message:'準備 Voice Lab…',running:false};jobs.set(id,job);
       try{
         // Keep at most five finished results in addition to the new job.
         for(const old of [...jobs.values()].filter(j=>j!==job&&finished(j)&&!j.running).slice(0,-5))await erase(old);
         await mkdir(dir,{recursive:true});await writeFile(path.join(dir,'input.wav'),value.audio);
-        await writeFile(path.join(dir,'request.json'),JSON.stringify({...value.settings,...modelFiles(value.settings.model,environment),applioHome:environment.applioHome}));
+        await writeFile(path.join(dir,'request.json'),JSON.stringify({...value.settings,modelPath:selected.modelPath,indexPath:selected.indexPath,applioHome:environment.applioHome}));
         const child=spawn(environment.python,['-u',path.join(root,'tools','voicelab_worker.py'),'--request',path.join(dir,'request.json')],{cwd:root,windowsHide:true,stdio:['ignore','pipe','pipe'],env:{...process.env,PYTHONIOENCODING:'utf-8',PYTHONDONTWRITEBYTECODE:'1',HF_HUB_OFFLINE:'1',TRANSFORMERS_OFFLINE:'1'}});
         job.child=child;job.running=true;let pending='',diagnostic='',ready=false;
         const event=line=>{let d;try{d=JSON.parse(line);}catch{return;}if(finished(job))return;
@@ -87,7 +79,7 @@ export async function handleVoiceLab(req,res,{gpuBusy=()=>false}={}){
           if(job.deleted)return;
           if(!finished(job))try{
             if(code!==0||!ready)throw Error();
-            job.result=JSON.parse(await readFile(path.join(dir,'result.json'),'utf8'));await stat(path.join(dir,'result.wav'));
+            job.result=JSON.parse(await readFile(path.join(dir,'result.json'),'utf8'));job.result.modelLabel=selected.label;await stat(path.join(dir,'result.wav'));
             job.stage='ready';job.message='Voice Lab 已完成；可比較原聲與 AI，或下載試聽副本。';
           }catch{job.stage='failed';job.message='Voice Lab 轉換未完成；原始錄音保留。診斷已存於本機測試目錄。';}
           if(diagnostic)await writeFile(path.join(dir,'diagnostic.log'),diagnostic).catch(()=>{});

@@ -1,6 +1,7 @@
 export const VOICELAB_DEFAULTS=Object.freeze({model:'ver3',pitchShift:0,indexRate:.75,protect:.33,volumeEnvelope:1,f0Method:'rmvpe',autotune:false,autotuneStrength:1});
 export const VOICELAB_F0_METHODS=Object.freeze({rmvpe:'RMVPE',fcpe:'FCPE',crepe:'CREPE'});
 export const VOICELAB_MODELS=Object.freeze({ver1:'我的音色 Ver1',ver2:'我的音色 Ver2',ver3:'我的音色 Ver3',wife_ver1:'Wife Ver1',wife_ver2:'Wife Ver2',mosi_ver1:'Mosi Ver1',n_1_ver1:'N_1 Ver1',n2_ver:'N2_VER',n3_ver:'N3_VER',n4_ver:'N4_VER'});
+export const voicelabModelLabel=report=>report.modelLabel||VOICELAB_MODELS[report.settings.model]||report.settings.model;
 export function voicelabPitchLabel(value=0){
   return value===0?'原八度（預設）':`${value===-12?'降低八度':value===12?'提高八度':'移調'}（${value>0?'+':''}${value} 半音）`;
 }
@@ -19,7 +20,7 @@ export function voicelabSongSource(reference){
 }
 export function voicelabSettings(v={}){
   const s={...VOICELAB_DEFAULTS,...v};
-  if(!Object.hasOwn(VOICELAB_MODELS,s.model))throw Error('請選擇已安裝的個人音色模型。');
+  if(typeof s.model!=='string'||(!Object.hasOwn(VOICELAB_MODELS,s.model)&&!/^folder-[a-f0-9]{64}$/.test(s.model)))throw Error('請選擇已安裝的個人音色模型。');
   if(!Object.hasOwn(VOICELAB_F0_METHODS,s.f0Method))throw Error('請選擇支援的音高擷取方法。');
   if(typeof s.autotune!=='boolean')throw Error('自動修音設定無效。');
   for(const [key,min,max,integer] of [['pitchShift',-12,12,true],['indexRate',0,1,false],['protect',0,.5,false],['volumeEnvelope',0,1,false],['autotuneStrength',0,1,false]]){
@@ -44,7 +45,7 @@ export function voicelabSavedMetadata({row,interval,report,delayMs,blend,match,u
   });
   const range=voicelabRangeLabel(interval,row.sourceSeconds??row.seconds),s=report.settings;
   const pitch=s.pitchShift??0;
-  const suffix=`_VoiceLab_${row.voicelabSource==='original'?'原唱換聲_':''}${VOICELAB_MODELS[s.model]}_${range.startsWith('整首')?'整首':`片段${interval.start}-${interval.end}秒`}${pitch?`_移調${pitch>0?'+':''}${pitch}半音`:''}_AI${blend}%${useBacking&&(arrangement??row.arrangement)?'_新配樂':''}`;
+  const suffix=`_VoiceLab_${row.voicelabSource==='original'?'原唱換聲_':''}${voicelabModelLabel(report)}_${range.startsWith('整首')?'整首':`片段${interval.start}-${interval.end}秒`}${pitch?`_移調${pitch>0?'+':''}${pitch}半音`:''}_AI${blend}%${useBacking&&(arrangement??row.arrangement)?'_新配樂':''}`;
   const result={id:crypto.randomUUID(),created:Date.now(),title:row.title.slice(0,500-suffix.length)+suffix,...(row.voicelabSource==='original'?{}:{parentId:row.id}),
     videoId:row.videoId,mode:useBacking?'mix':'voice',stems:useBacking?(arrangement??row.arrangement?['arrangement']:structuredClone(row.stems??[])):[],mime:'audio/wav',rawMime:'audio/wav',
     complete:true,seconds:duration,sourceSeconds:duration,bytes,rawBytes,appliedDelayMs:0,delayMs:0,
