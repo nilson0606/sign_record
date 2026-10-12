@@ -8,6 +8,7 @@ import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import {voicelabSettings,VOICELAB_F0_METHODS} from './voicelab-settings.mjs';
 import {scanVoiceLabModels,findVoiceLabModel} from './voicelab-models.mjs';
+import {mediaStorageList,deleteMediaStorage,readStorageSelection} from './media-storage.mjs';
 const root=fileURLToPath(new URL('./',import.meta.url)),runtime=path.join(root,'.runtime','voicelab'),jobsRoot=path.join(runtime,'jobs');
 const jobs=new Map();
 function config(){try{return JSON.parse(readFileSync(path.join(runtime,'config.json'),'utf8'));}catch{return {};}}
@@ -48,6 +49,16 @@ async function erase(job){
 export async function stopVoiceLab(){await Promise.allSettled([...jobs.values()].map(erase));}
 export async function handleVoiceLab(req,res,{gpuBusy=()=>false}={}){
   try{
+    if(req.url==='/voicelab/storage'){
+      const locked=()=>[...jobs.values()].filter(j=>j.running||!finished(j)).map(j=>j.id);
+      if(req.method==='GET'){json(res,200,mediaStorageList(jobsRoot,'temp',locked()));return;}
+      if(req.method==='DELETE'){
+        const value=await readStorageSelection(req),removed=deleteMediaStorage(jobsRoot,'temp',value,locked());
+        for(const id of removed.deleted){const job=jobs.get(id);if(job){clearTimeout(job.timer);clearTimeout(job.expiry);job.deleted=true;jobs.delete(id);}}
+        json(res,200,removed);return;
+      }
+      json(res,405,{error:'不支援此操作。'});return;
+    }
     if(req.url==='/voicelab'&&req.method==='GET'){const c=config(),catalog=scanVoiceLabModels(c.modelsRoot);json(res,200,{installed:engineAvailable(c)&&catalog.models.length>0,models:catalog.models.map(({id,label,folder})=>({id,label,folder})),modelDiscoveryVersion:1,modelsRoot:c.modelsRoot??'',modelIssues:catalog.issues,maxSeconds:600,pitchShiftRange:[-12,12],advancedSettingsVersion:1,f0Methods:Object.keys(VOICELAB_F0_METHODS)});return;}
     if(req.url==='/voicelab/jobs'&&req.method==='POST'){
       const environment=config();

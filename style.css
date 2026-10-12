@@ -261,3 +261,4 @@ header{gap:18px;flex-wrap:wrap}
 .song-pending-badge{display:inline-block;margin:8px 0 0;padding:4px 9px;border-radius:6px;background:#f0cf88;color:#352710;font-size:12px;font-weight:700;line-height:1.5}
 .song-pending-badge[hidden]{display:none}
 .song-key-group summary>.song-pending-badge{margin:0 0 0 10px}
+.storage-list{max-height:340px;overflow:auto;margin:12px 0}.storage-entry{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}.storage-entry label{display:flex;align-items:flex-start;gap:10px;flex:1;min-width:0;overflow-wrap:anywhere}.storage-entry input[type=checkbox]{width:auto;flex-shrink:0}.storage-entry button{flex-shrink:0}#voicelab-storage section+section{border-top:1px solid var(--line);margin-top:24px;padding-top:12px}#voicelab-storage .help{overflow-wrap:anywhere}

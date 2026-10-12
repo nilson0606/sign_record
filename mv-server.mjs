@@ -5,6 +5,7 @@ import {mkdir,writeFile,copyFile,rename,stat,rm} from 'node:fs/promises';
 import {pipeline} from 'node:stream/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {mediaStorageList,deleteMediaStorage,readStorageSelection} from './media-storage.mjs';
 const runtime=fileURLToPath(new URL('./.runtime/mv/',import.meta.url));
 const jobs=new Map(),MAX_BYTES=120*1024*1024;
 const json=(res,code,value)=>{res.writeHead(code,{'Content-Type':'application/json'});res.end(JSON.stringify(value));};
@@ -70,6 +71,22 @@ export async function stopMV(){for(const job of jobs.values()){if(job.running){i
 export async function handleMV(req,res,{getLibrary}={}){
   try{
     const url=new URL(req.url,'http://localhost');
+    if(url.pathname==='/mv/library'||/^\/mv\/library\/[a-f0-9]{64}$/.test(url.pathname)){
+      const library=await getLibrary();if(!library||!path.isAbsolute(library))throw Error('請先設定歌曲庫資料夾。');
+      const root=path.join(library,'vedio');
+      if(url.pathname==='/mv/library'&&req.method==='GET'){json(res,200,mediaStorageList(root,'mv'));return;}
+      if(url.pathname==='/mv/library'&&req.method==='DELETE'){
+        const value=await readStorageSelection(req);
+        if(await getLibrary()!==library)throw Error('歌曲庫已變更，請重新整理。');
+        json(res,200,deleteMediaStorage(root,'mv',value));return;
+      }
+      if(req.method==='GET'){
+        if(url.searchParams.get('root')!==root)throw Error('歌曲庫已變更，請重新整理。');
+        const entry=mediaStorageList(root,'mv').entries.find(e=>e.id===url.pathname.split('/').at(-1));if(!entry)throw Error('影片已移除，請重新整理。');
+        res.writeHead(200,{'Content-Type':'video/mp4','Content-Length':entry.bytes});await pipeline(createReadStream(path.join(root,entry.name)),res);return;
+      }
+      json(res,405,{error:'不支援此操作。'});return;
+    }
     if(url.pathname==='/mv/jobs'&&req.method==='POST'){
       if(mvBusy()){json(res,409,{error:'已有 MV 製作中，請等待完成或取消。'});return;}
       const labels=mvLabels(url.searchParams.get('title'),url.searchParams.get('artist'));

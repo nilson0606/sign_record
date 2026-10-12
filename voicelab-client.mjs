@@ -1,5 +1,6 @@
 import {arrangementCovers,recordingBackingRoute} from './arrangement-settings.mjs';
 import {wavBlob} from './recording-process.mjs';
+import {createVoiceLabStorage} from './voicelab-storage-client.mjs';
 import {VOICELAB_DEFAULTS,VOICELAB_MODELS,VOICELAB_F0_METHODS,voicelabSettings,voicelabInterval,voicelabRangeLabel,voicelabSavedMetadata,voicelabOriginalReference,voicelabSongSource,voicelabPitchLabel,voicelabModelLabel} from './voicelab-settings.mjs';
 const BASE='http://127.0.0.1:4274';
 const $=id=>document.getElementById('voicelab-'+id);
@@ -149,11 +150,12 @@ export function createVoiceLab({store,getSelected,getPosition,getReference=()=>n
       const context=new AudioContext({sampleRate:48000,sinkId:{type:'none'}});
       try{const [original,converted]=await Promise.all(blobs.map(async b=>context.decodeAudioData(await b.arrayBuffer())));if(rev!==revision)return;
         if(original.length!==converted.length||converted.length!==state.result.outputSamples||Math.abs(converted.duration-(input.interval.end-input.interval.start))>1/48000)throw Error('輸出長度與選取範圍不符，未接受結果。');
-        result={row,original,converted,report:state.result,interval:input.interval,delayMs:input.delayMs,tracks:null,draft:generatedDraft};}finally{await context.close();}
+        result={jobId:active,row,original,converted,report:state.result,interval:input.interval,delayMs:input.delayMs,tracks:null,draft:generatedDraft};}finally{await context.close();}
       $('result').hidden=false;$('blend').value=100;$('backing').checked=row.mode==='mix';labels();
       const s=applied;$('result-info').textContent=`已轉換：${row.voicelabSource==='original'?'原曲原唱':'我的錄音'} → ${voicelabModelLabel(result.report)} · ${voicelabRangeLabel(input.interval,row.sourceSeconds??row.seconds)} · ${voicelabPitchLabel(s.pitchShift)} · ${VOICELAB_F0_METHODS[s.f0Method]} · 檢索比例 ${s.indexRate} · 子音保護 ${s.protect} · 音量包絡 ${s.volumeEnvelope} · 修音${s.autotune?Math.round(s.autotuneStrength*100)+'%':'關閉'} · 校正 ${input.delayMs} ms。請試聽確認音色與對嘴。`;
       say('已完成。按「原聲／Voice Lab」同位置切換比較；原錄音與 A／B 設定保留。');
       showProgress('ready','音檔長度檢查通過，可以試聽。');
+      window.dispatchEvent(new Event('voicelab-result-ready'));
     }catch(e){if(rev===revision){say(e.message);showProgress('failed',e.message);}if(active)await request('/voicelab/jobs/'+active,{method:'DELETE'}).catch(()=>{});}
     finally{stopProgress();busy=false;active=null;controls();}
   });
@@ -238,5 +240,6 @@ export function createVoiceLab({store,getSelected,getPosition,getReference=()=>n
   $('backing-refresh').addEventListener('click',()=>void refreshBackings());window.addEventListener('arrangement-saved',()=>void refreshBackings());
   window.addEventListener('arrangement-deleted',({detail})=>{if($('backing-choice').value===detail.id){$('backing-choice').value='';player.pause();mixes=null;rendering++;$('listen-status').textContent='所選新配樂已刪除，已切回錄音原配樂，請重新試聽。';}void refreshBackings();});
   reset();syncSource();
+  createVoiceLabStorage({getProtectedIds:()=>[active,result?.jobId].filter(Boolean),beforePlay:()=>{player.pause();beforePlay();}});
   return {pause:()=>player.pause(),sync(row,locked){externalBusy=locked;syncSource();}};
 }

@@ -30,11 +30,13 @@ export function createMV({beforePlay=()=>{}}={}){
       if(state.stage!=='ready'){say(state.message);return;}
       say('MV 已保存，正在載入預覽…');$('progress').value=100;
       const blob=await(await request('/mv/jobs/'+active+'/result')).blob();url=URL.createObjectURL(blob);filename=state.filename||'MV.mp4';$('video').src=url;$('result').hidden=false;say('MV 已完成。保存位置：'+state.path);
+      window.dispatchEvent(new Event('mv-saved'));
     }catch(e){say(e.message);}finally{busy=false;active=null;controls();}
   });
   $('cancel').addEventListener('click',async()=>{if(!active)return;$('cancel').disabled=true;try{await request('/mv/jobs/'+active,{method:'DELETE'});say('已取消 MV 製作。');}catch(e){say(e.message);controls();}});
   $('download').addEventListener('click',()=>{if(url){const a=document.createElement('a');a.href=url;a.download=filename;a.click();}});
   $('video').addEventListener('play',beforePlay);
+  window.addEventListener('mv-library-deleted',({detail})=>{if(detail.names.includes(filename)){clearVideo();say('這份 MV 已從本機刪除，可使用音檔重新製作。');}});
   $('panel').addEventListener('toggle',()=>{if(!$('panel').open)$('video').pause();});
   window.addEventListener('pagehide',()=>{clearVideo();});controls();
   return {open,pause:()=>$('video').pause()};

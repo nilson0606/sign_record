@@ -243,6 +243,23 @@
       <label class="soulx-enable"><input id="voicelab-enable" type="checkbox" autocomplete="off"> 啟用 Voice Lab</label>
       <p class="help">把原曲原唱或自己的錄音換成已訓練的個人音色。預設我的音色 Ver3、原八度；展開「RVC 進階設定」可調整換聲參數與歌聲半音，配樂保持不變。先試聽短段，滿意後再轉整首並保存。</p>
       <p id="voicelab-status" class="status" role="status">Voice Lab 已關閉；展開不會載入模型。</p>
+      <details id="voicelab-storage" class="post-effects">
+        <summary><strong>檔案管理／清理暫存與 MV</strong></summary>
+        <p class="help">不需啟用換聲或先載入歌曲。勾選要清理的項目，確認後永久刪除；已保存錄音請到錄音清單管理。</p>
+        <section aria-label="Voice Lab 轉換暫存">
+          <h4>轉換暫存</h4><p id="voicelab-storage-temp-path" class="help"></p>
+          <p class="help">包含舊試聽、轉換中間檔與診斷。正在轉換及本頁目前試聽的暫存會保留；未保存的其他試聽刪除後需重新產生。</p>
+          <div class="button-row"><button id="voicelab-storage-temp-refresh" type="button" class="secondary">重新整理暫存</button><button id="voicelab-storage-temp-all" type="button" class="secondary" disabled>全選可清理項目</button><button id="voicelab-storage-temp-delete" type="button" class="secondary" disabled>清除勾選暫存</button></div>
+          <p id="voicelab-storage-temp-status" role="status" aria-live="polite"></p><div id="voicelab-storage-temp-list" class="storage-list"></div>
+        </section>
+        <section aria-label="已保存翻唱 MV">
+          <h4>已保存 MV</h4><p id="voicelab-storage-mv-path" class="help"></p>
+          <p class="help">列出本工具產生的 MP4，可播放確認後再刪除。刪除影片不會刪除來源音檔。</p>
+          <div class="button-row"><button id="voicelab-storage-mv-refresh" type="button" class="secondary">重新整理 MV</button><button id="voicelab-storage-mv-all" type="button" class="secondary" disabled>全選 MV</button><button id="voicelab-storage-mv-delete" type="button" class="secondary" disabled>刪除勾選 MV</button></div>
+          <p id="voicelab-storage-mv-status" role="status" aria-live="polite"></p><div id="voicelab-storage-mv-list" class="storage-list"></div>
+          <video id="voicelab-storage-mv-video" controls playsinline preload="metadata" hidden style="width:100%;aspect-ratio:16/9;background:#101d2c;border-radius:12px"></video>
+        </section>
+      </details>
       <section id="voicelab-progress" class="soulx-progress" hidden aria-label="Voice Lab 轉換進度">
         <div class="soulx-progress-heading"><strong id="voicelab-progress-stage">準備音訊</strong><span id="voicelab-elapsed">已用時間 0:00</span></div>
         <progress id="voicelab-progress-bar" max="100" aria-labelledby="voicelab-progress-stage" aria-describedby="voicelab-progress-detail"></progress>
