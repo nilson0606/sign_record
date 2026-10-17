@@ -21,7 +21,7 @@ export function createKeyPlayback({player,loadStem,mode,status}) {
         if(buffer.duration<reference.duration-.15)throw Error('變調音軌長度不足，請重新建立此 Key 版本。');
         c.buffers.set(stem,buffer);
       }
-      c.ready=true;status(`${keyLabel(reference.pitchShift)} · YouTube 原聲靜音，播放同步變調音軌。`);
+      c.ready=true;status(`${keyLabel(reference.pitchShift)} · 影片原聲靜音，播放同步變調音軌。`);
     }catch(error){if(request===serial){pause(c);p?.pauseVideo?.();p?.mute?.();throw error;}}
   }
   function sync(state=player()?.getPlayerState?.(),time=player()?.getCurrentTime?.()||0){

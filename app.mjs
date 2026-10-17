@@ -1,4 +1,7 @@
 import {nativeInputDevices,openNativeMicrophone} from './native-microphone.mjs';
+import {isLocalMediaId,selectedMediaId} from './media-source.mjs';
+import {localVideoPlayer} from './local-video-player.mjs';
+import {initializeLocalMedia,mediaRequest,LOCAL_BASE} from './local-media-client.mjs';
 import { youtubeId, noteOf, detectPitch, playerResponse, alignedTime } from './audio.mjs';
 import { createCalibration } from './calibration.mjs';
 import { createKaraokeSession } from './session.mjs';
@@ -42,7 +45,7 @@ function tracePlayback(stage, extra={}) {
   }).catch(error=>playbackTraceStatus(`播放追蹤未送達：${error.message}。這次紀錄尚未收到。`));
 }
 
-let player, playerReady, apiPromise, stream, context, analyser, samples, micTimer;
+let player, playerReady, playerAttempt, apiPromise, stream, context, analyser, samples, micTimer;
 let calibration, micStartPromise, micPitch = null, nativeCapture = null, micAbort = null;
 try{if(localStorage.getItem('karaoke.capture-mode.v1')==='native')$('capture-mode').value='native';}catch{}
 let generation = 0, history = [], beatTimer, beatStart, probeController;
@@ -180,6 +183,7 @@ function loadAPI() {
 function initializePlayer(id) {
   if (playerReady) return playerReady;
   const attempt = { active: true, ready: false, instance: null };
+  playerAttempt=attempt;
   let readyTimeout;
   playerReady = new Promise((resolve, reject) => {
     readyTimeout = setTimeout(() => reject(new Error('YouTube 播放器初始化逾時，請按「載入影片」重試；不需要重新安裝本機工具。')), 20000);
@@ -223,13 +227,26 @@ function initializePlayer(id) {
 }
 async function loadVideo(e) {
   e?.preventDefault();
-  const id = youtubeId($('url').value.trim());
-  if (!id) return status('請輸入有效的 YouTube 影片網址。');
+  const id = selectedMediaId();
+  if (!id) return status('請輸入有效的 YouTube 網址，或先選擇本機 MV。');
   const button = $('song-form').querySelector('button'); button.disabled = true;
-  status('正在載入 YouTube 播放器…');
+  status(isLocalMediaId(id)?'正在載入本機 MV…':'正在載入 YouTube 播放器…');
   try {
     tracePlayback('load-video-request',{videoId:id});
     await singing.changeSong(id);
+    if(isLocalMediaId(id)){
+      if(player?.sourceKind==='local'&&player.getVideoData().video_id===id&&$('local-video').readyState>=1)return true;
+      const media=await mediaRequest('/local-media/'+id);resetPlayer();
+      const video=$('local-video');video.hidden=false;video.dataset.title=media.title;$('player').hidden=true;
+      player=localVideoPlayer(video,id,state=>{if(state===1)calibration?.cancel();singing.playerState(state);},status);
+      await new Promise((resolve,reject)=>{
+        const cleanup=()=>{clearTimeout(timer);video.removeEventListener('loadedmetadata',ready);video.removeEventListener('error',fail);};
+        const ready=()=>{cleanup();resolve();},fail=()=>{cleanup();reject(Error('本機 MV 載入失敗，請重新載入。'));};
+        const timer=setTimeout(fail,20000);video.addEventListener('loadedmetadata',ready);video.addEventListener('error',fail);video.src=LOCAL_BASE+media.playbackPath;video.load();
+      });
+      $('video-placeholder').style.display='none';status(`已載入本機 MV：${media.title}。請按影片播放，或準備歌曲基準。`);return true;
+    }
+    if(player?.sourceKind==='local')resetPlayer();
     await loadAPI();
     const existing = !!playerReady;
     await initializePlayer(id);
@@ -238,6 +255,13 @@ async function loadVideo(e) {
   } catch (err) { status(err.message); return false; } finally { button.disabled = false; }
 }
 $('song-form').addEventListener('submit', loadVideo);
+function resetPlayer(){
+  if(playerAttempt)playerAttempt.active=false;playerAttempt=null;
+  player?.destroy?.();player=null;playerReady=null;
+  const mount=document.createElement('div');mount.id='player';if($('player'))$('player').replaceWith(mount);else $('video-placeholder').after(mount);
+  $('local-video').hidden=true;
+}
+initializeLocalMedia(loadVideo);
 function log(text, cls = '') { const li = document.createElement('li'); li.textContent = text; li.className = cls; $('probe-log').append(li); }
 async function readLimited(response, max, partial = false) {
   if (!response.body) throw new Error('瀏覽器未提供可讀取的串流。');

@@ -194,6 +194,8 @@ def main():
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument('--url', help='YouTube video URL')
     source.add_argument('--input', type=Path, help='Existing local audio; original is not modified')
+    parser.add_argument('--source-id', help='Stable local MV identity')
+    parser.add_argument('--title', help='Local MV title')
     parser.add_argument('--seconds', type=int, default=15, help='YouTube clip length, 1–120 seconds; 0 for full track (max 15 minutes)')
     parser.add_argument('--separate', action='store_true', help='Separate vocals and accompaniment locally')
     parser.add_argument('--reference', action='store_true', help='Build a temporary melody/beat reference')
@@ -210,8 +212,8 @@ def main():
     for command in ['ffmpeg', 'ffprobe']:
         if not shutil.which(command):
             parser.error(f'{command} is required on PATH')
-    if args.reference and (not args.url or not args.separate):
-        parser.error('--reference requires --url and --separate')
+    if args.reference and (not args.separate or (not args.url and not re.fullmatch(r'local_[a-f0-9]{64}', args.source_id or ''))):
+        parser.error('--reference requires --separate and a URL or valid local source ID')
     if args.separation_method == 'residual' and not args.separate:
         parser.error('--separation-method residual requires --separate')
     if args.vocal_mode == 'lead' and not args.separate:
@@ -244,8 +246,15 @@ def main():
             video_id = parse_qs(urlparse(url).query)['v'][0]
         else:
             source = args.input.resolve(strict=True)
-            audio = job / ('audio' + source.suffix.lower())
-            shutil.copy2(source, audio)
+            if args.reference:
+                video_id, title = args.source_id, str(args.title or source.stem)[:300]
+                audio = job / 'audio.wav'
+                emit('validated', message='從本機 MV 取出音訊…')
+                run(['ffmpeg', '-nostdin', '-v', 'error', '-protocol_whitelist', 'file,pipe', '-i', source,
+                     '-t', str(args.seconds or 900), '-map', '0:a:0', '-vn', '-ar', '44100', '-ac', '2', '-c:a', 'pcm_s16le', audio])
+            else:
+                audio = job / ('audio' + source.suffix.lower())
+                shutil.copy2(source, audio)
         original = validate_audio(audio)
         emit('validated', **original)
         report = {'source': {'path': str(audio), **original}, 'stems': {}, 'temporary': True}

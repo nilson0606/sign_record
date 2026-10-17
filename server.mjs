@@ -14,6 +14,7 @@ for(const name of ['recording-repair.mjs','recording-repair-client.mjs','recordi
 for(const name of ['voicelab-client.mjs','voicelab-settings.mjs','arrangement-client.mjs','arrangement-settings.mjs'])files.set('/'+name,[name,'text/javascript']);
 for(const name of ['voicelab-storage-client.mjs','mv-client.mjs'])files.set('/'+name,[name,'text/javascript']);
 for(const name of ['recording-diagnostics.mjs','recording-diagnostics-worklet.mjs'])files.set('/'+name,[name,'text/javascript']);
+for(const name of ['media-source.mjs','local-media-client.mjs','local-video-player.mjs'])files.set('/'+name,[name,'text/javascript']);
 const server = http.createServer(async (req, res) => {
   // Older open pages still use 4273; only the recording helper owns diagnostic
   // sessions and files, so both routes share one token, queue and clear guard.

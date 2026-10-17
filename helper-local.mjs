@@ -35,7 +35,7 @@ async function health() {
     const checks = { python: packages.ok, node: Number(process.versions.node.split('.')[0]) >= 22, ffmpeg: ffmpeg.ok, ffprobe: ffprobe.ok,
       ytDlp: modules.yt_dlp === true, demucs: modules.demucs === true, torch: modules.torch === true,
       torchaudio: modules.torchaudio === true, soundfile: modules.soundfile === true };
-    cache = { app: 'karaoke-local-helper', version: 1, features: ['library', 'stem-preview', 'library-location', 'separation-progress', 'rebuild-song', 'lead-vocals', 'separation-models', 'score-masks', 'pitch-methods', 'residual-separation', 'mel-roformer', 'recording-mp3', 'recording-library', 'recording-raw-mime', 'song-key-versions'], ready: Object.values(checks).every(Boolean), checks, audioUpload: false };
+    cache = { app: 'karaoke-local-helper', version: 1, features: ['local-media','library', 'stem-preview', 'library-location', 'separation-progress', 'rebuild-song', 'lead-vocals', 'separation-models', 'score-masks', 'pitch-methods', 'residual-separation', 'mel-roformer', 'recording-mp3', 'recording-library', 'recording-raw-mime', 'song-key-versions'], ready: Object.values(checks).every(Boolean), checks, audioUpload: false };
     cacheTime = Date.now(); return cache;
   })().finally(() => { pending = null; });
   return pending;
@@ -47,7 +47,7 @@ const server = http.createServer(async (req, res) => {
   if(await handleDiagnostics(req,res))return;
   res.setHeader('Access-Control-Allow-Origin', req.headers.origin); res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Private-Network', 'true');
-  if (req.method === 'OPTIONS') { res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS'); res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Karaoke-Token'); res.writeHead(204); res.end(); return; }
+  if (req.method === 'OPTIONS') { res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, POST, DELETE, OPTIONS'); res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Karaoke-Token, Range'); res.writeHead(204); res.end(); return; }
   try { if (await handleLocalJobs(req, res)) return; } catch { res.writeHead(500); res.end(JSON.stringify({error:'本機工作處理失敗。'})); return; }
   if (req.method !== 'GET') { res.writeHead(405); res.end(); return; }
   if (req.url !== '/health') { res.writeHead(404); res.end(); return; }

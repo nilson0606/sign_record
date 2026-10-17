@@ -54,10 +54,18 @@
   </details>
   <div class="layout">
     <section id="player-section" tabindex="-1" class="card source-card">
-      <div class="section-top"><h2><span class="step">01</span> 歌曲網址</h2><span class="subtle">YouTube 原生播放</span></div>
+      <div class="section-top"><h2><span class="step">01</span> 歌曲影片</h2><span id="source-description" class="subtle">YouTube 原生播放</span></div>
+      <label for="source-kind">影片來源</label><select id="source-kind"><option value="youtube">YouTube 網址</option><option value="local">本機 MV</option></select>
       <form id="song-form"><label for="url">歌曲影片網址</label><div class="input-row"><input id="url" type="url" placeholder="https://www.youtube.com/watch?v=…" required autocomplete="off"><button type="submit">載入影片</button></div></form>
+      <div id="local-media-controls" hidden>
+        <label for="local-media-file">選擇本機 MV</label><input id="local-media-file" type="file" accept=".mp4,.m4v,.mov,.mkv,.webm"><input id="local-media-id" type="hidden">
+        <p class="help">MP4／MOV／MKV／WebM，最多 2 GB、15 分鐘。影片副本保存在歌曲庫的 .local-mv 資料夾，原檔保留，不上傳雲端；必要時自動轉為 MP4。</p>
+        <label for="local-media-saved">已匯入的 MV</label><select id="local-media-saved"><option value="">選擇已匯入的 MV</option></select>
+        <div class="button-row"><button id="local-media-load" type="button">載入 MV</button><button id="local-media-refresh" type="button" class="secondary">重新整理</button><button id="local-media-cancel" type="button" class="secondary" hidden>取消匯入</button></div>
+        <p id="local-media-status" class="status" role="status">選擇影片後，可用相同流程準備基準、評分、分段、錄音、升降 Key 與 Voice Lab。</p>
+      </div>
       <p id="player-status" class="status" role="status">貼上網址後，影片會在這裡播放。</p>
-      <div class="video-shell"><div id="video-placeholder"><span>▶</span><p>你的下一首歌</p><small>播放器與麥克風分別啟動</small></div><div id="player"></div></div>
+      <div class="video-shell"><div id="video-placeholder"><span>▶</span><p>你的下一首歌</p><small>播放器與麥克風分別啟動</small></div><div id="player"></div><video id="local-video" controls playsinline preload="metadata" crossorigin="anonymous" hidden></video></div>
       <div class="clock-row"><span>播放器時間 <b id="player-time">—</b></span><span>補償後位置 <b id="aligned-time">—</b></span></div>
       <div class="song-key-control">
         <label for="song-key">歌曲 Key · 每格半音，速度不變</label>

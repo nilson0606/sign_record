@@ -22,7 +22,7 @@ export function applyMasks(reference) {
   return { ...reference, frames: reference.frames.map((hz,i) => excluded[i] ? null : hz) };
 }
 export function validateReference(value) {
-  if (!value || value.version !== 1 || typeof value.videoId !== 'string' || !/^[\w-]{11}$/.test(value.videoId)) throw new Error('歌曲基準缺少有效影片 ID。');
+  if (!value || value.version !== 1 || typeof value.videoId !== 'string' || !/^(?:[\w-]{11}|local_[a-f0-9]{64})$/.test(value.videoId)) throw new Error('歌曲基準缺少有效影片 ID。');
   if (typeof value.title !== 'string' || value.title.length > 300) throw new Error('歌曲名稱無效。');
   if (!Number.isFinite(value.step) || value.step < .02 || value.step > .2) throw new Error('基準時間間隔必須介於 20–200 ms。');
   if (!Array.isArray(value.frames) || value.frames.length < 1 || value.frames.length > 90000) throw new Error('基準長度無效。');

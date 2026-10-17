@@ -343,3 +343,11 @@ Voice Lab 以 RVC 個人音色模型取代 SoulX 的生成入口。模型已訓�
 `key-playback.mjs` 為非零 Key 接管帶唱：YouTube 原聲靜音，影片速度保持 1，本機音軌跟隨播放、暫停、緩衝和跳轉。「原唱＋伴樂」播放變調 vocals＋accompaniment；「只有伴樂」播放變調 accompaniment，主唱模式另加 backing。整首、分段播放／循環／錄音共用此輸出，試聽與試合從錄音所屬版本取伴樂；卸載／回原調恢復進入前的靜音狀態。
 
 驗證：`node --test tests/song-key.test.mjs`、`node tests/key-browser-check.mjs`、`node tests/key-helper-check.mjs`（臨時歌曲庫、需 FFmpeg）、`python -m unittest discover -s tests -p test_key_shift.py`（合成聲音驗證升降音高、長度與起尾時間）。
+
+## 本機 MV
+
+播放器的「影片來源」可選 YouTube 或本機 MV。本機支援 MP4／M4V／MOV／MKV／WebM，最大 2 GB、15 分鐘，需含音訊。匯入會在設定的歌曲庫 `.local-mv` 保存可播放的 MP4 副本，不變更原檔、不上傳雲端；不相容的視訊編碼會自動轉換。檔案內容 SHA-256 作為獨立歌曲 ID，同檔重複匯入沿用，不與 YouTube 混用。
+
+載入後按「準備歌曲基準」，可使用相同的分離選項、評分、整首／分段錄音、試合、升降 Key、Voice Lab 與後處理。後續從歌曲庫點選即載入影片和該 Key 的基準。建立基準前亦可在「已匯入的 MV」重新選擇。刪除歌曲基準保留 MV 副本及原始檔；手動移除副本後需重新匯入才能播放。
+
+影片只經 loopback 傳給本機工具；媒體播放以限定影片的暫時票證與 HTTP Range 支援拖曳，未授權請求不能取得影片。

@@ -6,7 +6,7 @@ import { validateReference, normalizeMasks } from './scoring.mjs';
 
 export function cacheKey(videoId, seconds, vocalMode = 'all', separationModel = 'demucs', pitchMethod = 'yin', separationMethod = 'single', pitchShift = 0) {
   keyShift(pitchShift);
-  if (!/^[\w-]{11}$/.test(videoId) || ![0, 15, 30, 60].includes(seconds) || !['all','lead'].includes(vocalMode) || !['demucs','bs-roformer','mel-roformer'].includes(separationModel) || !['yin','rmvpe'].includes(pitchMethod) || !['single','residual'].includes(separationMethod)) throw new Error('Invalid cache key');
+  if (!/^(?:[\w-]{11}|local_[a-f0-9]{64})$/.test(videoId) || ![0, 15, 30, 60].includes(seconds) || !['all','lead'].includes(vocalMode) || !['demucs','bs-roformer','mel-roformer'].includes(separationModel) || !['yin','rmvpe'].includes(pitchMethod) || !['single','residual'].includes(separationMethod)) throw new Error('Invalid cache key');
   return `${videoId}_${seconds}${vocalMode === 'lead' ? '_lead' : ''}${separationModel !== 'demucs' ? `_${separationModel}` : ''}${pitchMethod === 'rmvpe' ? '_rmvpe' : ''}${separationMethod === 'residual' ? '_residual' : ''}_v1${pitchShift ? '_key_' + (pitchShift < 0 ? 'm' : 'p') + Math.abs(pitchShift) : ''}`;
 }
 
@@ -15,7 +15,7 @@ export const previewStems = mode => mode === 'lead' ? ['vocals','accompaniment',
 export class LocalLibrary {
   constructor(root) { this.root = path.resolve(root); }
   directory(id) {
-    if (!/^[\w-]{11}_(0|15|30|60)(?:_lead)?(?:_(?:bs-roformer|mel-roformer))?(?:_rmvpe)?(?:_residual)?_v1(?:_key_[mp](?:[1-9]|1[0-2]))?$/.test(id)) throw new Error('Invalid library ID');
+    if (!/^(?:[\w-]{11}|local_[a-f0-9]{64})_(0|15|30|60)(?:_lead)?(?:_(?:bs-roformer|mel-roformer))?(?:_rmvpe)?(?:_residual)?_v1(?:_key_[mp](?:[1-9]|1[0-2]))?$/.test(id)) throw new Error('Invalid library ID');
     const dir = path.resolve(this.root, id);
     if (path.dirname(dir) !== this.root) throw new Error('Invalid library path');
     return dir;
@@ -70,7 +70,7 @@ export class LocalLibrary {
   }
   maskFile(id) {
     this.directory(id);
-    const [, video, seconds] = /^([\w-]{11})_(0|15|30|60)/.exec(id);
+    const [, video, seconds] = /^((?:[\w-]{11}|local_[a-f0-9]{64}))_(0|15|30|60)/.exec(id);
     return path.join(this.root, '.masks', `${video}_${seconds}.json`);
   }
   async rawMasks(id) {
@@ -116,7 +116,7 @@ export class LocalLibrary {
     await mkdir(this.root, { recursive: true });
     const rows = [];
     for (const id of await readdir(this.root)) {
-      if (!/^[\w-]{11}_(0|15|30|60)(?:_lead)?(?:_(?:bs-roformer|mel-roformer))?(?:_rmvpe)?(?:_residual)?_v1(?:_key_[mp](?:[1-9]|1[0-2]))?$/.test(id)) continue;
+      if (!/^(?:[\w-]{11}|local_[a-f0-9]{64})_(0|15|30|60)(?:_lead)?(?:_(?:bs-roformer|mel-roformer))?(?:_rmvpe)?(?:_residual)?_v1(?:_key_[mp](?:[1-9]|1[0-2]))?$/.test(id)) continue;
       const ref = await this.get(id); if (!ref) continue;
       let bytes = 0;
       for (const name of ['reference.json', ...previewStems(ref.vocalMode).map(stem => stem + '.mp3')]) bytes += (await stat(path.join(this.directory(id), name)).catch(() => null))?.size || 0;

@@ -1,3 +1,4 @@
+import {selectedMediaId,selectMediaSource,isLocalMediaId} from './media-source.mjs';
 import {keyLabel,keyShift} from './song-key.mjs';
 import {recordingReviewKey} from './recording-review.mjs';
 import {libraryRecordingCounts,updateLibraryRecordingBadges} from './library-recordings.mjs';
@@ -20,7 +21,7 @@ export async function seekPlayerToStart(player, cancelled = () => false, timeout
     if (requested && player.getCurrentTime() <= .05) return;
     await new Promise(resolve => setTimeout(resolve, 50));
   }
-  throw new Error('YouTube 尚未確認回到開頭，請重試「從頭開始唱」。');
+  throw new Error('播放器尚未確認回到開頭，請重試「從頭開始唱」。');
 }
 
 export function createKaraokeSession(options) {
@@ -121,6 +122,7 @@ export function createKaraokeSession(options) {
     $('preparation-reset').disabled=!!take||['preparing','finishing','restarting'].includes(phase);
     for(const [element,disabled]of segmentLocks)element.disabled=disabled;segmentLocks.clear();
     if (phase === 'finishing') { $('mic-start').disabled = true; $('mic-stop').disabled = true; }
+    for(const id of ['source-kind','local-media-file','local-media-saved','local-media-load','local-media-refresh'])if($(id))$(id).disabled=maskBusy||locationBusy||['preparing','finishing','restarting','singing'].includes(phase)||!!segmented?.busy()||$('local-media-controls')?.dataset.importing==='true';
     $('prepare-song').disabled = maskBusy || locationBusy || libraryLocation?.configured === false || ['preparing', 'finishing', 'restarting'].includes(phase);
     for (const id of ['library-path','library-choose','library-use-path']) $(id).disabled = locationBusy || !!reference || ['preparing','finishing','restarting'].includes(phase);
     $('rebuild-song').textContent=reference?.pitchShift?'重新建立此 Key':'重新分離並覆蓋';
@@ -152,7 +154,12 @@ export function createKaraokeSession(options) {
       $('library-list').querySelectorAll('button').forEach(b=>b.disabled=true);
       for(const stem of ['vocals','accompaniment','lead','backing'])$('preview-'+stem).disabled=true;
     }else{ $('capture-mode').disabled=false;$('input-device').disabled=false;$('recording-delete-all').disabled=false; }
+    if($('local-media-controls')?.dataset.importing==='true'){
+      for(const id of ['prepare-song','song-key-apply','sing-start','segment-record','segment-open','library-path','library-choose','library-use-path','rebuild-song','preview-build'])if($(id))$(id).disabled=true;
+      $('library-list').querySelectorAll('button').forEach(button=>{button.disabled=true;});
+    }
   }
+  window.addEventListener('karaoke-media-import-state',controls);
   async function api(url, init = {}, timeoutMs = 10000) {
     const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -260,7 +267,7 @@ export function createKaraokeSession(options) {
   }
   $('rebuild-song').addEventListener('click', () => {
     if (!reference || take || ['preparing','finishing','restarting'].includes(phase)) return;
-    $('url').value = `https://www.youtube.com/watch?v=${reference.videoId}`;
+    selectMediaSource(reference.videoId);
     $('clip-seconds').value = String(reference.rangeSeconds);
     $('song-key').value=String(reference.pitchShift || 0);
     $('vocal-mode').value=reference.vocalMode||'all';$('separation-model').value=reference.separationModel||'demucs';$('pitch-method').value=reference.pitchMethod||'yin';$('separation-method').value=reference.separationMethod||'single';
@@ -268,7 +275,7 @@ export function createKaraokeSession(options) {
   });
   $('preview-build').addEventListener('click', () => {
     if (!reference || reference.hasPreview || take || ['preparing','finishing','restarting'].includes(phase)) return;
-    $('url').value = `https://www.youtube.com/watch?v=${reference.videoId}`;
+    selectMediaSource(reference.videoId);
     $('clip-seconds').value = String(reference.rangeSeconds);
     $('vocal-mode').value = reference.vocalMode || 'all';
     $('song-key').value=String(reference.pitchShift || 0);
@@ -335,7 +342,7 @@ export function createKaraokeSession(options) {
             controls(); $('prepare-status').textContent = `已就緒：${reference.title} · ${modelName(reference.separationModel)} · ${methodName(reference.separationMethod)} · ${reference.pitchMethod.toUpperCase()} 音高。`;
             message('這首歌已載入，可直接試聽或按「從頭開始唱」。'); return;
           }
-          $('url').value = `https://www.youtube.com/watch?v=${song.videoId}`;
+          selectMediaSource(song.videoId);
           $('separation-model').value = song.separationModel || 'demucs';
           $('pitch-method').value = song.pitchMethod || 'yin';
           $('separation-method').value = song.separationMethod || 'single';
@@ -469,7 +476,7 @@ export function createKaraokeSession(options) {
           options.stopBeats(); $('bpm').value = reference.bpm; $('bpm').disabled = true; $('beat-toggle').disabled = true;
           $('beat-note').textContent = `自動估計約 ${reference.bpm} BPM；播放時顯示拍點，可能出現半速／倍速誤差。`;
         }
-        message('基準就緒。開啟麥克風後，按「從頭開始唱」或 YouTube 播放按鈕。'); controls();
+        message('基準就緒。開啟麥克風後，按「從頭開始唱」或影片播放按鈕。'); controls();
         if (options.player()?.getPlayerState?.() === 1) playerState(1);
         refreshLibrary().catch(() => {});
         return;
@@ -482,9 +489,10 @@ export function createKaraokeSession(options) {
     }
   }
   async function prepareSong(force = false, preserveVersion = false) {
-    const id = youtubeId($('url').value.trim());
+    if($('local-media-controls')?.dataset.importing==='true'){$('prepare-status').textContent='請等本機 MV 匯入完成，再準備歌曲。';return;}
+    const id = selectedMediaId();
     if (maskBusy) return;
-    if (!id) { $('prepare-status').textContent = '請先填入有效的 YouTube 影片網址。'; return; }
+    if (!id) { $('prepare-status').textContent = '請先載入 YouTube 影片或選擇本機 MV。'; return; }
     // Normal preparations honor the visible controls; library/rebuild actions
     // supply the saved version and retain audio for preview and Voice Lab.
     if(preserveVersion)$('keep-preview').checked = true;
@@ -498,6 +506,7 @@ export function createKaraokeSession(options) {
     if (current !== generation) return;
     try {
       const helper = await ensureSession();
+      if(isLocalMediaId(id)&&!helper.features?.includes('local-media'))throw Error('請更新並重新啟動本機工具，才能使用本機 MV。');
       if(requestedKey&&!helper.features?.includes('song-key-versions'))throw Error('請更新並重新啟動本機工具，才能建立 Key 版本。');
       if (requestedMethod !== 'single' && !helper.features?.includes('residual-separation')) throw new Error('本機工具需要更新才能使用伴奏二次分離＋反向相減，請更新並重新啟動工具。');
       if (requestedPitch !== 'yin' && !helper.features?.includes('pitch-methods')) throw new Error('本機工具需要更新才能使用 RMVPE，請更新並重新啟動工具。');
@@ -521,7 +530,7 @@ export function createKaraokeSession(options) {
     }
   }
   $('song-key').addEventListener('change',()=>{$('song-key-status').textContent=`已選 ${keyLabel(Number($('song-key').value))}，尚未套用。${reference?'目前播放 '+keyLabel(reference.pitchShift)+'；請按「建立／載入此 Key」。':'請按「準備歌曲基準」。'}`;});
-  $('song-key-apply').addEventListener('click',()=>{try{keyShift(Number($('song-key').value));if(reference){$('url').value=`https://www.youtube.com/watch?v=${reference.videoId}`;prepareSong(false,true);}}catch(error){$('song-key-status').textContent=error.message;}});
+  $('song-key-apply').addEventListener('click',()=>{try{keyShift(Number($('song-key').value));if(reference){selectMediaSource(reference.videoId);prepareSong(false,true);}}catch(error){$('song-key-status').textContent=error.message;}});
   $('prepare-song').addEventListener('click', () => prepareSong());
   $('cancel-song').addEventListener('click', () => { options.player()?.pauseVideo?.(); clear(); });
   $('sing-start').addEventListener('click', async () => {
@@ -529,7 +538,7 @@ export function createKaraokeSession(options) {
     if(segmented?.busy()||!segmented?.leave())return;
     stopPreview(); stopGuide(); options.cancelCalibration?.();
     const request = ++restartToken, p = options.player();
-    phase = 'restarting'; message(options.micReady() ? '正在同步 YouTube 到 0 秒…' : '正在開啟麥克風，請允許瀏覽器的收音授權…'); controls();
+    phase = 'restarting'; message(options.micReady() ? '正在同步影片到 0 秒…' : '正在開啟麥克風，請允許瀏覽器的收音授權…'); controls();
     try {
       if (!options.micReady()) await options.startMic();
       if (request !== restartToken || !reference || !options.micReady()) { if (request === restartToken) { phase = take ? 'paused' : 'ready'; message('未開始演唱：麥克風尚未就緒，請查看「收音」區的狀態，再按「從頭開始唱」。'); controls(); } return; }
@@ -542,7 +551,7 @@ export function createKaraokeSession(options) {
       message('正在準備演唱時帶唱…');
       await prepareGuide(reference, p, $('sing-guide-mode').value, () => request !== restartToken || !reference || !options.micReady());
       if (request !== restartToken || !reference || !options.micReady()) return;
-      message('正在同步 YouTube 到 0 秒…');
+      message('正在同步影片到 0 秒…');
       await seekPlayerToStart(p, () => request !== restartToken || !reference || !options.micReady());
       if (request !== restartToken || !reference || !options.micReady()) return;
       take?.clear(); take = new ScoringTake(reference, { allowOctave: $('pitch-mode').value === 'octave', rangeMode: $('score-range').value, difficulty: $('score-difficulty').value });

@@ -49,7 +49,7 @@ test('helper enforces setup, auth and idle-only changes; selected library surviv
   }
   async function stop() { if (child && child.exitCode === null) { const exited = new Promise(resolve => child.once('exit', resolve)); child.kill(); await exited; } }
   try {
-    for (const file of ['helper-local.mjs', 'recording-diagnostics-server.mjs', 'native-microphone-server.mjs', 'local-jobs.mjs', 'mv-server.mjs', 'media-storage.mjs', 'voicelab-server.mjs', 'voicelab-models.mjs', 'voicelab-settings.mjs', 'arrangement-server.mjs', 'arrangement-settings.mjs', 'recording-export.mjs', 'recording-archive.mjs', 'local-library.mjs', 'library-location.mjs', 'scoring.mjs', 'song-key.mjs']) await copyFile(new URL('../' + file, import.meta.url), path.join(dir, file));
+    for (const file of ['local-media-server.mjs','media-source.mjs','audio.mjs','helper-local.mjs', 'recording-diagnostics-server.mjs', 'native-microphone-server.mjs', 'local-jobs.mjs', 'mv-server.mjs', 'media-storage.mjs', 'voicelab-server.mjs', 'voicelab-models.mjs', 'voicelab-settings.mjs', 'arrangement-server.mjs', 'arrangement-settings.mjs', 'recording-export.mjs', 'recording-archive.mjs', 'local-library.mjs', 'library-location.mjs', 'scoring.mjs', 'song-key.mjs']) await copyFile(new URL('../' + file, import.meta.url), path.join(dir, file));
     // Bind a random test port without exposing the helper outside loopback.
     const helper = path.join(dir, 'helper-local.mjs');
     let source = await readFile(helper, 'utf8');
@@ -171,5 +171,18 @@ test('helper enforces setup, auth and idle-only changes; selected library surviv
     assert.equal((await (await request('/library/location')).json()).path, first);
     assert.equal((await (await request('/library')).json()).songs[0].title, 'Retained');
     assert.deepEqual((await (await request('/library/'+id+'/reference')).json()).masks,[{start:1,end:2}]);
+    const localId='local_'+'c'.repeat(64),localKey=cacheKey(localId,0),localDir=path.join(first,'.local-mv',localId);
+    await mkdir(localDir,{recursive:true});await writeFile(path.join(localDir,'video.mp4'),'local MV fixture');
+    await writeFile(path.join(localDir,'metadata.json'),JSON.stringify({id:localId,title:'Local MV',duration:4}));
+    await library.save(localKey,{version:1,videoId:localId,title:'Local MV',step:.1,frames:Array(40).fill(440),duration:4,rangeSeconds:0},dir,false);
+    assert.equal((await request('/local-media','GET',undefined,false)).status,403);
+    const imported=await(await request('/local-media/'+localId)).json();assert.equal(imported.title,'Local MV');
+    assert.equal((await request('/local-media/'+localId+'/video','GET',undefined,false)).status,403);
+    const playback=await fetch(base+imported.playbackPath,{headers:{Origin:origin,Range:'bytes=0-4'}});assert.equal(playback.status,206);assert.equal(await playback.text(),'local');
+    const localJob=await(await request('/jobs','POST',{videoId:localId,seconds:0})).json();assert.equal(localJob.ready,true);
+    assert.equal((await(await request('/jobs/'+localJob.id+'/reference')).json()).videoId,localId);
+    assert.equal((await(await request('/library/'+localKey+'/reference')).json()).videoId,localId);
+    await request('/library/'+localKey+'/masks','POST',{masks:[{start:1,end:2}]});assert.deepEqual((await library.get(localKey)).masks,[{start:1,end:2}]);
+    await request('/jobs/'+localJob.id,'DELETE');
   } finally { await stop(); await removeFixture(dir); }
 });
