@@ -134,6 +134,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     const editable=!!(selected?.complete&&selected.rawBytes&&selected.post?.segments?.length);
     $('post-diagnostic').disabled=busy||!editable;
     for(const action of ['preview','download','delete'])$('selected-recording-'+action).disabled=busy||!selected;
+    $('selected-recording-mv').disabled=busy||!selected?.complete;
     $('post-delete-all').disabled=busy||!rows.length||isRecording();
     $('selected-recording-edit').disabled=busy||!editable;
     $('selected-recording-voice').disabled=busy||!selected||!(selected.mode==='voice'||editable);
@@ -206,6 +207,11 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
   }));
   $('selected-recording-download').addEventListener('click',()=>run(async row=>{
     download(await store.blob(row),row);status('已開始下載選取的錄音。');
+  }));
+  $('selected-recording-mv').addEventListener('click',()=>run(async row=>{
+    clearAudio();
+    const blob=await store.blob(row);
+    if(mv.open({title:row.title,blob,label:`${row.title} · 已保存後處理成品 · ${new Date(row.created).toLocaleString()}`}))status('已帶入選取的成品製作 MV；使用已保存的音量、效果與剪輯，尚未重新合成的調整不會套用。');
   }));
   $('selected-recording-edit').addEventListener('click',()=>{
     if(busy||!selected)return;
