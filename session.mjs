@@ -158,6 +158,11 @@ export function createKaraokeSession(options) {
       for(const id of ['prepare-song','song-key-apply','sing-start','segment-record','segment-open','library-path','library-choose','library-use-path','rebuild-song','preview-build'])if($(id))$(id).disabled=true;
       $('library-list').querySelectorAll('button').forEach(button=>{button.disabled=true;});
     }
+    // Read-only UI snapshot; the navigation never controls capture or playback.
+    const guideState=JSON.stringify({phase,hasTake:!!take&&phase!=='result',pitchShift:reference?.pitchShift||0,mediaId:loadedVideo,reference:reference?.cacheId||'',
+      prepared:!!reference&&reference.videoId===selectedMediaId()&&!previewSelectionChanged()&&Number($('song-key').value)===(reference.pitchShift||0)&&(!reference.pitchShift||keyPlayback.ready()),
+      micReady:options.micReady(),segmented:!!segmented?.enabled(),busy:!!segmented?.busy()});
+    if($('player-section').dataset.workflow!==guideState)$('player-section').dataset.workflow=guideState;
   }
   window.addEventListener('karaoke-media-import-state',controls);
   async function api(url, init = {}, timeoutMs = 10000) {
@@ -643,7 +648,7 @@ export function createKaraokeSession(options) {
   return {
     reference: () => displayReference, sample, playerState, stopRecording: error=>{stopGuide();return segmented?.enabled()?segmented.stop(error):recording.stop(error);},
     pauseForCalibration() { if (phase === 'restarting') { stopGuide(); recording.stop(); restartToken++; phase = take ? 'paused' : 'ready'; } options.player()?.pauseVideo?.(); stopPreview(); controls(); },
-    async changeSong(id) { if (loadedVideo !== id) { await clear(); loadedVideo = id; } },
+    async changeSong(id) { if (loadedVideo !== id) { await clear(); loadedVideo = id; controls(); } },
     micStarted() {
       if (reference && options.player()?.getPlayerState?.() === 1) playerState(1);
       controls();

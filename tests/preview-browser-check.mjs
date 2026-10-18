@@ -159,21 +159,15 @@ try {
   await page.locator('#separation-model').selectOption('demucs');await page.locator('#vocal-mode').selectOption('all');await page.locator('#rebuild-song').click();await page.waitForFunction(()=>document.querySelector('#prepare-status').textContent.startsWith('已就緒'));
   assert.equal(requests.at(-1).separationModel,'mel-roformer');assert.equal(requests.at(-1).vocalMode,'lead');assert.equal(requests.at(-1).force,true);
   await page.locator('#preparation-reset').click();await page.locator('#preparation-advanced > summary').click();await page.locator('#prepare-song').click();await page.waitForFunction(()=>document.querySelector('#prepare-status').textContent.startsWith('已就緒'));
-  await page.locator('#nav-settings > summary').click();
   await page.locator('.section-nav a[href="#timing-section"]').click();assert.equal(await page.locator('#timing-section').evaluate(el=>el.open),true);
-  assert.equal(await page.locator('#nav-settings').evaluate(el=>el.open),false);
   await page.locator('#timing-section > summary').click();
   await page.locator('#score-settings > summary').focus();await page.keyboard.press('Enter');assert.ok(await page.locator('#score-difficulty').isVisible());
   await page.locator('#score-difficulty').selectOption('strict');await page.locator('#score-settings > summary').click();assert.equal(await page.locator('#score-difficulty').inputValue(),'strict');
   // Collapsing tools during a take must not stop capture, playback or recording.
   await page.locator('#sing-start').click();await page.waitForFunction(()=>document.querySelector('#recording-status').textContent.includes('● 錄音中'));
   await page.evaluate(()=>{window.playerBeforeFold=fixturePlayer;});
-  await page.locator('#nav-labs > summary').click();
-  await page.locator('#nav-settings > summary').click();
-  assert.equal(await page.locator('#nav-labs').evaluate(el=>el.open),false);
-  await page.keyboard.press('Escape');
-  assert.equal(await page.locator('#nav-settings').evaluate(el=>el.open),false);
-  assert.equal(await page.locator('#nav-settings > summary').evaluate(el=>el===document.activeElement),true);
+  await page.locator('.section-nav a[href="#voice-settings"]').click();
+  await page.locator('.section-nav a[href="#player-section"]').click();
   await page.locator('#prepare-settings > summary').click();
   await page.locator('#timing-section > summary').click();await page.locator('#timing-section > summary').click();
   await page.locator('#score-settings > summary').click();await page.locator('#score-settings > summary').click();
@@ -207,29 +201,20 @@ try {
     await page.locator('#preparation-advanced > summary').click();
     await page.locator('#prepare-settings > summary').click();
   }
-  // Menus remain reachable on narrow screens, with anchors below the sticky bar.
+  // Direct links, scroll-following highlight, and sticky anchors on desktop/mobile.
   await page.emulateMedia({reducedMotion:'reduce'});
   for(const theme of ['current','warm'])for(const width of [1440,390,320]){
     await page.setViewportSize({width,height:900});await page.locator('#theme-select').selectOption(theme);
-    await page.locator('.section-nav a[href="#player-section"]').click();
-    await page.locator('#nav-settings > summary').focus();await page.keyboard.press('Enter');
-    assert.equal(await page.locator('#nav-settings').evaluate(el=>el.open),true);
-    const menuBox=await page.locator('#nav-settings .nav-menu-panel').boundingBox();
-    assert.ok(menuBox.x>=0&&menuBox.x+menuBox.width<=width);
-    await page.screenshot({path:`test-results/nav-${theme}-${width}.png`});
-    const navBounds=await page.locator('.section-nav').boundingBox();
-    assert.ok(navBounds.x>=0&&navBounds.x+navBounds.width<=width);
     await page.locator('.section-nav a[href="#voice-settings"]').click();
-    assert.equal(await page.locator('#voice-settings').evaluate(el=>el.open),true);
-    assert.equal(await page.locator('#voice-settings').evaluate(el=>el===document.activeElement),true);
-    assert.equal(await page.locator('#nav-settings').evaluate(el=>el.open),false);
+    await page.waitForFunction(()=>document.querySelector('.nav-links [aria-current]')?.hash==='#voice-settings');
+    assert.equal(await page.locator('#voice-settings').evaluate(el=>el.open&&el===document.activeElement),true);
     const navBox=await page.locator('.section-nav').boundingBox(),targetBox=await page.locator('#voice-settings').boundingBox();
+    assert.ok(navBox.x>=0&&navBox.x+navBox.width<=width);
     assert.ok(targetBox.y>=navBox.y+navBox.height-1);
-    await page.locator('#nav-labs > summary').click();
-    await page.locator('label[for="capture-mode"]').click();
-    assert.equal(await page.locator('#nav-labs').evaluate(el=>el.open),false);
-    await page.locator('#nav-labs > summary').click();
-    await page.locator('.section-nav a[href="#voicelab-panel"]').click();
+    await page.screenshot({path:`test-results/nav-${theme}-${width}.png`});
+    await page.locator('#prepare-section').evaluate(el=>el.scrollIntoView({block:'start',behavior:'instant'}));
+    await page.waitForFunction(()=>document.querySelector('.nav-links [aria-current]')?.hash==='#prepare-section');
+    await page.locator('.section-nav a[href="#voicelab-panel"]').focus();await page.keyboard.press('Enter');
     assert.equal(await page.locator('#voicelab-panel').evaluate(el=>el.open&&el===document.activeElement),true);
     await page.locator('#voicelab-panel > summary').click();
   }

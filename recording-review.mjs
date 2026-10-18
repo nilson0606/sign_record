@@ -70,7 +70,7 @@ export function createRecordingReview({store,pause,loadStem,onChanged,isRecordin
   async function save(){
     if(working||isRecording()||!currentSelection()||!selected.complete)return;
     const row=selected;working=true;clear();controls();
-    try{await store.save({...row,postPending:false});await onChanged(row.id);status('已存到錄音後處理。');}
+    try{await store.save({...row,postPending:false});await onChanged(row.id);status('已存到錄音後處理。');window.dispatchEvent(new CustomEvent('karaoke-recording-saved',{detail:{cacheId:row.post.reference.cacheId}}));}
     finally{working=false;controls();}
   }
   async function remove(){
