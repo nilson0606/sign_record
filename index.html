@@ -10,7 +10,7 @@
 </head>
 <body>
 <main>
-  <header><a href="./" class="brand"><span class="brand-icon">♪</span> 唱錄系統 <small>LOCAL LAB</small></a><div class="header-controls"><span class="pill">本機分析 · 錄音留在本機</span><label class="theme-picker" for="theme-select">配色<select id="theme-select"><option value="current">冷色調</option><option value="warm">暖色調</option></select></label></div></header>
+  <header><a href="./" class="brand"><span class="brand-icon">♪</span> 唱錄系統 <small>LOCAL LAB</small></a><div class="header-controls"><span class="pill">本機分析 · 錄音留在本機</span><label class="theme-picker" for="theme-select">配色<select id="theme-select"><option value="current">科技藍</option><option value="warm">暖色調</option></select></label></div></header>
   <nav class="section-nav" aria-label="頁面區段導覽">
     <div class="nav-links">
       <a href="#voice-settings">收音設定</a><a href="#local-section">本機工具</a><a href="#library-panel">歌曲庫</a><a href="#player-section">播放／錄音</a><a href="#prepare-section">歌曲準備／Key</a><a href="#score-section">評分／結算</a><a href="#recording-post">錄音後處理</a>
@@ -22,7 +22,10 @@
       <button id="workflow-confirm" type="button" class="secondary" hidden>設定已確認</button>
     </div>
   </nav>
-  <section class="intro"><p class="eyebrow">DESKTOP KARAOKE / 本機練唱版</p><h1>看著唱。<br><span>看見你的聲音。</span></h1><p>貼上歌曲，讓本機準備旋律基準。戴上耳機，看著 YouTube 唱，唱完留下歌名與分數。</p></section>
+  <section class="intro studio-intro">
+    <div class="intro-copy"><p class="eyebrow">LOCAL AUDIO STUDIO / 本機聲音工作室</p><h1>看著唱。<br><span>看見你的聲音。</span></h1><p>從選歌、錄唱到後製，留下屬於你的版本。<br>YouTube 與本機 MV 都能唱，錄音留在你的電腦。</p><div class="studio-tags"><span>選歌</span><i aria-hidden="true">／</i><span>錄唱</span><i aria-hidden="true">／</i><span>後製</span></div></div>
+    <div class="studio-art" aria-hidden="true"><svg viewBox="0 0 384 200" fill="none"><path class="signal-grid" d="M0 50H384M0 100H384M0 150H384M72 0V200M192 0V200M312 0V200"/><ellipse class="signal-orbit" cx="192" cy="100" rx="170" ry="82"/><g class="signal-bars"><rect x="36" y="94.0" width="4" height="12" rx="2"/><rect x="48" y="90.0" width="4" height="20" rx="2"/><rect x="60" y="84.0" width="4" height="32" rx="2"/><rect x="72" y="91.0" width="4" height="18" rx="2"/><rect x="84" y="76.0" width="4" height="48" rx="2"/><rect x="96" y="64.0" width="4" height="72" rx="2"/><rect x="108" y="78.0" width="4" height="44" rx="2"/><rect x="120" y="53.0" width="4" height="94" rx="2"/><rect x="132" y="40.0" width="4" height="120" rx="2"/><rect x="144" y="60.0" width="4" height="80" rx="2"/><rect x="156" y="26.0" width="4" height="148" rx="2"/><rect x="168" y="46.0" width="4" height="108" rx="2"/><rect x="180" y="18.0" width="4" height="164" rx="2"/><rect x="192" y="34.0" width="4" height="132" rx="2"/><rect x="204" y="54.0" width="4" height="92" rx="2"/><rect x="216" y="27.0" width="4" height="146" rx="2"/><rect x="228" y="45.0" width="4" height="110" rx="2"/><rect x="240" y="62.0" width="4" height="76" rx="2"/><rect x="252" y="41.0" width="4" height="118" rx="2"/><rect x="264" y="57.0" width="4" height="86" rx="2"/><rect x="276" y="73.0" width="4" height="54" rx="2"/><rect x="288" y="66.0" width="4" height="68" rx="2"/><rect x="300" y="82.0" width="4" height="36" rx="2"/><rect x="312" y="76.0" width="4" height="48" rx="2"/><rect x="324" y="88.0" width="4" height="24" rx="2"/><rect x="336" y="93.0" width="4" height="14" rx="2"/></g><path class="signal-line" d="M0 100H24L32 96L40 104L48 100H336L344 96L352 104L360 100H384"/></svg></div>
+  </section>
   <div id="environment" class="notice" role="status"></div>
   <details id="voice-settings" tabindex="-1" class="card section-fold voice-settings">
     <summary>收音設定 <span class="fold-caption">收音方式 · 麥克風選擇</span></summary>

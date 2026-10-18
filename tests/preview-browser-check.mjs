@@ -87,6 +87,12 @@ try {
     await route.fulfill({json:value,headers:{'Access-Control-Allow-Origin':site}});
   });
   await page.goto(site+'/');
+  for(const theme of ['current','warm']){
+    await page.setViewportSize({width:1440,height:1000});await page.locator('#theme-select').selectOption(theme);
+    await page.screenshot({path:`test-results/studio-${theme}-entry.png`});
+  }
+  await page.locator('#theme-select').selectOption('current');
+
   for(const id of ['voice-settings','recording-settings','prepare-settings','timing-section','score-settings'])assert.equal(await page.locator('#'+id).evaluate(el=>el.open),false);
   assert.equal(await page.locator('#prepare-settings #mask-panel').count(),1);
   assert.equal(await page.locator('#prepare-settings #preview-panel').count(),1);
