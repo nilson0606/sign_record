@@ -127,13 +127,20 @@ try{
  await page.evaluate(async()=>{const c=new AudioContext({sinkId:{type:'none'}});window.previewMixBuffer=await c.decodeAudioData(await(await fetch(document.getElementById('segment-take-audio').src)).arrayBuffer());await c.close();});
  await $('segment-take-mode-selected').selectOption('voice');assert.equal(await $('segment-take-audio').isHidden(),true);
  for(const id of ['segment-take-mode-selected'])assert.equal(await $(id).inputValue(),'voice');
+ // An MV preview is another audible source even though it is a <video>, not <audio>.
+ await page.evaluate(async()=>{const v=document.getElementById('mv-video');v.src=URL.createObjectURL(await(await fetch('http://127.0.0.1:4274/library/segment-fixture/accompaniment')).blob());v.loop=true;await v.play();});
+ assert.equal(await $('mv-video').evaluate(v=>v.paused),false);
  await $('segment-listen-selected').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);
+ assert.equal(await $('mv-video').evaluate(v=>v.paused),true,'pure voice must silence a previously playing MV');
  const takeAlignment=await page.evaluate(async row=>{
-   const c=new AudioContext({sinkId:{type:'none'}}),voice=await c.decodeAudioData(await(await fetch(document.getElementById('segment-take-audio').src)).arrayBuffer()),raw=await c.decodeAudioData(await(await fixtureStore.blob(row,'voice')).arrayBuffer());
+   const previewBlob=await(await fetch(document.getElementById('segment-take-audio').src)).blob(),rawBlob=await fixtureStore.blob(row,'voice');
+   const exactFile=await hash(previewBlob)===await hash(rawBlob);
+   const c=new AudioContext({sinkId:{type:'none'}}),voice=await c.decodeAudioData(await previewBlob.arrayBuffer()),raw=await c.decodeAudioData(await rawBlob.arrayBuffer());
    const v=voice.getChannelData(0),m=previewMixBuffer.getChannelData(0),expectedVoice=await expectedWhole(row,'voice'),expectedMix=await expectedWhole(row,'mix');
-   const delayError=audioError(v,expectedVoice.getChannelData(0)),backError=audioError(m,expectedMix.getChannelData(0)),backEnergy=m.reduce((sum,n,i)=>sum+Math.abs(n-v[i]),0);
-   await c.close();return {delayError,backError,backEnergy,length:voice.length,mixLength:previewMixBuffer.length,rawLength:raw.length};
+   const delayError=audioError(v,raw.getChannelData(0)),backError=audioError(m,expectedMix.getChannelData(0)),backEnergy=m.reduce((sum,n,i)=>sum+Math.abs(n-v[i]),0);
+   await c.close();return {exactFile,delayError,backError,backEnergy,length:voice.length,mixLength:previewMixBuffer.length,rawLength:raw.length};
  },first);
+ assert.equal(takeAlignment.exactFile,true,'pure voice plays the exact saved voice file, without gain changes, delay or re-encoding');
  assert.ok(takeAlignment.delayError<.00012,JSON.stringify(takeAlignment));assert.ok(takeAlignment.backError<.012,JSON.stringify(takeAlignment));assert.ok(takeAlignment.backEnergy>100);assert.equal(takeAlignment.length,takeAlignment.rawLength);assert.equal(takeAlignment.mixLength,takeAlignment.length);
  assert.equal(await page.evaluate(async row=>hash(await fixtureStore.blob(row,'voice')),first),firstHash,'preview modes preserve the source');
  await page.evaluate(()=>fixturePlayer.playVideo());assert.equal(await $('segment-take-audio').evaluate(el=>el.paused),true);await page.evaluate(()=>fixturePlayer.pauseVideo());

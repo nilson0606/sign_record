@@ -43,7 +43,7 @@ export function createSegmentRecording(options) {
     if(busy()||takeLoading||!enabled)return;
     const row=validRows().find(r=>r.id===part()?.takeId&&r.segmentTake);
     if(!row)throw Error('本段尚未選用錄音，請先錄這一段，或在右側挑選演唱版本。');
-    const mode=takeMode,delay=Number($('delay').value),ref=structuredClone(row.post.reference),balance=options.recording.balanceSettings();delaySeconds(delay);
+    const mode=takeMode,delay=Number($('delay').value),ref=structuredClone(row.post.reference),balance=options.recording.balanceSettings();if(mode==='mix')delaySeconds(delay);
     if(mode==='mix'&&!reference()?.hasPreview)throw Error('加入伴樂需要已保存的伴奏音軌，請先補建音軌，或改選「純人聲」。');
     clearTakePreview();loop=false;previewEnd=null;options.player()?.pauseVideo?.();options.pauseOther();$('audio').pause();
     const request=takeRequest,cancelled=()=>request!==takeRequest||!enabled||busy();takeSourceId=row.id;takeLoading=true;render();status(`正在準備本段試聽：${takeModeLabel()}…`);
@@ -52,6 +52,13 @@ export function createSegmentRecording(options) {
       const blob=await store.blob(row,'voice');
       if(cancelled())return;
       if(!blob.size)throw Error('無法讀取本段人聲錄音，請確認歌曲庫。');
+      // Pure voice is the saved microphone track itself, without the mixing path.
+      if(mode==='voice'){
+        takeURL=URL.createObjectURL(blob);$('take-audio').src=takeURL;$('take-audio').hidden=false;
+        await $('take-audio').play();
+        if(request===takeRequest)status('正在播放本段原始人聲錄音，不加入伴樂、不套用音量平衡或延時校正。');
+        return;
+      }
       decoder=new AudioContext({sampleRate:48000,sinkId:{type:'none'}});
       const raw=await decoder.decodeAudioData(await blob.arrayBuffer()),tracks=[];
       if(cancelled())return;
@@ -148,7 +155,7 @@ export function createSegmentRecording(options) {
     $('delete-selected').disabled=locked||!take;
     for(const id of takeModeIds){$(id).value=takeMode;$(id).disabled=locked||!draft;}
     for(const id of guideModeIds){$(id).value=guideMode;$(id).disabled=locked||!draft;}
-    $('take-info').textContent=take?`本段錄音：${takeName(take)} · ${new Date(take.created).toLocaleTimeString()} · ${takeModeLabel()} · 歌聲校正 ${$('delay').value} ms（含起唱與尾音餘量）${take.diagnostics?.status==='incomplete'?' · 診斷未完整保存：'+take.diagnostics.error:take.diagnostics?.status==='saved'?' · 診斷已保存':''}`:'本段尚未選用錄音；錄完保存後即可試聽，也可在右側挑選已錄版本。';
+    $('take-info').textContent=take?`本段錄音：${takeName(take)} · ${new Date(take.created).toLocaleTimeString()} · ${takeModeLabel()} · ${takeMode==='voice'?'直接播放原始收音':`歌聲校正 ${$('delay').value} ms（含起唱與尾音餘量）`}${take.diagnostics?.status==='incomplete'?' · 診斷未完整保存：'+take.diagnostics.error:take.diagnostics?.status==='saved'?' · 診斷已保存':''}`:'本段尚未選用錄音；錄完保存後即可試聽，也可在右側挑選已錄版本。';
     if(!draft)return;
     const p=part();$('song').textContent=ref?.title||'';$('seek').max=draft.duration;
     $('selected-summary').textContent=`${p.name} · ${fmt(p.start)}–${fmt(p.end)}`;
@@ -311,7 +318,7 @@ export function createSegmentRecording(options) {
   $('take-audio').onplay=()=>{
     if(busy()||!enabled){clearTakePreview();return;}
     loop=false;previewEnd=null;options.player()?.pauseVideo?.();options.pauseOther();
-    for(const audio of document.querySelectorAll('audio'))if(audio!==$('take-audio'))audio.pause();
+    for(const media of document.querySelectorAll('audio,video'))if(media!==$('take-audio'))media.pause();
   };
   document.addEventListener('play',e=>{if(e.target instanceof HTMLMediaElement&&e.target!==$('take-audio')){clearTakePreview();render();}},true);
   window.addEventListener('storage',e=>{if(key&&e.key===storageKey()&&e.newValue!==savedText){conflict=true;render();status('另一分頁已變更草稿，請重新整理後再編輯；現有錄音保留。');}});

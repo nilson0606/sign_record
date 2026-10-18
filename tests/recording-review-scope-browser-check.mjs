@@ -20,6 +20,18 @@ try{
  assert.deepEqual(await ids(),['wine1']);await page.evaluate(()=>change(refs.wei));assert.deepEqual(await ids(),['wei1','wei2']);await page.evaluate(()=>reloadRows('wine1'));assert.deepEqual(await ids(),['wei1','wei2']);
  await page.locator('#recording-review-listen').click();await page.waitForFunction(()=>!!globalThis.resolveBlob);await page.evaluate(()=>{change(refs.wine);resolveBlob(new Blob([]));});await page.waitForTimeout(100);assert.deepEqual(await ids(),['wine1']);assert.equal(await page.locator('#recording-review-audio').getAttribute('src'),null);assert.equal(await page.locator('#recording-review-status').textContent(),'');
  await page.evaluate(()=>change(null));assert.equal(await page.locator('#recording-review').isHidden(),true);assert.deepEqual(await ids(),[]);
+ // Pure voice must bypass decoding/remixing even with no segment timing metadata.
+ await page.evaluate(async()=>{
+  const {pcmHeader,pcm16}=await import('/recording-pcm.mjs'),samples=Float32Array.from({length:48000},(_,i)=>.1*Math.sin(i*2*Math.PI*440/48000));
+  globalThis.originalVoice=new Blob([pcmHeader(48000,1,48000),pcm16(samples,0,samples.length)],{type:'audio/wav'});
+  globalThis.originalContext=AudioContext;globalThis.AudioContext=class{constructor(){throw Error('Pure voice must not create an audio processing context');}};
+  change(refs.wine);globalThis.resolveBlob=null;
+ });
+ await page.locator('#recording-review-listen').click();await page.waitForFunction(()=>!!globalThis.resolveBlob);await page.evaluate(()=>resolveBlob(originalVoice));
+ await page.waitForFunction(()=>!document.getElementById('recording-review-audio').paused);
+ assert.equal(await page.evaluate(async()=>{const served=await(await fetch(document.getElementById('recording-review-audio').src)).arrayBuffer(),original=await originalVoice.arrayBuffer();return new Uint8Array(served).every((v,i)=>v===new Uint8Array(original)[i])&&served.byteLength===original.byteLength;}),true);
+ await page.waitForFunction(()=>document.getElementById('recording-review-status').textContent.includes('原始人聲錄音'));
+ await page.evaluate(()=>{globalThis.AudioContext=originalContext;change(null);});
  await page.evaluate(()=>{change(refs.wei);globalThis.listPending=true;});await page.locator('#recording-review-delete-song').click();await page.waitForFunction(()=>!!globalThis.resolveList);await page.evaluate(()=>{change(refs.wine);resolveList();});await page.waitForFunction(()=>!document.querySelector('#recording-review-delete-song').disabled);assert.deepEqual(await page.evaluate(()=>deleted),[]);
  await page.evaluate(()=>{globalThis.listPending=false;change(refs.wei0);});assert.deepEqual(await ids(),['wei0']);page.once('dialog',d=>d.accept());await page.locator('#recording-review-delete-song').click();await page.waitForFunction(()=>document.querySelector('#recording-review').hidden);assert.deepEqual(await page.evaluate(()=>deleted),['wei0']);await page.evaluate(()=>change(refs.wei));assert.deepEqual(await ids(),['wei1','wei2']);assert.deepEqual(await page.evaluate(()=>writes),[]);assert.deepEqual(errors,[]);
  console.log(JSON.stringify({pass:true,currentSongAndKeyOnly:true,unloadedHidden:true,lateAuditionCancelled:true,staleDeleteCancelled:true,otherSongsPreserved:true}));

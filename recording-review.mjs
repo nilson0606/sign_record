@@ -48,6 +48,11 @@ export function createRecordingReview({store,pause,loadStem,onChanged,isRecordin
     try{
       const blob=await store.blob(row,'voice');if(cancelled())return;
       if(!blob.size)throw Error('無法讀取人聲錄音。');
+      if(mode==='voice'){
+        url=URL.createObjectURL(blob);$('audio').src=url;$('audio').hidden=false;await $('audio').play();
+        if(!cancelled())status('正在播放原始人聲錄音，不加入伴樂、不套用音量平衡或延時校正。滿意後按「存到錄音後處理」。');
+        return;
+      }
       context=new AudioContext({sampleRate:48000,sinkId:{type:'none'}});
       const raw=await context.decodeAudioData(await blob.arrayBuffer()),tracks=[];if(cancelled())return;
       if(mode==='mix')for(const stem of ['accompaniment',...(ref.vocalMode==='lead'?['backing']:[])]){
@@ -101,7 +106,7 @@ export function createRecordingReview({store,pause,loadStem,onChanged,isRecordin
   for(const [id,fn]of [['listen',listen],['save',save],['delete',remove],['delete-song',removeSong]])$(id).onclick=()=>Promise.resolve().then(fn).catch(e=>status(e.message));
   $('take').onchange=()=>{clear();selected=rows.find(row=>row.id===$('take').value)||null;controls();status('已選取待確認錄音，可先試聽。');};
   $('mode').onchange=()=>{clear();controls();status('試聽內容已變更，請按「試聽這一版」。');};
-  $('audio').onplay=()=>{if(isRecording()||working){clear();controls();return;}pause();for(const audio of document.querySelectorAll('audio'))if(audio!==$('audio'))audio.pause();};
+  $('audio').onplay=()=>{if(isRecording()||working){clear();controls();return;}pause();for(const media of document.querySelectorAll('audio,video'))if(media!==$('audio'))media.pause();};
   document.addEventListener('play',event=>{if(event.target instanceof HTMLMediaElement&&event.target!==$('audio')){clear();controls();}},true);
   window.addEventListener('pagehide',clear);
   return {refresh,controls,clear,referenceChanged};
