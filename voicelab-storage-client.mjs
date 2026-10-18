@@ -10,8 +10,10 @@ export function createVoiceLabStorage({getProtectedIds=()=>[],beforePlay=()=>{}}
   for(const kind of ['temp','mv']){
     const $=id=>document.getElementById(`voicelab-storage-${kind}-${id}`),route=kind==='temp'?'/voicelab/storage':'/mv/library';
     let catalog=null,busy=false,url=null,previewId=null,previewRevision=0;
+    const clearAll=kind==='mv'?document.getElementById('mv-clear-all'):null;
+    const clearResult=kind==='mv'?document.getElementById('mv-clear-result'):null;
     const selected=()=>[...$('list').querySelectorAll('input:checked:not(:disabled)')].map(e=>e.value);
-    function controls(){ $('refresh').disabled=busy;$('all').disabled=busy||!catalog?.entries.some(e=>!e.locked&&!getProtectedIds().includes(e.id));$('delete').disabled=busy||!selected().length;for(const e of $('list').querySelectorAll('input,button'))e.disabled=busy||e.dataset.locked==='true';}
+    function controls(){ if(clearAll)clearAll.disabled=busy;$('refresh').disabled=busy;$('all').disabled=busy||!catalog?.entries.some(e=>!e.locked&&!getProtectedIds().includes(e.id));$('delete').disabled=busy||!selected().length;for(const e of $('list').querySelectorAll('input,button'))e.disabled=busy||e.dataset.locked==='true';}
     function stopPreview(){if(kind!=='mv')return;previewRevision++;$('video').pause();$('video').removeAttribute('src');$('video').load();$('video').hidden=true;if(url)URL.revokeObjectURL(url);url=null;previewId=null;}
     async function preview(entry){
       stopPreview();const rev=previewRevision;busy=true;controls();$('status').textContent='載入影片：'+entry.name;
@@ -34,6 +36,29 @@ export function createVoiceLabStorage({getProtectedIds=()=>[],beforePlay=()=>{}}
       finally{busy=false;controls();}
     }
     $('refresh').addEventListener('click',()=>void refresh());
+    clearAll?.addEventListener('click',async()=>{
+      if(busy)return;
+      const say=text=>{clearResult.hidden=false;clearResult.textContent=text;};
+      busy=true;controls();say('正在確認目前歌曲庫的 MV 數量與容量…');
+      let count=0,bytes=0,message='';
+      try{
+        // Freeze the exact catalog before confirmation; newer renders are not included.
+        const snapshot=await(await request(route)).json(),entries=snapshot.entries.filter(e=>!e.locked);
+        if(!entries.length){message='清理完成：目前沒有可清理的 MV。';return;}
+        const total=entries.reduce((sum,e)=>sum+e.bytes,0);
+        if(!window.confirm(`清除全部 ${entries.length} 部 MV（${size(total)}）？\n位置：${snapshot.root}\n\n包含目前歌曲庫內所有歌曲由本工具產生的 MV 成品，永久刪除後無法復原。原始影片、歌曲、錄音、音色模型與製作中的暫存都保留。`)){message='已取消清理，MV 保留。';return;}
+        stopPreview();
+        for(let offset=0;offset<entries.length;offset+=500){
+          say(`正在清理 MV：${count}／${entries.length} 部…`);
+          const batch=entries.slice(offset,offset+500);
+          const removed=await(await request(route,{method:'DELETE',body:JSON.stringify({root:snapshot.root,ids:batch.map(e=>e.id)})})).json();
+          count+=removed.deleted.length;bytes+=removed.bytes;
+          window.dispatchEvent(new CustomEvent('mv-library-deleted',{detail:{names:batch.filter(e=>removed.deleted.includes(e.id)).map(e=>e.name)}}));
+        }
+        message=`清理完成：已刪除 ${count} 部 MV，釋出 ${size(bytes)}。原始影片、歌曲與錄音保留。`;
+      }catch(e){message=`清理未全部完成${count?`（已確認刪除 ${count} 部，釋出 ${size(bytes)}）`:''}：${e.message} 請查看重新整理後的清單。`;}
+      finally{busy=false;await refresh();say(message);}
+    });
     $('all').addEventListener('click',()=>{for(const box of $('list').querySelectorAll('input:not(:disabled)'))box.checked=true;controls();});
     $('delete').addEventListener('click',async()=>{
       const ids=selected();if(busy||!ids.length)return;
