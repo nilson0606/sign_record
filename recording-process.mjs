@@ -11,6 +11,30 @@ export function delaySeconds(ms) {
   if(!Number.isFinite(ms)||Math.abs(ms)>2000)throw new Error('延時需介於 −2000 與 +2000 ms。');
   return ms/1000;
 }
+// Ranges use the song clock, independent of microphone latency correction.
+export function originalVocalRanges(value=[],duration) {
+  if(!Array.isArray(value)||value.length>200)throw Error('原唱區間最多 200 段。');
+  if(value.length&&(!Number.isFinite(duration)||duration<=0))throw Error('缺少原唱區間的歌曲長度。');
+  const ranges=value.map(r=>({start:r.start,end:r.end,mode:r.mode})).sort((a,b)=>a.start-b.start);
+  for(let i=0;i<ranges.length;i++){
+    const r=ranges[i];
+    if(!Number.isFinite(r.start)||!Number.isFinite(r.end)||r.start<0||r.end-r.start<.1||r.end>duration||!['duet','original'].includes(r.mode))throw Error('原唱區間需在歌曲內，至少 0.1 秒，並選擇播放方式。');
+    if(i&&r.start<ranges[i-1].end)throw Error('原唱區間不可重疊，請調整起訖時間。');
+  }
+  return ranges;
+}
+export function originalVocalWindows(ranges,segments) {
+  const windows=[];
+  for(const s of segments)for(const r of ranges){
+    const start=Math.max(s.songTime,r.start),end=Math.min(s.songTime+s.duration,r.end);
+    if(end<=start)continue;
+    const fade=Math.min(.012,(r.end-r.start)/2);
+    const points=[start,...[r.start+fade,r.end-fade].filter(t=>t>start&&t<end),end];
+    windows.push({source:start,when:s.offset+start-s.songTime,duration:end-start,mode:r.mode,
+      envelope:points.map(t=>({time:s.offset+t-s.songTime,gain:Math.max(0,Math.min(1,(t-r.start)/fade,(r.end-t)/fade))}))});
+  }
+  return windows.sort((a,b)=>a.when-b.when);
+}
 export function recordedSongTime(segments, offset) {
   const segment=segments.find(s=>offset>=s.offset&&offset<s.offset+s.duration);
   return segment ? segment.songTime+offset-segment.offset : null;
@@ -100,13 +124,32 @@ export async function remixRecording(raw, tracks, meta, ms, {softening='off',vol
   const p=voicePlacement(raw.duration,ms);
   const singer=await softenedVoice(context,voice,voice.buffer,p,softening);
   const processed=processedVoice(context,singer,recipe);
-  const mix=meta.fixedMixGains?fixedRecordingMix(context,processed.output,meta,volume):createRecordingMix(context,processed.output,context.destination,{mode:meta.mode,settings:meta.balance,voiced:()=>false,volume});
+  const original=meta.mode==='mix'?meta.post.originalVocals:null;
+  const ranges=original?originalVocalRanges(original.ranges,meta.post.reference.duration):[];
+  const originalIndex=original?meta.stems?.indexOf(original.stem):-1;
+  if(original&&(!['vocals','lead'].includes(original.stem)||originalIndex<0||!tracks[originalIndex]))throw Error('缺少指定區間的原唱音軌，請補建歌曲音軌後重新試合。');
+  const windows=originalVocalWindows(ranges,meta.post.segments);
+  const voiceGate=context.createGain();processed.output.connect(voiceGate);
+  voiceGate.gain.setValueAtTime(1,0);
+  for(const w of windows.filter(w=>w.mode==='original')){
+    w.envelope.forEach((p,i)=>voiceGate.gain[i?'linearRampToValueAtTime':'setValueAtTime'](1-p.gain,p.time));
+    voiceGate.gain.setValueAtTime(1,w.when+w.duration);
+  }
+  const mix=meta.fixedMixGains?fixedRecordingMix(context,voiceGate,meta,volume):createRecordingMix(context,voiceGate,context.destination,{mode:meta.mode,settings:meta.balance,voiced:()=>false,volume});
   if(p.duration>0)voice.start(p.when,p.source,p.duration);
   const rms=(buffer,time)=>{
     const a=buffer.getChannelData(0),start=Math.max(0,Math.floor(time*rate)),end=Math.min(a.length,start+Math.floor(.1*rate));
     if(time<0||end<=start)return 0;let sum=0;for(let i=start;i<end;i++)sum+=a[i]*a[i];return Math.sqrt(sum/(end-start));
   };
-  for(const segment of meta.post.segments)for(const buffer of tracks){
+  for(const w of windows){
+    const node=context.createBufferSource(),gain=context.createGain();node.buffer=tracks[originalIndex];
+    if(node.buffer.duration<w.source+w.duration-.001)throw Error('原唱音軌長度不足，請補建完整音軌。');
+    node.connect(gain);gain.connect(mix.input);
+    w.envelope.forEach((p,i)=>gain.gain[i?'linearRampToValueAtTime':'setValueAtTime'](p.gain,p.time));
+    node.start(w.when,w.source,w.duration);
+  }
+  for(const segment of meta.post.segments)for(const [index,buffer] of tracks.entries()){
+    if(index===originalIndex)continue;
     const length=Math.min(segment.duration,buffer.duration-segment.songTime);
     if(length<=0||segment.songTime<0)continue;
     const node=context.createBufferSource();node.buffer=buffer;node.connect(mix.input);node.start(segment.offset,segment.songTime,length);
@@ -118,9 +161,9 @@ export async function remixRecording(raw, tracks, meta, ms, {softening='off',vol
     while(sampleIndex+1<meta.post.samples.length&&meta.post.samples[sampleIndex+1].offset<=sourceTime)sampleIndex++;
     const sample=meta.post.samples[sampleIndex];
     const voiced=!!sample?.hz&&Math.abs(sample.offset-sourceTime)<.2;
-    const backingRms=segment?Math.hypot(...tracks.map(b=>rms(b,segment.songTime+t-segment.offset))):0;
+    const backingRms=segment?Math.hypot(...tracks.map((b,i)=>i===originalIndex&&!windows.some(w=>t>=w.when&&t<w.when+w.duration)?0:rms(b,segment.songTime+t-segment.offset))):0;
     mix.setLevels(balanceGains({mode:meta.mode,settings:meta.balance,voiceRms:rms(raw,sourceTime),backingRms,voiced}),t);
     if(Math.round(t*10)%100===0)await new Promise(resolve=>setTimeout(resolve,0));
   }
-  const rendered=await context.startRendering();mix.disconnect();processed.disconnect();singer.disconnect();return editRecordingAudio(rendered,cuts);
+  const rendered=await context.startRendering();mix.disconnect();voiceGate.disconnect();processed.disconnect();singer.disconnect();return editRecordingAudio(rendered,cuts);
 }

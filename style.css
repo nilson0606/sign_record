@@ -329,3 +329,5 @@ button:active:not(:disabled){transform:translateY(1px)}
 #local-audio-panel .eyebrow{margin:8px 0;font-size:10px}#local-audio-title{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:18px;margin:4px 0}
 #local-audio-panel .help{margin:4px 0}#local-audio{width:100%;flex-shrink:0;margin:12px 0 0;height:42px}
 @media(max-width:500px){#local-audio-panel{padding:10px}.local-audio-art{max-height:30%}#local-audio-panel .eyebrow,#local-audio-panel .help{display:none}#local-audio-title{font-size:14px}#local-audio{margin-top:6px}}
+.original-vocal-ranges{display:grid;gap:12px;margin:14px 0}.original-vocal-range{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;padding:12px;border:1px solid var(--line);border-radius:10px}.original-vocal-range label{min-width:0}.original-vocal-range input,.original-vocal-range select{width:100%;min-width:0}.original-vocal-range button{align-self:end}
+@media(max-width:600px){.original-vocal-range select{grid-column:1/-1}.original-vocal-range button{grid-column:2;min-height:40px}}

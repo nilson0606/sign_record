@@ -367,7 +367,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
         const tracks=[];for(const stem of row.stems){const response=await localRequest(recordingBackingRoute(row,stem));tracks.push(await c.decodeAudioData(await response.arrayBuffer()));}previewSources.tracks=tracks;
       }finally{await c.close();}}
       const fade=Math.min(.003,(interval.end-interval.start)/4);
-      return remixRecording(previewSources.raw,solo?[]:previewSources.tracks??[],row,settings.delayMs,{...settings,edit:{...interval,fadeIn:fade,fadeOut:fade},progress:status});
+      return remixRecording(previewSources.raw,solo?[]:previewSources.tracks??[],solo?{...row,mode:'voice'}:row,settings.delayMs,{...settings,edit:{...interval,fadeIn:fade,fadeOut:fade},progress:status});
     }
   });
   soulx=createVoiceLab({store,getSelected:()=>selected,getReference:reference,getPosition:originalPlayhead,onMakeMV:data=>mv.open(data),beforePlay:()=>{mv.pause();arrangement?.pause();audition?.stop();$('post-audio').pause();pause();},onSaved:async meta=>{

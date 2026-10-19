@@ -164,6 +164,14 @@
           <details id="segment-output-panel" open><summary>試合完整一版／滿意後保存 · 預設人聲＋伴樂，200 ms</summary>
           <p class="help">依每個段落目前選用的錄音版本試合；換選版本後，請重新試合。</p>
           <div class="segment-fields"><label>試合內容<select id="segment-output"><option value="mix" selected>人聲＋伴樂／和音</option><option value="voice">純人聲</option></select></label><label>歌聲校正（ms）<input id="segment-delay" type="number" min="-2000" max="2000" step="10" value="200"></label></div>
+          <details id="segment-original-panel"><summary>原唱加入區間 <span id="segment-original-count">（未設定）</span></summary>
+          <p class="help">用歌曲時間設定多個區間，每段可選一起唱或只用原唱。區間外保留你的錄音，伴奏照常；僅套用「人聲＋伴樂／和音」的完整試合，純人聲仍保留你的收音。</p>
+          <div id="segment-original-ranges" class="original-vocal-ranges"></div>
+          <div class="segment-fields"><label>開始（分:秒）<input id="segment-original-start" type="text" value="00:00.000" placeholder="00:20.000"></label><label>結束（分:秒）<input id="segment-original-end" type="text" value="00:05.000" placeholder="00:30.000"></label></div>
+          <label>區間人聲<select id="segment-original-mode"><option value="duet">原唱＋我的錄音</option><option value="original">只用原唱</option></select></label>
+          <div class="button-row"><button id="segment-original-current" type="button" class="secondary">填入目前段落時間</button><button id="segment-original-add" type="button">新增原唱區間</button></div>
+          <p id="segment-original-help" class="help">設定隨本歌曲草稿保存；調整後請重新試合。</p>
+          </details>
           <label class="check-option"><input id="segment-allow-gaps" type="checkbox">允許未錄範圍保留靜音</label>
           <div class="button-row"><button id="segment-compose" type="button">試合完整一版</button><button id="segment-join" type="button" class="secondary">試合並聽本段接合</button></div>
           <audio id="segment-audio" controls hidden preload="metadata"></audio>

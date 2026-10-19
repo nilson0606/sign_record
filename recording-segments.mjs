@@ -1,5 +1,6 @@
 import {detectPitch} from './audio.mjs';
 import {mixSettings} from './recording-mix.mjs';
+import {originalVocalRanges} from './recording-process.mjs';
 // Non-destructive edit decisions use song seconds; source files are never changed.
 export async function segmentMixMetadata(raw,meta,balance) {
   // Old segment takes did not collect pitch samples. Analyze only for gain gating;
@@ -38,6 +39,7 @@ export function validateSegmentDraft(draft) {
     ids.add(p.id);end=p.end;
   }
   if(Math.abs(end-draft.duration)>1e-6)throw Error('段落需涵蓋完整歌曲。');
+  originalVocalRanges(draft.originalVocalRanges,draft.duration);
   return draft;
 }
 export function splitSegment(draft,time) {
@@ -68,17 +70,23 @@ export function sourceOffset(meta,time) {
   const s=meta?.post?.segments?.find(s=>time>=s.songTime&&time<s.songTime+s.duration);
   return s?s.offset+time-s.songTime:null;
 }
-export function missingSegmentRanges(draft,rows,delayMs=200) {
+export function missingSegmentRanges(draft,rows,delayMs=200,useOriginal=false) {
   validateSegmentDraft(draft);const shift=delayMs/1000,result=[];
+  const replaced=useOriginal?originalVocalRanges(draft.originalVocalRanges,draft.duration).filter(r=>r.mode==='original'):[];
   for(const p of draft.parts){
-    const row=rows.find(r=>r.id===(p.takeId||draft.baseId)),end=Math.min(draft.duration,p.end+shift);let cursor=Math.max(0,p.start+shift);
+    let needed=[[p.start,p.end]];
+    for(const r of replaced)needed=needed.flatMap(([a,b])=>r.end<=a||r.start>=b?[[a,b]]:[[a,Math.min(b,r.start)],[Math.max(a,r.end),b]].filter(([start,end])=>end>start));
+    const row=rows.find(r=>r.id===(p.takeId||draft.baseId));
+    for(const [start,until]of needed){
+    const end=Math.min(draft.duration,until+shift);let cursor=Math.max(0,start+shift);
     // Player end notifications and the PCM clock can differ slightly at EOF.
     // Allow the same 150 ms clock tolerance as recording timeline sync only at
     // the song's end; missing sources and gaps inside the song still fail.
     const endTolerance=end===draft.duration ? .15 : .03;let covered=false;
     const intervals=(row?.rawBytes?row.post?.segments||[]:[]).map(s=>[s.songTime,s.songTime+Math.min(s.duration,Math.max(0,(row.seconds??Infinity)-s.offset))]).sort((a,b)=>a[0]-b[0]);
     for(const [a,b]of intervals){if(b<=cursor)continue;if(a>cursor+.03)break;covered=true;cursor=Math.max(cursor,b);if(cursor>=end-.03)break;}
-    if(cursor<end-.03&&(!covered||cursor<end-endTolerance))result.push(p.name);
+    if(cursor<end-.03&&(!covered||cursor<end-endTolerance)){result.push(p.name);break;}
+    }
   }
   return result;
 }
