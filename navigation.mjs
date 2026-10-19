@@ -28,14 +28,14 @@ new ResizeObserver(() => {
 window.addEventListener('scroll',scheduleHighlight,{passive:true});
 window.addEventListener('resize',scheduleHighlight);
 document.addEventListener('toggle',scheduleHighlight,true);
-function visit(hash) {
+function visit(hash, behavior) {
   if (!hash.startsWith('#')) return;
   const target=$(hash.slice(1)); if (!target) return;
   for (let node=target;node;node=node.parentElement) if (node instanceof HTMLDetailsElement) node.open=true;
   if (!visible(target)) return;
   preferredHash=hash;
   if (!target.hasAttribute('tabindex')) target.tabIndex=-1;
-  target.focus({preventScroll:true});target.scrollIntoView({block:'start'});
+  target.focus({preventScroll:true});target.scrollIntoView({block:'start',...(behavior?{behavior}:{})});
   scheduleHighlight();
 }
 nav.addEventListener('click',event=>{
@@ -44,7 +44,18 @@ nav.addEventListener('click',event=>{
   event.preventDefault();history.replaceState(null,'',link.hash);visit(link.hash);
 });
 window.addEventListener('hashchange',()=>visit(location.hash));
-if (location.hash) requestAnimationFrame(()=>visit(location.hash));
+const reloaded=performance.getEntriesByType('navigation')[0]?.type==='reload';
+if (reloaded) {
+  // A fresh recording session starts at microphone setup, not the last bookmark.
+  history.scrollRestoration='manual';
+  history.replaceState(history.state,'',location.pathname+location.search+'#voice-settings');
+  const startAtMic=()=>requestAnimationFrame(()=>{
+    document.documentElement.style.setProperty('--nav-offset',`${nav.offsetHeight+16}px`);
+    visit('#voice-settings','instant');
+  });
+  if (document.readyState==='complete') startAtMic();
+  else window.addEventListener('pageshow',startAtMic,{once:true});
+} else if (location.hash) requestAnimationFrame(()=>visit(location.hash));
 scheduleHighlight();
 
 let micChecked=false, nativeConfigured=false, settingsConfirmed=false, scope='', saved=false, listened='', segmentMode=false;

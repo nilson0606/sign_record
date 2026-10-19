@@ -41,6 +41,24 @@ try{
  s.busy=false;await snapshot(s);await expectStep(7);
  await page.evaluate(()=>document.getElementById('segment-take-audio').dispatchEvent(new Event('playing')));await expectStep(8);
  assert.equal(await page.locator('#workflow-go').getAttribute('href'),'#segment-output-panel');
+ // F5 resets position and guidance, preserving settings and normal direct links.
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await page.evaluate(()=>localStorage.setItem('reload-preserved-fixture','keep'));
+ await page.locator('.nav-links a[href="#recording-post"]').click();
+ await page.reload();await expectStep(1);
+ await page.waitForFunction(()=>document.querySelector('.nav-links [aria-current]')?.hash==='#voice-settings');
+ assert.equal(new URL(page.url()).hash,'#voice-settings');
+ assert.equal(await page.locator('#voice-settings').evaluate(el=>el.open&&el===document.activeElement),true);
+ const navBox=await page.locator('.section-nav').boundingBox(),micBox=await page.locator('#voice-settings').boundingBox();
+ assert.ok(micBox.y>=navBox.y+navBox.height-1&&micBox.y<navBox.y+navBox.height+40);
+ assert.equal(await page.evaluate(()=>localStorage.getItem('reload-preserved-fixture')),'keep');
+ await page.evaluate(()=>{history.replaceState(null,'','?reload-test=1');document.getElementById('recording-post').scrollIntoView({behavior:'instant'});});
+ await page.reload();await expectStep(1);
+ await page.waitForFunction(()=>document.querySelector('.nav-links [aria-current]')?.hash==='#voice-settings');
+ assert.equal(new URL(page.url()).search,'?reload-test=1');
+ await page.goto(`http://127.0.0.1:${server.address().port}/?direct=1#timing-section`);
+ await page.waitForFunction(()=>document.getElementById('timing-section').open);
+ assert.equal(new URL(page.url()).hash,'#timing-section');
  assert.deepEqual(errors,[]);
  console.log('Eight ordered guide steps, native-mic dependency, key change, recording/result priority, song scoping and segmented review passed.');
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}
