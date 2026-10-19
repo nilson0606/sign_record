@@ -277,6 +277,11 @@ header{gap:18px;flex-wrap:wrap}
 #source-kind { margin-bottom:12px; }
 #local-media-controls { margin-bottom:16px; }
 
+/* Returning to whole-song scoring is a distinct mode change. */
+#segment-whole{min-height:62px;padding:16px 24px;font-size:18px;font-weight:750;letter-spacing:.5px;color:#fff;background:linear-gradient(115deg,#414fa7,#63419b);border:1px solid #acb6ff;border-radius:10px;box-shadow:0 6px 18px -7px #111742aa,inset 0 1px #ffffff30}
+#segment-whole:not(:disabled):hover{color:#fff;background:linear-gradient(115deg,#4d5dbb,#754db1);border-color:#d1d6ff;box-shadow:0 7px 22px -6px #6265d077,inset 0 1px #ffffff40}
+#segment-whole:focus-visible{outline:3px solid #d1d6ff;outline-offset:4px}
+
 /* Studio finish: static light, opaque working surfaces, and raised selections. */
 :root:not([data-theme="warm"]){--bg:#080f1b;--card:#111e30;--line:#293d56;--text:#edf6ff;--soft:#a9bed4;--accent:#72e4f4;--input-bg:#0a1525;--input-border:#334e6b;--notice-bg:#122e42;--notice-border:#305e79;--graph-bg:#0b1829;--inset-bg:#0d1a2b;--inset-border:#2b435e;--choice-bg:#183a52;--choice-border:#71cde5;--library-heading:#132c42;--studio-light:#72e4f40a;--studio-halo:#526dff10;--studio-top:#1c334b;--studio-edge:#72e4f44a;--studio-shadow:#0009;--studio-grid:#7099d007;--studio-selected:#20465f;--studio-sub:#b1baff}
 :root[data-theme="warm"]{--studio-light:#ffc28a08;--studio-halo:#ba815910;--studio-top:#3c2d22;--studio-edge:#ffc28a40;--studio-shadow:#0008;--studio-grid:#c6a58a06;--studio-selected:#533925;--studio-sub:#e6c8a7}
