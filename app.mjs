@@ -1,5 +1,5 @@
 import {nativeInputDevices,openNativeMicrophone} from './native-microphone.mjs';
-import {isLocalMediaId,selectedMediaId} from './media-source.mjs';
+import {isLocalMediaId,selectedMediaId,selectMediaSource} from './media-source.mjs';
 import {localVideoPlayer} from './local-video-player.mjs';
 import {initializeLocalMedia,mediaRequest,LOCAL_BASE} from './local-media-client.mjs';
 import { youtubeId, noteOf, detectPitch, playerResponse, alignedTime } from './audio.mjs';
@@ -228,23 +228,25 @@ function initializePlayer(id) {
 async function loadVideo(e) {
   e?.preventDefault();
   const id = selectedMediaId();
-  if (!id) return status('請輸入有效的 YouTube 網址，或先選擇本機 MV。');
+  if (!id) return status('請輸入有效的 YouTube 網址，或先選擇本機 MV／音檔。');
   const button = $('song-form').querySelector('button'); button.disabled = true;
-  status(isLocalMediaId(id)?'正在載入本機 MV…':'正在載入 YouTube 播放器…');
+  status(isLocalMediaId(id)?'正在載入本機媒體…':'正在載入 YouTube 播放器…');
   try {
     tracePlayback('load-video-request',{videoId:id});
     await singing.changeSong(id);
     if(isLocalMediaId(id)){
-      if(player?.sourceKind==='local'&&player.getVideoData().video_id===id&&$('local-video').readyState>=1)return true;
+      if(player?.sourceKind==='local'&&player.getVideoData().video_id===id&&player.getIframe().readyState>=1){selectMediaSource(id,document,player.getIframe().tagName==='AUDIO'?'audio':'video');return true;}
       const media=await mediaRequest('/local-media/'+id);resetPlayer();
-      const video=$('local-video');video.hidden=false;video.dataset.title=media.title;$('player').hidden=true;
+      const audioOnly=media.kind==='audio';selectMediaSource(id,document,media.kind);
+      const video=$(audioOnly?'local-audio':'local-video');video.hidden=false;video.dataset.title=media.title;$('player').hidden=true;
+      $('local-audio-panel').hidden=!audioOnly;$('local-audio-title').textContent=media.title;
       player=localVideoPlayer(video,id,state=>{if(state===1)calibration?.cancel();singing.playerState(state);},status);
       await new Promise((resolve,reject)=>{
         const cleanup=()=>{clearTimeout(timer);video.removeEventListener('loadedmetadata',ready);video.removeEventListener('error',fail);};
-        const ready=()=>{cleanup();resolve();},fail=()=>{cleanup();reject(Error('本機 MV 載入失敗，請重新載入。'));};
+        const ready=()=>{cleanup();resolve();},fail=()=>{cleanup();reject(Error('本機媒體載入失敗，請重新載入。'));};
         const timer=setTimeout(fail,20000);video.addEventListener('loadedmetadata',ready);video.addEventListener('error',fail);video.src=LOCAL_BASE+media.playbackPath;video.load();
       });
-      $('video-placeholder').style.display='none';status(`已載入本機 MV：${media.title}。請按影片播放，或準備歌曲基準。`);return true;
+      $('video-placeholder').style.display='none';status(`已載入${audioOnly?'本機音檔':'本機 MV'}：${media.title}。請按播放，或準備歌曲基準。`);return true;
     }
     if(player?.sourceKind==='local')resetPlayer();
     await loadAPI();
@@ -259,7 +261,7 @@ function resetPlayer(){
   if(playerAttempt)playerAttempt.active=false;playerAttempt=null;
   player?.destroy?.();player=null;playerReady=null;
   const mount=document.createElement('div');mount.id='player';if($('player'))$('player').replaceWith(mount);else $('video-placeholder').after(mount);
-  $('local-video').hidden=true;
+  $('local-video').hidden=true;$('local-audio-panel').hidden=true;
 }
 initializeLocalMedia(loadVideo);
 function log(text, cls = '') { const li = document.createElement('li'); li.textContent = text; li.className = cls; $('probe-log').append(li); }

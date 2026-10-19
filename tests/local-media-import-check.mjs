@@ -23,5 +23,17 @@ try{
  assert.equal((await imported(Buffer.from('invalid video'),'broken.mp4')).stage,'failed');
  assert.equal((await fetch(base+'/local-media/imports?name=payload.html',{method:'POST',body:'bad'})).status,400);
  assert.deepEqual(await readFile(file),original);assert.ok((await readdir(path.join(root,'.local-mv'))).every(x=>x===first.media.id));
+ for(const extension of ['wav','mp3']){
+  const input=path.join(root,'audio.'+extension);
+  await exec('ffmpeg',['-nostdin','-v','error','-f','lavfi','-i','sine=frequency=330:sample_rate=44100','-t','2',input],{windowsHide:true});
+  const bytes=await readFile(input),audio=await imported(bytes,'Song.'+extension);assert.equal(audio.stage,'ready',audio.message);assert.equal(audio.media.kind,'audio');
+  const info=await(await fetch(base+'/local-media/'+audio.media.id)).json();
+  const response=await fetch(base+info.playbackPath,{headers:{Range:'bytes=0-43'}});assert.equal(response.status,206);assert.equal(response.headers.get('content-type'),'audio/wav');
+  const decoded=JSON.parse((await exec('ffprobe',['-v','error','-show_streams','-of','json',path.join(root,'.local-mv',audio.media.id,'audio.wav')],{windowsHide:true})).stdout);
+  assert.equal(decoded.streams.length,1);assert.equal(decoded.streams[0].codec_name,'pcm_s24le');assert.equal(decoded.streams[0].sample_rate,'48000');
+  assert.equal((await imported(bytes,'Renamed.'+extension)).media.id,audio.media.id);assert.deepEqual(await readFile(input),bytes);
+ }
+ assert.equal((await imported(Buffer.from('invalid audio'),'broken.wav')).stage,'failed');
+ assert.equal((await fetch(base+'/local-media/imports?name=wrong.mp4&kind=audio',{method:'POST',body:original})).status,400);
  console.log('PASS: WebM converts to H264/AAC; duplicate import reuses identity; missing copy repairs; invalid media rejected and temporary files cleaned; original unchanged.');
 }finally{await stopLocalMedia();await new Promise(r=>server.close(r));await rm(root,{recursive:true,force:true,maxRetries:5});}
