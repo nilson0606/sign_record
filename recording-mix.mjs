@@ -5,7 +5,7 @@ export function recordingVolume(value = {}) {
   return { voice: level(value.voice), backing: level(value.backing) };
 }
 export function mixSettings(value = {}) {
-  const level = (x, fallback) => Number.isFinite(x) ? clamp(x, 0, 100) : fallback;
+  const level = (x, fallback) => Number.isFinite(x) ? clamp(x, 0, 200) : fallback;
   return { manual: value.manual === true, voice: level(value.voice, 70), backing: level(value.backing, 30) };
 }
 export function balanceGains({ voiceRms = 0, backingRms = 0, voiced = false, mode = 'mix', settings = {} } = {}) {

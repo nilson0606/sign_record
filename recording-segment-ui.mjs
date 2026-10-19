@@ -168,7 +168,7 @@ export function createSegmentRecording(options) {
     for(const panel of [$('tools'),$('side'),$('transport')])for(const node of panel.querySelectorAll('button,input,select'))node.disabled=locked||!draft;
     const balance=options.recording.balanceSettings();$('manual').checked=balance.manual;
     for(const name of ['voice','backing']){$(name+'-level').value=balance[name];$(name+'-value').textContent=balance[name]+'%';$(name+'-level').disabled=locked||!draft||!balance.manual;}
-    $('balance-help').textContent=balance.manual?'手動比例＋自動微調：兩路各自最多修正 ±3 dB，0% 保持靜音。':'自動平衡：人聲 75%、伴樂 45% 為基準，各自最多修正 ±6 dB；下方手動數值不參與。';
+    $('balance-help').textContent=balance.manual?'手動比例＋自動微調：音量可調 0–200%，兩路各自最多修正 ±3 dB，0% 保持靜音。':'自動平衡：人聲 75%、伴樂 45% 為基準，各自最多修正 ±6 dB；下方手動數值不參與。';
     $('stop').disabled=!capture;$('download').disabled=locked||!trial;$('export').disabled=locked||!trial||!!trial.saved;
     $('delete-song-takes').disabled=locked||!draft||!songTakes().length;
     $('export').textContent=trial?.saved?'已存到錄音後處理':'存到錄音後處理';

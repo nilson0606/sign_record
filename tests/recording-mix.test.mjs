@@ -20,3 +20,15 @@ test('silence, low-level noise and unvoiced input never get automatic microphone
  assert.equal(balanceGains({backingRms:.001}).backingDb,0);
  assert.deepEqual(mixSettings({manual:'true',voice:-10,backing:Infinity}),{manual:false,voice:0,backing:30});
 });
+test('manual balance supports 200 percent on both buses with bounded automatic correction',()=>{
+ const settings={manual:true,voice:200,backing:150};
+ assert.deepEqual(mixSettings(settings),settings);
+ assert.deepEqual(mixSettings({manual:true,voice:250,backing:201}),{manual:true,voice:200,backing:200});
+ const base=balanceGains({settings});
+ assert.equal(base.voice,2);assert.equal(base.backing,1.5);
+ const adjusted=balanceGains({settings,voiceRms:.01,backingRms:.8,voiced:true});
+ assert.equal(adjusted.voiceDb,3);assert.equal(adjusted.backingDb,-3);
+ assert.ok(Math.abs(adjusted.voice-2*10**(3/20))<1e-10);
+ assert.ok(Math.abs(adjusted.backing-1.5*10**(-3/20))<1e-10);
+ assert.equal(balanceGains({settings,mode:'voice'}).backing,0);
+});

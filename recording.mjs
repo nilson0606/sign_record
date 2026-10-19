@@ -39,7 +39,7 @@ export function createSingerRecorder(options) {
     $('recording-voice-value').textContent = $('recording-voice-level').value+'%';
     $('recording-backing-value').textContent = $('recording-backing-level').value+'%';
     if (!active) $('recording-balance-status').textContent = mode==='off' ? '不保存錄音，音量平衡不啟動。' : `${manual ? '手動＋自動微調' : '自動平衡'} · 只影響錄音，不影響評分；每輪開始前設定。`;
-    $('recording-balance-help').textContent = mode==='off' ? '已關閉錄音，音量平衡不啟動。' : manual ? '手動＋自動：依你的音量設定，兩路各自最多微調 ±3 dB。0% 保持靜音；每輪開始後固定設定。' : '自動平衡：依歌唱者及配樂／和音音量平滑調整，各自最多修正 ±6 dB。下方手動音量不參與；每輪開始後固定設定。';
+    $('recording-balance-help').textContent = mode==='off' ? '已關閉錄音，音量平衡不啟動。' : manual ? '手動＋自動：音量可調 0–200%，兩路各自最多微調 ±3 dB。0% 保持靜音；每輪開始後固定設定。' : '自動平衡：依歌唱者及配樂／和音音量平滑調整，各自最多修正 ±6 dB。下方手動音量不參與；每輪開始後固定設定。';
   }
   function clearPreview() {
     review.clear();review.controls();

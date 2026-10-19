@@ -212,7 +212,7 @@ RMVPE 驗證：33 項 JavaScript、24 項 Python 測試；Edge／Chrome 的正�
 
 ### 錄音自動平衡與手動比例
 
-預設未勾選「手動設定比例＋自動微調」時自動平衡；勾選後，voice/backing 0–100% 各自作為 base gain，兩路各限 ±3 dB 修正。未勾選忽略 slider，採固定 base 與各路 ±6 dB 修正；選項在每輪開始時固定並保存於錄音 metadata，瀏覽器記住偏好。0% 始終靜音，voice-only 不連伴奏，off 不建立錄音器或混音圖。
+預設未勾選「手動設定比例＋自動微調」時自動平衡；勾選後，voice/backing 0–200% 各自作為 base gain，兩路各限 ±3 dB 修正。未勾選忽略 slider，採固定 base 與各路 ±6 dB 修正；選項在每輪開始時固定並保存於錄音 metadata，瀏覽器記住偏好。0% 始終靜音，voice-only 不連伴奏，off 不建立錄音器或混音圖。
 
 `recording-mix.mjs` 在獨立錄音分支計算兩路 RMS，以 0.18 為目標電平；麥克風需現有音高偵測報告 voiced 且 RMS > 0.008 才做增益修正，不對低電平或未發聲訊號自動增強。AudioParam 平滑增益（下降 0.3 秒、上升 0.8 秒時間常數）；混音經 compressor 與 ±0.98 峰值上限後進 MediaRecorder。此分支不更改收音 constraints，不修改評分用原始樣本或音高值。
 
