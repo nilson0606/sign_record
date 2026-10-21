@@ -345,3 +345,11 @@ button:active:not(:disabled){transform:translateY(1px)}
 :lang(en) .audition-transport{grid-template-columns:repeat(3,minmax(0,1fr))}
 :lang(en) .audition-transport button{min-width:0}
 @media(max-width:600px){:lang(en) .audition-transport{grid-template-columns:repeat(2,minmax(0,1fr))}:lang(en) .audition-transport #post-audition-stop{grid-column:1/-1}}
+
+/* Keep the complete video, including bottom subtitles, below the sticky guide.
+   Limit width at the same 16:9 ratio instead of cropping or shifting the iframe. */
+.source-card .video-shell{
+  --player-visible-height:max(120px,calc(100dvh - var(--nav-offset,104px) - 64px));
+  max-width:min(100%,calc(var(--player-visible-height) * 16 / 9));
+  aspect-ratio:16/9;
+}

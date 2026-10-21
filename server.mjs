@@ -15,7 +15,7 @@ for(const name of ['voicelab-client.mjs','voicelab-settings.mjs','arrangement-cl
 for(const name of ['voicelab-storage-client.mjs','mv-client.mjs'])files.set('/'+name,[name,'text/javascript']);
 for(const name of ['recording-diagnostics.mjs','recording-diagnostics-worklet.mjs'])files.set('/'+name,[name,'text/javascript']);
 for(const name of ['media-source.mjs','local-media-client.mjs','local-video-player.mjs'])files.set('/'+name,[name,'text/javascript']);
-for(const name of ['i18n.mjs','i18n-catalog.mjs'])files.set('/'+name,[name,'text/javascript']);
+for(const name of ['i18n.mjs','i18n-catalog.mjs','player-view.mjs'])files.set('/'+name,[name,'text/javascript']);
 files.set('/manual.en.html',['manual.en.html','text/html']);
 const server = http.createServer(async (req, res) => {
   // Older open pages still use 4273; only the recording helper owns diagnostic

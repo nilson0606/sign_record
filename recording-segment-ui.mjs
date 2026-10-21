@@ -1,4 +1,5 @@
 import {localizedConfirm} from './i18n.mjs';
+import {revealPlayerVideo} from './player-view.mjs';
 import {segmentDraft,validateSegmentDraft,normalizeSegmentNames,splitSegment,moveBoundary,mergeBoundary,formatSegmentTime as fmt,parseSegmentTime,missingSegmentRanges,composeSegmentVoice,segmentMixMetadata} from './recording-segments.mjs';
 import {remixRecording,wavBlob,delaySeconds,originalVocalRanges} from './recording-process.mjs';
 import {recordingSceneDefaultsVersion} from './recording-scenes.mjs';
@@ -42,8 +43,7 @@ export function createSegmentRecording(options) {
     if(takeURL)URL.revokeObjectURL(takeURL);takeURL=null;
   }
   function showPlayer(){
-    const target=document.getElementById('player-section');
-    target.focus({preventScroll:true});target.scrollIntoView({block:'start',behavior:'instant'});
+    revealPlayerVideo();
   }
   async function listenTake(){
     if(busy()||takeLoading||!enabled)return;

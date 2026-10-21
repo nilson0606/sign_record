@@ -1,4 +1,5 @@
 import {originalText,userText} from './i18n.mjs';
+import {revealPlayerVideo} from './player-view.mjs';
 import {selectedMediaId,selectMediaSource,isLocalMediaId} from './media-source.mjs';
 import {keyLabel,keyShift} from './song-key.mjs';
 import {recordingReviewKey} from './recording-review.mjs';
@@ -564,8 +565,7 @@ export function createKaraokeSession(options) {
       showTakeDifficulty(); take.begin(0); lastProgress = 0; rangeComplete = false; phase = 'paused';
       $('total-score').textContent = '…'; $('pitch-score').textContent = '—'; $('rhythm-score').textContent = '—'; $('coverage-score').textContent = '—';
       message('影片已回到開頭，等待播放開始。'); controls();
-      $('player-section').focus({ preventScroll: true });
-      $('player-section').scrollIntoView({ behavior: 'instant', block: 'start' });
+      revealPlayerVideo();
       if (wholeGuide) { wholeGuide.armed = true; if (reference.pitchShift || wholeGuide.mode === 'backing') p.mute?.(); else p.unMute?.(); }
       p.playVideo();
       if (p.getPlayerState() === 1) playerState(1);
