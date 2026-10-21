@@ -187,10 +187,11 @@ try{
  async function level(id,value){await $(id).fill(String(value));await $(id).dispatchEvent('input');}
  await level('segment-voice-level',0);await level('segment-backing-level',0);
  assert.equal(await $('recording-manual').isChecked(),true);assert.equal(await $('recording-voice-level').inputValue(),'0');
- assert.equal(await $('segment-export').isDisabled(),true);assert.equal(await $('segment-audio').isHidden(),true);
+ assert.equal(await $('segment-export').isEnabled(),true);assert.equal(await $('segment-audio').isHidden(),false,'volume edits keep the prepared trial available');
  await $('segment-take-mode-selected').selectOption('mix');await $('segment-listen-selected').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);
  const muted=await page.evaluate(async()=>{const c=new AudioContext({sinkId:{type:'none'}}),b=await c.decodeAudioData(await(await fetch(document.getElementById('segment-take-audio').src)).arrayBuffer());await c.close();return b.getChannelData(0).every(x=>x===0);});assert.equal(muted,true,'zero controls really mute both preview tracks');
  await level('segment-backing-level',30);
+ assert.equal(await $('segment-take-audio').evaluate(el=>el.paused),false,'adjusting a playing take does not stop it');
  await $('segment-listen-selected').click();await page.waitForFunction(()=>!document.getElementById('segment-take-audio').paused);
  const isolatedBacking=await page.evaluate(async()=>{const c=new AudioContext({sinkId:{type:'none'}}),b=await c.decodeAudioData(await(await fetch(document.getElementById('segment-take-audio').src)).arrayBuffer()),x=b.getChannelData(0),power=hz=>{let re=0,im=0;for(let i=48000;i<144000;i++){re+=x[i]*Math.cos(2*Math.PI*hz*i/b.sampleRate);im+=x[i]*Math.sin(2*Math.PI*hz*i/b.sampleRate);}return Math.hypot(re,im);};const result={voice:power(443.27),backing:power(660.37)};await c.close();return result;});assert.ok(isolatedBacking.backing>isolatedBacking.voice*100,JSON.stringify(isolatedBacking));
  await level('segment-voice-level',70);await level('segment-backing-level',30);
@@ -198,8 +199,24 @@ try{
  await page.setViewportSize({width:390,height:844});assert.ok(await $('segment-side').evaluate(el=>el.scrollWidth<=el.clientWidth+1));await page.setViewportSize({width:1440,height:1100});
  await $('segment-output').selectOption('mix');await $('segment-compose').click();await page.waitForFunction(()=>!document.getElementById('segment-export').disabled);
  const manualEnergy=await page.evaluate(async()=>{const c=new AudioContext({sinkId:{type:'none'}}),b=await c.decodeAudioData(await(await fetch(document.getElementById('segment-audio').src)).arrayBuffer());await c.close();return Math.sqrt(b.getChannelData(0).reduce((s,x)=>s+x*x,0)/b.length);});assert.ok(manualEnergy>.03&&manualEnergy<.2,manualEnergy);
+ await page.evaluate(async()=>{const a=document.getElementById('segment-audio');a.currentTime=1;await a.play();});
+ const liveSource=await $('segment-audio').getAttribute('src');
+ await level('segment-voice-level',0);await level('segment-backing-level',0);
+ assert.equal(await $('segment-audio').getAttribute('src'),liveSource,'sliders keep the same transport instead of rebuilding playback');
+ assert.equal(await $('segment-audio').evaluate(el=>el.paused),false);
+ await $('segment-export').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('已存到錄音後處理'));
+ const mutedSaved=(await page.evaluate(()=>fixtureStore.list())).find(r=>r.segmentComposition&&r.balance?.manual);
+ assert.deepEqual(mutedSaved.balance,{manual:true,voice:0,backing:0});
+ assert.equal(await page.evaluate(async row=>{const c=new AudioContext({sinkId:{type:'none'}}),b=await c.decodeAudioData(await(await fixtureStore.blob(row)).arrayBuffer());await c.close();return b.getChannelData(0).every(x=>x===0);},mutedSaved),true,'export renders the latest slider settings without a second compose');
+ const mutedHash=await page.evaluate(async row=>hash(await fixtureStore.blob(row)),mutedSaved);
+ await level('segment-voice-level',70);await level('segment-backing-level',30);
+ assert.equal(await $('segment-export').isEnabled(),true,'editing after export permits saving a new version');
  await $('segment-export').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('已存到錄音後處理'));
  const manualSaved=(await page.evaluate(()=>fixtureStore.list())).find(r=>r.segmentComposition&&r.balance?.manual);assert.deepEqual(manualSaved.balance,{manual:true,voice:70,backing:30});assert.equal(manualSaved.fixedMixGains,undefined);
+ const savedEnergy=await page.evaluate(async row=>{const c=new AudioContext({sinkId:{type:'none'}}),b=await c.decodeAudioData(await(await fixtureStore.blob(row)).arrayBuffer());await c.close();return Math.sqrt(b.getChannelData(0).reduce((s,x)=>s+x*x,0)/b.length);},manualSaved);
+ assert.ok(Math.abs(savedEnergy-manualEnergy)<.00001,'saving after unmuting rebuilds the audible mix, not just its metadata');
+ assert.notEqual(manualSaved.id,mutedSaved.id);
+ assert.equal(await page.evaluate(async row=>hash(await fixtureStore.blob(row)),mutedSaved),mutedHash,'another volume save preserves the previous saved version');
  assert.equal(await page.evaluate(async row=>hash(await fixtureStore.blob(row,'voice')),first),firstHash);
  await page.reload();await initialize();await $('segment-open').click();assert.equal(await $('segment-manual').isChecked(),true);assert.equal(await $('segment-voice-level').inputValue(),'70');assert.equal(await $('segment-backing-level').inputValue(),'30');
  await $('segment-balance-panel').locator('summary').click();await $('segment-manual').uncheck();

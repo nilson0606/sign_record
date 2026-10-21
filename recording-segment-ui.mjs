@@ -1,6 +1,7 @@
 import {segmentDraft,validateSegmentDraft,normalizeSegmentNames,splitSegment,moveBoundary,mergeBoundary,formatSegmentTime as fmt,parseSegmentTime,missingSegmentRanges,composeSegmentVoice,segmentMixMetadata} from './recording-segments.mjs';
 import {remixRecording,wavBlob,delaySeconds,originalVocalRanges} from './recording-process.mjs';
 import {recordingSceneDefaultsVersion} from './recording-scenes.mjs';
+import {createLiveRecordingPreview} from './recording-live-preview.mjs';
 
 export function createSegmentRecording(options) {
   const $=id=>document.getElementById('segment-'+id),store=options.recording.store;
@@ -13,6 +14,8 @@ export function createSegmentRecording(options) {
   let guideMode='original';
   const guideModeIds=['guide-mode'];
   const status=text=>{$('status').textContent=text;},busy=()=>work||!!capture,reference=()=>options.reference(),part=()=>draft?.parts[selected];
+  const liveOptions={settings:()=>options.recording.balanceSettings(),onError:error=>status('試聽無法播放：'+error.message)};
+  const takePreview=createLiveRecordingPreview($('take-audio'),liveOptions),trialPreview=createLiveRecordingPreview($('audio'),liveOptions);
   const clearResult=text=>{$('clear-result').textContent=text;$('clear-result').hidden=!text;};
   const storageKey=()=>`karaoke.segment-draft.v1.${key}`;
   const takeName=row=>{
@@ -26,12 +29,14 @@ export function createSegmentRecording(options) {
   }
   function invalidate(){
     clearTakePreview();
+    trialPreview.clear();
     audioEnd=null;
     $('audio').pause();$('audio').removeAttribute('src');$('audio').load();$('audio').hidden=true;
     if(trialURL)URL.revokeObjectURL(trialURL);trialURL=null;trial=null;$('export').disabled=$('download').disabled=true;
   }
   function clearTakePreview(){
     takeRequest++;takeLoading=false;takeSourceId=null;
+    takePreview.clear();
     const audio=$('take-audio');audio.pause();audio.removeAttribute('src');audio.load();audio.hidden=true;
     if(takeURL)URL.revokeObjectURL(takeURL);takeURL=null;
   }
@@ -76,9 +81,10 @@ export function createSegmentRecording(options) {
       // recorded section, including any pauses; correction moves only the voice.
       const meta=await segmentMixMetadata(raw,{...row,mode,seconds:raw.duration,sourceSeconds:raw.duration,postEdit:{version:1,start:0,end:raw.duration,fadeIn:0,fadeOut:0}},balance);if(cancelled())return;
       const preview=wavBlob(await remixRecording(raw,tracks,meta,delay));if(cancelled())return;
+      takePreview.set({raw,tracks,meta,ms:delay});
       takeURL=URL.createObjectURL(preview);$('take-audio').src=takeURL;$('take-audio').hidden=false;
       await $('take-audio').play();
-      if(request===takeRequest)status(`正在試聽本段錄音：${takeModeLabel()} · 歌聲校正 ${delay} ms，含起唱與尾音餘量。`);
+      if(request===takeRequest)status(`正在試聽本段錄音：${takeModeLabel()} · 歌聲校正 ${delay} ms。可邊聽邊調人聲與伴樂音量，不必重錄。`);
     }catch(e){if(request===takeRequest){clearTakePreview();throw e;}}
     finally{if(decoder)await decoder.close().catch(()=>{});if(request===takeRequest)takeLoading=false;render();}
   }
@@ -296,7 +302,7 @@ export function createSegmentRecording(options) {
       const meta=await segmentMixMetadata(raw,{id:crypto.randomUUID(),title:ref.title+' · 分段合成',videoId:ref.videoId,created:Date.now(),mime:'audio/wav',rawMime:'audio/wav',rawBytes:voice.size,mode,stems,seconds:plan.duration,sourceSeconds:plan.duration,complete:true,appliedDelayMs:delay,recordingDelayMs:delay,postDefaults:recordingSceneDefaultsVersion,postEdit:{version:1,start:0,end:plan.duration,fadeIn:0,fadeOut:0},segmentComposition:{version:1,draft:plan,delayMs:delay,crossfadeSeconds:.012},post:{version:1,reference:ref,scoring:{},offsetMs:delay,segments:[{offset:0,songTime:0,duration:plan.duration}],samples:[]}},balance);if(request!==serial||key!==plan.key)return;
       if(original)meta.post.originalVocals=original;
       const mix=wavBlob(await remixRecording(raw,tracks,meta,delay,{edit:meta.postEdit}));meta.bytes=mix.size;if(request!==serial||key!==plan.key)return;
-      trial={meta,mix,voice};trialURL=URL.createObjectURL(mix);$('audio').src=trialURL;$('audio').hidden=false;$('audio').load();
+      trial={meta,mix,voice,raw,tracks,dirty:false};trialPreview.set({raw,tracks,meta,ms:delay});trialURL=URL.createObjectURL(mix);$('audio').src=trialURL;$('audio').hidden=false;$('audio').load();
       if(join){$('audio').currentTime=Math.max(0,part().start-3);audioEnd=Math.min(plan.duration,part().end+3);await $('audio').play();}
       status(`已試合完整 ${fmt(plan.duration)} · ${mode==='mix'?'人聲＋伴樂／和音':'純人聲'} · 歌聲校正 ${delay} ms${original?` · 原唱加入 ${ranges.length} 個區間`:''}。目前為暫存試聽；滿意後按「存到錄音後處理」。`);
     }finally{await decoder.close().catch(()=>{});work=false;render();options.changed();}
@@ -334,11 +340,24 @@ export function createSegmentRecording(options) {
     if(busy()||conflict)return;
     options.recording.setBalanceSettings({manual:$('manual').checked,voice:Number($('voice-level').value),backing:Number($('backing-level').value)});
   };
-  window.addEventListener('recording-balance-changed',()=>{invalidate();render();if(enabled)status('音量平衡已記住，與「從頭開始唱」共用。請重新試聽或試合；原始錄音與已存成品保留。');});
+  window.addEventListener('recording-balance-changed',()=>{
+    takePreview.update();trialPreview.update();
+    if(trial){
+      if(trial.saved){trial.meta={...trial.meta,id:crypto.randomUUID(),created:Date.now()};trial.saved=false;}
+      trial.meta.balance=options.recording.balanceSettings();trial.dirty=true;
+    }
+    render();if(enabled)status(takeSourceId&&takeMode==='voice'?'音量已記住。純人聲原檔試聽不套用音量，請選「人聲＋伴樂／和音」邊聽邊調整。':'音量已即時套用，可繼續邊聽邊調整。滿意後試合完整一版並存到錄音後處理；已試合的版本可直接保存最新音量。');
+  });
   for(const id of takeModeIds)$(id).onchange=()=>{takeMode=$(id).value==='voice'?'voice':'mix';clearTakePreview();render();status(`已切換為${takeModeLabel()}，請按「試聽本段錄音」。`);};
   for(const id of guideModeIds)$(id).onchange=()=>{guideMode=$(id).value==='backing'?'backing':'original';render();status(guideMode==='backing'?'下次分段錄音只用伴樂／和音帶唱。':'下次分段錄音播放原唱＋伴樂帶唱。');};
-  action('export',async()=>{if(!trial||trial.saved||busy())return;work=true;render();options.changed();try{await store.saveRemix(trial.meta,trial.mix,trial.voice);trial.saved=true;await options.recording.refresh(trial.meta.id);window.dispatchEvent(new CustomEvent('karaoke-recording-saved',{detail:{cacheId:reference()?.cacheId}}));status('已存到錄音後處理，可繼續調整與 A/B 比較。分段素材仍保留在分段區。');}finally{work=false;render();options.changed();}});
-  action('download',()=>{if(!trial)return;const a=document.createElement('a');a.href=trialURL;a.download=trial.meta.title.replace(/[\\/:*?"<>|]/g,'_')+`-${trial.meta.mode}-${trial.meta.appliedDelayMs}ms.wav`;a.click();});
+  async function latestTrialMix(){
+    if(!trial.dirty)return;
+    status('正在將最新試聽音量合成至成品…');
+    const mix=wavBlob(await remixRecording(trial.raw,trial.tracks,trial.meta,trial.meta.appliedDelayMs,{edit:trial.meta.postEdit}));
+    trial.mix=mix;trial.meta.bytes=mix.size;trial.dirty=false;
+  }
+  action('export',async()=>{if(!trial||trial.saved||busy())return;work=true;render();options.changed();try{await latestTrialMix();await store.saveRemix(trial.meta,trial.mix,trial.voice);trial.saved=true;await options.recording.refresh(trial.meta.id);window.dispatchEvent(new CustomEvent('karaoke-recording-saved',{detail:{cacheId:reference()?.cacheId}}));status('已存到錄音後處理，已套用最新音量，可繼續後製與 A/B 比較。分段素材仍保留在分段區。');}finally{work=false;render();options.changed();}});
+  action('download',async()=>{if(!trial||busy())return;work=true;render();options.changed();try{await latestTrialMix();const url=URL.createObjectURL(trial.mix),a=document.createElement('a');a.href=url;a.download=trial.meta.title.replace(/[\\/:*?"<>|]/g,'_')+`-${trial.meta.mode}-${trial.meta.appliedDelayMs}ms.wav`;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}finally{work=false;render();options.changed();}});
   $('part').onchange=()=>{selected=Number($('part').value);loop=false;render();};$('boundary').onchange=()=>{boundary=Number($('boundary').value);render();};
   $('name').onchange=()=>change(()=>{const name=$('name').value.trim();part().autoName=!name;part().name=name||`第 ${selected+1} 段`;});$('boundary-time').onchange=()=>change(()=>moveBoundary(draft,boundary,parseSegmentTime($('boundary-time').value)));
   $('take').onchange=()=>change(()=>{part().takeId=$('take').value||null;});
@@ -361,6 +380,6 @@ export function createSegmentRecording(options) {
       syncMonitor(capture,t);const p=part();status(t<p.start?`準備起唱 · 還有 ${(p.start-t).toFixed(1)} 秒`:`● ${t>=p.end?'保留尾音':'錄製中'} · ${p.name} · ${fmt(t)}`);
     }else if(!busy()&&player?.getPlayerState?.()===1){if(loop&&t>=part().end)player.seekTo(part().start,true);else if(previewEnd!==null&&t>=previewEnd){player.pauseVideo();previewEnd=null;}}
   },80);
-  window.addEventListener('pagehide',()=>{clearInterval(timer);stop();invalidate();});render();
+  window.addEventListener('pagehide',()=>{clearInterval(timer);stop();invalidate();takePreview.dispose();trialPreview.dispose();});render();
   return {enabled:()=>enabled,busy,enter,leave,referenceChanged,playerState,stop};
 }

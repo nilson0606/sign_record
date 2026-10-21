@@ -9,7 +9,7 @@ for(const name of ['song-key.mjs','key-playback.mjs'])files.set('/'+name,[name,'
 files.set('/recording-scenes.mjs',['recording-scenes.mjs','text/javascript']);
 files.set('/recording-review.mjs',['recording-review.mjs','text/javascript']);
 files.set('/library-recordings.mjs',['library-recordings.mjs','text/javascript']);
-for(const name of ['recording-segments.mjs','recording-segment-ui.mjs'])files.set('/'+name,[name,'text/javascript']);
+for(const name of ['recording-segments.mjs','recording-segment-ui.mjs','recording-live-preview.mjs'])files.set('/'+name,[name,'text/javascript']);
 for(const name of ['recording-repair.mjs','recording-repair-client.mjs','recording-repair-worker.mjs'])files.set('/'+name,[name,'text/javascript']);
 for(const name of ['voicelab-client.mjs','voicelab-settings.mjs','arrangement-client.mjs','arrangement-settings.mjs'])files.set('/'+name,[name,'text/javascript']);
 for(const name of ['voicelab-storage-client.mjs','mv-client.mjs'])files.set('/'+name,[name,'text/javascript']);

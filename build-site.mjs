@@ -7,7 +7,7 @@ export const assets = ['style.css','theme.mjs','app.mjs','native-microphone.mjs'
 assets.push('recording-scenes.mjs','song-key.mjs','key-playback.mjs');
 assets.push('recording-review.mjs','recording-diagnostics.mjs','recording-diagnostics-worklet.mjs');
 assets.push('library-recordings.mjs');
-assets.push('recording-segments.mjs','recording-segment-ui.mjs');
+assets.push('recording-segments.mjs','recording-segment-ui.mjs','recording-live-preview.mjs');
 assets.push('recording-repair.mjs','recording-repair-client.mjs','recording-repair-worker.mjs');
 assets.push('voicelab-client.mjs','voicelab-settings.mjs','arrangement-client.mjs','arrangement-settings.mjs');
 assets.push('mv-client.mjs','media-source.mjs','local-media-client.mjs','local-video-player.mjs');
