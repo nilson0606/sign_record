@@ -1,3 +1,4 @@
+import {localizedConfirm} from './i18n.mjs';
 import {prepareRecordingDiagnostics} from './recording-diagnostics.mjs';
 import { recordingTuningSuffix } from './recording-tune.mjs';
 import { recordingSofteningSuffix, recordingEffectsSuffix } from './recording-soften.mjs';
@@ -57,14 +58,14 @@ export function createSingerRecorder(options) {
     if (!rows.length) { const li = document.createElement('li'); li.textContent = '尚無演唱錄音。'; list.append(li); }
     for (const row of rows) {
       const li = document.createElement('li'), label = document.createElement('strong'), info = document.createElement('small'), buttons = document.createElement('div');
-      label.textContent = row.title + recordingEffectsSuffix(row)+recordingSofteningSuffix(row)+recordingTuningSuffix(row) + (recordingDelaySuffix(row) ? ' '+recordingDelaySuffix(row) : '');
+      label.dataset.i18nUser=''; label.textContent = row.title + recordingEffectsSuffix(row)+recordingSofteningSuffix(row)+recordingTuningSuffix(row) + (recordingDelaySuffix(row) ? ' '+recordingDelaySuffix(row) : '');
       info.textContent = `${new Date(row.created).toLocaleString()} · ${row.mode === 'mix' ? (row.stems?.includes('backing') ? '歌唱者＋配樂／和音' : '歌唱者＋配樂（無獨立和音）') : '歌唱者'}${row.balance ? (row.balance.manual ? ' · 手動＋自動' : ' · 自動平衡') : ''} · ${row._archiveRoot?'歌曲庫錄音目錄':'瀏覽器待搬存'} · ${Math.round(row.seconds)} 秒${Number.isFinite(row.appliedDelayMs)?' · 歌聲校正 '+row.appliedDelayMs+' ms':''}${row.complete ? '' : ' · 未正常結束，保留已儲存片段'}`;
       buttons.className = 'button-row';
       for (const [text, action] of [
         ['試聽', async () => { await stop(); options.pausePlayer(); clearPreview(); previewURL = URL.createObjectURL(await store.blob(row)); $('recording-audio').src = previewURL; $('recording-audio').hidden = false; await $('recording-audio').play(); }],
         ['後處理', async () => { await stop(); post.select(row.id); }],
         ['下載', async () => download(await store.blob(row), row)],
-        ['刪除', async () => { if(!confirm('刪除這筆錄音、原始歌聲及其後處理資料？此操作無法復原。'))return; clearPreview();post.clearAudio(); await store.delete(row.id); await render(); }],
+        ['刪除', async () => { if(!localizedConfirm('刪除這筆錄音、原始歌聲及其後處理資料？此操作無法復原。'))return; clearPreview();post.clearAudio(); await store.delete(row.id); await render(); }],
       ]) {
         const button = document.createElement('button'); button.type = 'button'; button.className = 'secondary'; button.textContent = text;
         button.addEventListener('click', async () => { button.disabled = true; try { await action(); } catch (error) { status(error.message); } finally { button.disabled = false; } }); buttons.append(button);
@@ -255,7 +256,7 @@ export function createSingerRecorder(options) {
   window.addEventListener('recording-post-saved',()=>render().catch(error=>status(error.message)));
   $('recording-delete-all').addEventListener('click',async()=>{
     if(active){status('請先停止收音，再刪除全部錄音。');return;}
-    if(!confirm('刪除此清單中的整首錄音、已保存成品及其後處理資料？待確認錄音、分段素材、歌曲基準與分離音軌保留。此操作無法復原。'))return;
+    if(!localizedConfirm('刪除此清單中的整首錄音、已保存成品及其後處理資料？待確認錄音、分段素材、歌曲基準與分離音軌保留。此操作無法復原。'))return;
     const button=$('recording-delete-all');button.disabled=true;
     try{await stop();options.pausePlayer();clearPreview();post.clearAudio();const rows=(await store.list()).filter(isPostRecording);let deleted=0;for(const row of rows){await store.delete(row.id);status(`正在清除後處理錄音：${++deleted}／${rows.length} 筆…`);}await render();status(`已刪除 ${rows.length} 筆錄音及其後處理資料；待確認錄音與分段素材保留。`);}catch(error){status('未全部刪除：'+error.message);}finally{button.disabled=false;}
   });

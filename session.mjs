@@ -1,3 +1,4 @@
+import {originalText,userText} from './i18n.mjs';
 import {selectedMediaId,selectMediaSource,isLocalMediaId} from './media-source.mjs';
 import {keyLabel,keyShift} from './song-key.mjs';
 import {recordingReviewKey} from './recording-review.mjs';
@@ -118,7 +119,7 @@ export function createKaraokeSession(options) {
 
   function controls() {
     $('preparation-fields').disabled=!!take||segmented?.busy()||['preparing','finishing','restarting'].includes(phase);
-    $('preparation-summary').textContent=['clip-seconds','separation-model','separation-method','vocal-mode','pitch-method'].map(id=>$(id).selectedOptions[0]?.textContent??'').join(' · ')+($('keep-preview').checked?' · 保留音軌':' · 不保留音軌');
+    $('preparation-summary').textContent=['clip-seconds','separation-model','separation-method','vocal-mode','pitch-method'].map(id=>originalText($(id).selectedOptions[0])).join(' · ')+($('keep-preview').checked?' · 保留音軌':' · 不保留音軌');
     $('preparation-reset').disabled=!!take||['preparing','finishing','restarting'].includes(phase);
     for(const [element,disabled]of segmentLocks)element.disabled=disabled;segmentLocks.clear();
     if (phase === 'finishing') { $('mic-start').disabled = true; $('mic-stop').disabled = true; }
@@ -328,7 +329,7 @@ export function createKaraokeSession(options) {
       const keyVideos=new Set(songs.filter(song=>song.pitchShift).map(song=>song.videoId)),groups=new Map();
       for (const song of songs) {
         const li = document.createElement('li'), title = document.createElement('strong'), detail = document.createElement('small');
-        title.textContent = song.title;
+        title.dataset.i18nUser=''; title.textContent = song.title;
         detail.textContent = `${keyLabel(song.pitchShift || 0)} · ${modelName(song.separationModel)} · ${methodName(song.separationMethod)} · ${(song.pitchMethod || 'yin').toUpperCase()} 音高 · ${song.seconds ? '前 ' + song.seconds + ' 秒' : '完整歌曲'} · ${song.vocalMode === 'lead' ? '主唱模式' : '一般人聲'} · ${(song.bytes / 1024 / 1024).toFixed(2)} MB · ${song.hasPreview ? (song.vocalMode === 'lead' ? '含主唱／和音等 4 軌試聽' : '含人聲／伴奏試聽') : '只有旋律基準'}`;
         const load = document.createElement('button'), remove = document.createElement('button');
         load.type = remove.type = 'button'; load.className = 'song-choice'; remove.className = 'secondary song-delete'; remove.textContent = '刪除';
@@ -366,7 +367,7 @@ export function createKaraokeSession(options) {
         });
         li.append(load, remove);
         if(keyVideos.has(song.videoId)){
-          if(!groups.has(song.videoId)){const group=document.createElement('li'),fold=document.createElement('details'),heading=document.createElement('summary'),versions=document.createElement('ul');group.className='song-key-group';fold.open=true;heading.textContent=song.baseTitle || song.title;versions.className='library-list key-versions';fold.append(heading,versions);group.append(fold);list.append(group);groups.set(song.videoId,versions);}
+          if(!groups.has(song.videoId)){const group=document.createElement('li'),fold=document.createElement('details'),heading=document.createElement('summary'),versions=document.createElement('ul');group.className='song-key-group';fold.open=true;heading.dataset.i18nUser='';heading.textContent=song.baseTitle || song.title;versions.className='library-list key-versions';fold.append(heading,versions);group.append(fold);list.append(group);groups.set(song.videoId,versions);}
           groups.get(song.videoId).append(li);
         }else list.append(li);
       }
@@ -399,7 +400,7 @@ export function createKaraokeSession(options) {
     renderedHistory.map((row,index)=>({...row,index})).reverse().forEach(row => {
       const li = document.createElement('li'), label = document.createElement('label'), check = document.createElement('input'), title = document.createElement('span'), score = document.createElement('b');
       label.className = 'check-option'; check.type = 'checkbox'; check.value = row.index; check.setAttribute('aria-label', `選取 ${row.title} ${row.score} 分`);
-      check.addEventListener('change',historySelection); title.textContent = row.title; score.textContent = `${row.score} 分`;
+      check.addEventListener('change',historySelection); title.dataset.i18nUser=''; title.textContent = row.title; score.textContent = `${row.score} 分`;
       label.append(check,title); li.append(label,score); list.append(li);
     });
     historySelection();
@@ -422,7 +423,7 @@ export function createKaraokeSession(options) {
     $('take-difficulty').textContent = `本輪已結算 · 評分難度：${take.profile.label}`;
     $('total-score').textContent = result.score === null ? '—' : String(result.score);
     $('pitch-score').textContent = String(result.pitch); $('rhythm-score').textContent = String(result.rhythm); $('coverage-score').textContent = String(result.coverage);
-    $('result-title').textContent = title;
+    $('result-title').replaceChildren(userText(title));
     let saved = true;
     if (result.score !== null) { try { localStorage.setItem(HISTORY, JSON.stringify([...historyRows(), savedResult(title, result.score)].slice(-100))); } catch { saved = false; } }
     options.player()?.pauseVideo?.();
@@ -475,7 +476,7 @@ export function createKaraokeSession(options) {
         await keyPlayback.load(reference);if(current!==generation)return;
         phase = 'ready';
         $('prepare-status').textContent = `已就緒：${reference.title} · ${modelName(reference.separationModel)} · ${methodName(reference.separationMethod)} · ${reference.pitchMethod.toUpperCase()} 音高 · ${reference.vocalMode === 'lead' ? '主唱／和音模式' : '一般人聲模式'} · ${Math.round(reference.duration)} 秒 · ${state.cached ? '直接載入本機基準' : '已保存到本機'}${reference.hasPreview ? '，可試聽分離結果' : '，音檔已清除'}。`;
-        $('result-title').textContent = reference.title + (reference.vocalMode === 'lead' ? ' · 以主唱評分' : '');
+        $('result-title').replaceChildren(userText(reference.title),document.createTextNode(reference.vocalMode === 'lead' ? ' · 以主唱評分' : ''));
         for (const id of ['total-score','pitch-score','rhythm-score','coverage-score']) $(id).textContent = '—';
         if (reference.beats.length && reference.bpm) {
           options.stopBeats(); $('bpm').value = reference.bpm; $('bpm').disabled = true; $('beat-toggle').disabled = true;

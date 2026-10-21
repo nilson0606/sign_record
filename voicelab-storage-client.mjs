@@ -1,3 +1,4 @@
+import {localizedConfirm} from './i18n.mjs';
 const base='http://127.0.0.1:4274';
 const size=n=>n>=1024**3?(n/1024**3).toFixed(2)+' GB':(n/1024**2).toFixed(1)+' MB';
 async function request(route,options={}){
@@ -46,7 +47,7 @@ export function createVoiceLabStorage({getProtectedIds=()=>[],beforePlay=()=>{}}
         const snapshot=await(await request(route)).json(),entries=snapshot.entries.filter(e=>!e.locked);
         if(!entries.length){message='清理完成：目前沒有可清理的 MV。';return;}
         const total=entries.reduce((sum,e)=>sum+e.bytes,0);
-        if(!window.confirm(`清除全部 ${entries.length} 部 MV（${size(total)}）？\n位置：${snapshot.root}\n\n包含目前歌曲庫內所有歌曲由本工具產生的 MV 成品，永久刪除後無法復原。原始影片、歌曲、錄音、音色模型與製作中的暫存都保留。`)){message='已取消清理，MV 保留。';return;}
+        if(!localizedConfirm(`清除全部 ${entries.length} 部 MV（${size(total)}）？\n位置：${snapshot.root}\n\n包含目前歌曲庫內所有歌曲由本工具產生的 MV 成品，永久刪除後無法復原。原始影片、歌曲、錄音、音色模型與製作中的暫存都保留。`)){message='已取消清理，MV 保留。';return;}
         stopPreview();
         for(let offset=0;offset<entries.length;offset+=500){
           say(`正在清理 MV：${count}／${entries.length} 部…`);
@@ -64,7 +65,7 @@ export function createVoiceLabStorage({getProtectedIds=()=>[],beforePlay=()=>{}}
       const ids=selected();if(busy||!ids.length)return;
       const entries=catalog.entries.filter(e=>ids.includes(e.id)),bytes=entries.reduce((sum,e)=>sum+e.bytes,0);
       const warning=kind==='temp'?'會永久刪除選取的轉換暫存，未保存的舊試聽將無法再取回。已保存錄音、音色模型及 MV 保留。':'會永久刪除選取的本機 MP4，無法復原。原始音檔與已保存錄音保留。';
-      if(!window.confirm(`刪除 ${ids.length} 項（${size(bytes)}）？\n位置：${catalog.root}\n${entries.slice(0,5).map(e=>e.name).join('\n')}${entries.length>5?'\n…':''}\n\n${warning}`))return;
+      if(!localizedConfirm(`刪除 ${ids.length} 項（${size(bytes)}）？\n位置：${catalog.root}\n${entries.slice(0,5).map(e=>e.name).join('\n')}${entries.length>5?'\n…':''}\n\n${warning}`))return;
       busy=true;controls();if(ids.includes(previewId))stopPreview();
       let message;
       try{const removed=await(await request(route,{method:'DELETE',body:JSON.stringify({root:catalog.root,ids})})).json();message=`已刪除 ${removed.deleted.length} 項，釋出 ${size(removed.bytes)}。`;if(kind==='mv')window.dispatchEvent(new CustomEvent('mv-library-deleted',{detail:{names:entries.filter(e=>removed.deleted.includes(e.id)).map(e=>e.name)}}));}

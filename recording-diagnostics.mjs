@@ -1,3 +1,4 @@
+import {localizedConfirm} from './i18n.mjs';
 const base='http://127.0.0.1:4274',key='karaoke.recording-diagnostics.v1';
 let enabled=true,busy=0,tokenPromise;
 try{enabled=localStorage.getItem(key)!=='off';}catch{}
@@ -19,7 +20,7 @@ export function initRecordingDiagnostics(){
   toggle.addEventListener('change',()=>{enabled=toggle.checked;try{localStorage.setItem(key,enabled?'on':'off');}catch{}status(enabled?'待命：只在演唱錄音時收集。':'診斷已關閉，已保存資料仍保留。');});
   $('diagnostics-refresh').addEventListener('click',refreshDiagnostics);
   $('diagnostics-clear').addEventListener('click',async()=>{
-    if(busy)return;if(!confirm('清除所有錄音診斷資料？歌曲、演唱錄音與後處理成品都會保留。'))return;
+    if(busy)return;if(!localizedConfirm('清除所有錄音診斷資料？歌曲、演唱錄音與後處理成品都會保留。'))return;
     busy++;controls();try{const r=await request('/diagnostics','DELETE');status(`已清除 ${r.cleared} 次診斷；錄音與歌曲保留。`);}catch(e){status('未清除：'+e.message);}finally{busy--;controls();await refreshDiagnostics();}
   });
   status(enabled?'待命：只在演唱錄音時收集。':'診斷已關閉，已保存資料仍保留。');refreshDiagnostics();

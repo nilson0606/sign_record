@@ -1,3 +1,4 @@
+import {localizedConfirm} from './i18n.mjs';
 import {segmentDraft,validateSegmentDraft,normalizeSegmentNames,splitSegment,moveBoundary,mergeBoundary,formatSegmentTime as fmt,parseSegmentTime,missingSegmentRanges,composeSegmentVoice,segmentMixMetadata} from './recording-segments.mjs';
 import {remixRecording,wavBlob,delaySeconds,originalVocalRanges} from './recording-process.mjs';
 import {recordingSceneDefaultsVersion} from './recording-scenes.mjs';
@@ -93,7 +94,7 @@ export function createSegmentRecording(options) {
     const row=validRows().find(r=>r.id===part()?.takeId&&r.segmentTake);
     if(!row)return;
     const uses=draft.parts.filter(p=>p.takeId===row.id).length;
-    if(!confirm(`刪除「${takeName(row)} · ${new Date(row.created).toLocaleString()} · ${row.seconds.toFixed(1)} 秒」這一版錄音？\n目前有 ${uses} 段選用此版本，刪除後需重新挑選。\n此版人聲及錄音檔會刪除，無法復原；其他版本與已另存成品保留。`))return;
+    if(!localizedConfirm(`刪除「${takeName(row)} · ${new Date(row.created).toLocaleString()} · ${row.seconds.toFixed(1)} 秒」這一版錄音？\n目前有 ${uses} 段選用此版本，刪除後需重新挑選。\n此版人聲及錄音檔會刪除，無法復原；其他版本與已另存成品保留。`))return;
     persist();work=true;invalidate();loop=false;previewEnd=null;options.player()?.pauseVideo?.();options.pauseOther();render();options.changed();
     let deleted=false;
     try{
@@ -113,7 +114,7 @@ export function createSegmentRecording(options) {
       // Read a fresh list, then delete only the explicitly confirmed song's segment sources.
       rows=await store.list();const targets=songTakes();
       if(!targets.length){const text='此歌曲的分段錄音已清空，目前剩餘 0 筆。';status(text);clearResult(text);return;}
-      if(!confirm(`清除「${reference().title}」的全部 ${targets.length} 筆分段錄音？\n包含各段所有演唱版本，刪除後無法復原。\n段落分界、其他歌曲、整首錄音及錄音後處理中的已存成品都會保留。`)){clearResult('已取消清除，錄音保留。');return;}
+      if(!localizedConfirm(`清除「${reference().title}」的全部 ${targets.length} 筆分段錄音？\n包含各段所有演唱版本，刪除後無法復原。\n段落分界、其他歌曲、整首錄音及錄音後處理中的已存成品都會保留。`)){clearResult('已取消清除，錄音保留。');return;}
       persist();invalidate();loop=false;previewEnd=null;options.player()?.pauseVideo?.();options.pauseOther();
       clearResult(`正在清除 ${targets.length} 筆分段錄音…`);
       const failed=[];let processed=0;
@@ -188,7 +189,7 @@ export function createSegmentRecording(options) {
     $('take-info').textContent=take?`本段錄音：${takeName(take)} · ${new Date(take.created).toLocaleTimeString()} · ${takeModeLabel()} · ${takeMode==='voice'?'直接播放原始收音':`歌聲校正 ${$('delay').value} ms（含起唱與尾音餘量）`}${take.diagnostics?.status==='incomplete'?' · 診斷未完整保存：'+take.diagnostics.error:take.diagnostics?.status==='saved'?' · 診斷已保存':''}`:'本段尚未選用錄音；錄完保存後即可試聽，也可在右側挑選已錄版本。';
     renderOriginal(locked||!draft);
     if(!draft)return;
-    const p=part();$('song').textContent=ref?.title||'';$('seek').max=draft.duration;
+    const p=part();$('song').dataset.i18nUser='';$('song').textContent=ref?.title||'';$('seek').max=draft.duration;
     $('selected-summary').textContent=`${p.name} · ${fmt(p.start)}–${fmt(p.end)}`;
     $('part').replaceChildren();draft.parts.forEach((p,i)=>option($('part'),String(i),`${p.name} · ${fmt(p.start)}–${fmt(p.end)}`));$('part').value=String(selected);
     $('name').value=p.name;$('boundary').replaceChildren();draft.parts.slice(1).forEach((p,i)=>option($('boundary'),String(i+1),`${i+1}｜${fmt(p.start)}`));$('boundary').value=String(boundary);

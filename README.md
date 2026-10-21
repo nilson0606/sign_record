@@ -4,6 +4,19 @@
 
 桌機 Windows + Chrome／Edge 優先。GitHub Pages 提供介面；YouTube 音訊取得、格式驗證、人聲分離、旋律／節拍估計，以及麥克風評分都在自己的電腦執行。本專案僅提供桌機版。
 
+## 介面語言 / Interface language
+
+預設繁體中文；頁首「語言 / Language」可切換 English，並在此瀏覽器記住選擇。切換不重載頁面、不停止試聽，也不改動歌曲、錄音、音量或延時設定。說明連結會開啟相同語言的操作手冊。
+
+The interface defaults to Traditional Chinese. Choose **English** in the header; the choice is remembered in this browser. Switching language preserves playback and settings. See the [English user guide](manual.en.html).
+
+### Translation maintenance
+
+- Keep UI translations in `i18n-catalog.mjs`. Exact Chinese messages are keys; dynamic templates use numbered placeholders. The third array lists UI-fragment slots that may be translated recursively; the optional fourth lists generated segment-name slots. Leave user titles, model names, and paths out of those lists.
+- `i18n.mjs` translates text and accessibility attributes in place and retains their Chinese source for switching back. Unknown diagnostic messages remain verbatim. It does not translate stored metadata, input values, or filenames, and makes no translation service requests.
+- Mark pure user text with `data-i18n-user`, or use `userText` / `userOption`. Use `originalText` when composing another message from translated DOM text, and `localizedConfirm` for confirmation dialogs. Do not use displayed text as application state.
+- Run `npm test`, `node build-site.mjs`, and `node tests/i18n-browser-check.mjs` (Playwright and desktop Edge required). The browser check uses isolated fixtures and verifies language coverage, preserved values and playback, persistence, dialogs, and both manuals.
+
 ## 獨立環境（2026-09-25）
 
 本專案從 0925 評分版還原點建立；第一版 UI 已依討論收合設定、遮罩與試聽。GitHub Pages 只發布 `build-site.mjs` 明確列出的網頁資產，歌曲、分離音軌、錄音、模型、Python 執行環境與本機路徑設定不會上傳。

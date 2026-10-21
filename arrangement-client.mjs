@@ -1,3 +1,4 @@
+import {originalText,localizedConfirm} from './i18n.mjs';
 import {wavBlob} from './recording-process.mjs';
 import {ARRANGEMENT_PRESETS,ARRANGEMENT_INSTRUMENTS,ARRANGEMENT_STYLES,ARRANGEMENT_MOODS,ARRANGEMENT_CHORDS,ARRANGEMENT_KEYS,arrangementSections,arrangementPlan,arrangementSettings,arrangementRange,arrangementLabel} from './arrangement-settings.mjs';
 const $=id=>document.getElementById('arrangement-'+id),BASE='http://127.0.0.1:4274';
@@ -32,7 +33,7 @@ export function createArrangement({getReference,beforePlay}){
   }
   function libraryRelation(){
     const labels={match:'同曲同版本',related:'同曲・不同分離版本',other:'其他歌曲',none:'未載入歌曲'};
-    for(const option of $('library').options){const meta=library.find(m=>m.id===option.value);if(!meta)continue;const kind=relation(meta);option.dataset.relation=kind;const text=`【${labels[kind]}】${meta.title}`;if(option.textContent!==text)option.textContent=text;}
+    for(const option of $('library').options){const meta=library.find(m=>m.id===option.value);if(!meta)continue;const kind=relation(meta);option.dataset.relation=kind;const text=`【${labels[kind]}】${meta.title}`;if(originalText(option)!==text)option.textContent=text;}
     const selected=library.find(m=>m.id===$('library').value),kind=selected?relation(selected):'none';
     $('library').dataset.relation=kind;$('library-relation').dataset.relation=kind;
     const title=getReference()?.title??'目前歌曲';
@@ -64,12 +65,12 @@ export function createArrangement({getReference,beforePlay}){
   async function refresh(){const data=await(await request('/arrangements/library')).json();library=data.records;const previous=$('library').value;$('library').replaceChildren(new Option(library.length?'選擇已保存配樂':'尚無已保存配樂',''));for(const m of library)$('library').add(new Option(m.title,m.id));if(library.some(m=>m.id===previous))$('library').value=previous;$('library-path').textContent=`本機保存位置：${data.path}。共 ${library.length} 份，包含所有歌曲與分離版本。`;controls();}
   async function cancel(){revision++;player.pause();if(active)await request('/arrangements/jobs/'+active,{method:'DELETE'}).catch(()=>{});say('已取消；原曲保留。');}
   $('cancel').addEventListener('click',()=>void cancel());
-  $('enable').addEventListener('change',async()=>{modelReady=false;controls();if(!enabled()){void cancel();return;}syncSource();const rev=revision;try{const state=await(await request('/arrangements')).json();if(rev!==revision||!enabled())return;modelReady=state.installed===true&&state.model==='midi-sag';$('model-state').textContent=modelReady?'MIDI-SAG 已通過本機生成驗證。':state.model==='midi-sag'?(state.message||'MIDI-SAG 尚未安裝與驗證完成，暫不開放生成。'):'請重新啟動新版本機工具，以使用 MIDI-SAG。';say(modelReady?'MIDI-SAG 已就緒，預選整首；可調整和弦與音色方向。':$('model-state').textContent);controls();await refresh();}catch(e){say(e.message);}});
+  $('enable').addEventListener('change',async()=>{modelReady=false;controls();if(!enabled()){void cancel();return;}syncSource();const rev=revision;try{const state=await(await request('/arrangements')).json();if(rev!==revision||!enabled())return;modelReady=state.installed===true&&state.model==='midi-sag';$('model-state').textContent=modelReady?'MIDI-SAG 已通過本機生成驗證。':state.model==='midi-sag'?(state.message||'MIDI-SAG 尚未安裝與驗證完成，暫不開放生成。'):'請重新啟動新版本機工具，以使用 MIDI-SAG。';say(modelReady?'MIDI-SAG 已就緒，預選整首；可調整和弦與音色方向。':originalText($('model-state')));controls();await refresh();}catch(e){say(e.message);}});
   $('panel').addEventListener('toggle',()=>{if(!$('panel').open)player.pause();});
   $('refresh').addEventListener('click',()=>void refresh().catch(e=>say(e.message)));$('library').addEventListener('change',controls);
   $('delete').addEventListener('click',async()=>{
     if(busy||saving||locked)return;const meta=library.find(m=>m.id===$('library').value);if(!meta)return;
-    if(!window.confirm(`刪除這份已保存配樂？\n${meta.title}\n\n會移除本機配樂檔案，無法復原。`))return;
+    if(!localizedConfirm(`刪除這份已保存配樂？\n${meta.title}\n\n會移除本機配樂檔案，無法復原。`))return;
     saving=true;controls();
     try{await request(`/arrangements/library/${meta.id}?root=${encodeURIComponent(meta._archiveRoot)}`,{method:'DELETE'});
       if(result&&(result.meta.id===meta.id||result.jobId===meta.id))clear();

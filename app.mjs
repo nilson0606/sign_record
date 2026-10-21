@@ -1,3 +1,4 @@
+import {originalText,userOption} from './i18n.mjs';
 import {nativeInputDevices,openNativeMicrophone} from './native-microphone.mjs';
 import {isLocalMediaId,selectedMediaId,selectMediaSource} from './media-source.mjs';
 import {localVideoPlayer} from './local-video-player.mjs';
@@ -90,7 +91,7 @@ function createVoiceOutput() {
         output=session;
         await session.speaker.ready;
         if(current!==request||source!==input||!toggle.checked){release(session);return;}
-        message.textContent='本機歌聲直送喇叭中 · '+device.selectedOptions[0].textContent;
+        message.textContent='本機歌聲直送喇叭中 · '+originalText(device.selectedOptions[0]);
         return;
       }
       const context=new AudioContext({latencyHint:'interactive',...(native?.createMonitorSource?{sampleRate:native.monitorSampleRate}:{})});
@@ -106,7 +107,7 @@ function createVoiceOutput() {
       session.gain.gain.value=Number(volume.value)/100;
       session.source.connect(session.gain);session.gain.connect(context.destination);
       context.onstatechange=()=>{if(output===session&&context.state!=='running')silence('歌聲輸出已暫停，請確認喇叭後重新開啟。');};
-      message.textContent='低延遲歌聲輸出中 · '+device.selectedOptions[0].textContent;
+      message.textContent='低延遲歌聲輸出中 · '+originalText(device.selectedOptions[0]);
     }catch(error){
       release(session);
       if(current!==request)return;
@@ -120,7 +121,7 @@ function createVoiceOutput() {
       if(current!==deviceRequest)return;
       device.disabled=!(native?.speakerDevices||canChoose);
       device.replaceChildren(new Option('系統預設喇叭',''));
-      if(native?.speakerDevices||canChoose)for(const [i,d] of (devices||[]).filter(d=>d.kind==='audiooutput'&&d.deviceId&&d.deviceId!=='default').entries())device.append(new Option(d.label||'喇叭 '+(i+1),d.deviceId));
+      if(native?.speakerDevices||canChoose)for(const [i,d] of (devices||[]).filter(d=>d.kind==='audiooutput'&&d.deviceId&&d.deviceId!=='default').entries())device.append(d.label?userOption(d.label,d.deviceId):new Option('喇叭 '+(i+1),d.deviceId));
       if([...device.options].some(o=>o.value===previous))device.value=previous;
       else if(toggle.checked)silence('原輸出裝置已離線，請重新選擇喇叭並開啟歌聲輸出。');
       if(!native?.speakerDevices&&!canChoose&&!toggle.checked)message.textContent='此瀏覽器使用系統預設喇叭；開啟麥克風後可勾選歌聲輸出。';
@@ -452,7 +453,7 @@ async function refreshInputs() {
     if(request!==inputRefreshGeneration||mode!==$('capture-mode').value)return;
     select.replaceChildren(new Option('系統預設麥克風', ''));
     for (const [i, d] of devices.filter(d => d.kind === 'audioinput').entries()) {
-      if (d.deviceId && d.deviceId !== 'default') select.append(new Option(d.label || `麥克風 ${i + 1}`, d.deviceId));
+      if (d.deviceId && d.deviceId !== 'default') select.append(d.label?userOption(d.label,d.deviceId):new Option(`麥克風 ${i + 1}`,d.deviceId));
     }
     if ([...select.options].some(o => o.value === previous)) select.value = previous;
   } catch(error) { if(request===inputRefreshGeneration&&mode===$('capture-mode').value&&mode==='native')$('mic-status').textContent=error.message; }

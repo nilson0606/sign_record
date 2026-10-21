@@ -1,14 +1,15 @@
 <!doctype html>
-<html lang="zh-Hant">
+<html lang="zh-Hant" data-manual-language="zh-Hant">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="dark"><title>操作手冊 · 唱錄系統</title>
 <style>
 :root{font-family:system-ui,"Microsoft JhengHei",sans-serif;color:#ecf0e5;background:#101510;line-height:1.8;scroll-behavior:smooth}*{box-sizing:border-box}body{margin:0}a{color:#d7fc87;text-underline-offset:4px}header,main,footer{max-width:1100px;margin:auto;padding:28px}header{padding-top:48px}header p{max-width:750px;color:#b3bdac}h1{font-size:clamp(2rem,4vw,3rem);line-height:1.3;margin:16px 0}h2{font-size:1.5rem;margin:0 0 20px}h3{font-size:1.1rem}main{display:grid;grid-template-columns:200px minmax(0,1fr);gap:36px;padding-top:0}nav{position:sticky;top:20px;align-self:start;border:1px solid #35432d;border-radius:14px;padding:16px}nav a{display:block;padding:6px 4px;font-size:.95rem;text-decoration:none}nav a:hover{text-decoration:underline}section{background:#1b231b;border:1px solid #35432d;border-radius:18px;padding:28px;margin:0 0 22px;scroll-margin-top:24px}ol,ul{padding-left:24px}li{margin:10px 0}strong{color:#f2f7e7}.tag{color:#d7fc87;letter-spacing:.1em;font-size:.85rem}.note{border-left:3px solid #d7fc87;padding:10px 16px;background:#263020;border-radius:0 8px 8px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#101510;padding:14px;border-radius:10px;font-size:.88rem;line-height:1.6}code{overflow-wrap:anywhere}table{width:100%;border-collapse:collapse}th,td{text-align:left;vertical-align:top;padding:10px;border-bottom:1px solid #35432d}th{color:#d7fc87}details{border-bottom:1px solid #35432d;padding:12px 0}summary{cursor:pointer;font-weight:600}footer{color:#a2af9a;font-size:.9rem;padding-bottom:50px}a:focus-visible,summary:focus-visible{outline:2px solid #d7fc87;outline-offset:4px}@media(max-width:760px){header,main,footer{padding:20px}main{display:block}nav{position:static;display:flex;flex-wrap:wrap;gap:4px 14px;margin-bottom:20px}section{padding:20px}h2{font-size:1.3rem}th,td{padding:8px 4px;font-size:.9rem}}@media print{:root{color:#111;background:white}main{display:block}nav{display:none}section{background:white;border-color:#ccc;break-inside:avoid}a,strong,th,.tag{color:#111}.note,pre{background:#eee}header p,footer{color:#444}}
 </style>
+<script type="module" src="i18n.mjs"></script>
 </head>
 <body>
-<header><a href="./">← 回到唱錄系統</a><p class="tag">桌機版 · STEP BY STEP · 更新於 2026-09-25</p><h1>從選歌，到唱完一輪</h1><p>適用 Windows 的 Chrome／Edge。網頁放在 GitHub Pages；音訊取得、分離與評分在你的電腦進行。先完成一次安裝，之後從本機歌單載入就能再唱。</p></header>
+<header><label class="theme-picker language-picker" data-i18n-skip for="language-select">語言 / Language<select id="language-select" data-language-picker><option value="zh-Hant">繁體中文</option><option value="en">English</option></select></label><a href="./">← 回到唱錄系統</a><p class="tag">桌機版 · STEP BY STEP · 更新於 2026-09-25</p><h1>從選歌，到唱完一輪</h1><p>適用 Windows 的 Chrome／Edge。網頁放在 GitHub Pages；音訊取得、分離與評分在你的電腦進行。先完成一次安裝，之後從本機歌單載入就能再唱。</p></header>
 <main>
 <nav aria-label="手冊目錄"><a href="#quick">日常快速流程</a><a href="#install">01 初次安裝</a><a href="#folder">02 指定歌曲庫</a><a href="#prepare">03 準備歌曲</a><a href="#listen">04 分離與試聽</a><a href="#pitch-model">RMVPE 與既有版本</a><a href="#masks">選用：不計分遮罩</a><a href="#sing">05 開始演唱</a><a href="#finish">06 停止與結算</a><a href="#recording">演唱錄音與紀錄</a><a href="#library">07 歌曲庫管理</a><a href="#latency">08 延遲測試</a><a href="#trouble">遇到問題</a><a href="#data">資料與使用限制</a></nav>
 <div>

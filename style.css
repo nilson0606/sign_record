@@ -331,3 +331,17 @@ button:active:not(:disabled){transform:translateY(1px)}
 @media(max-width:500px){#local-audio-panel{padding:10px}.local-audio-art{max-height:30%}#local-audio-panel .eyebrow,#local-audio-panel .help{display:none}#local-audio-title{font-size:14px}#local-audio{margin-top:6px}}
 .original-vocal-ranges{display:grid;gap:12px;margin:14px 0}.original-vocal-range{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;padding:12px;border:1px solid var(--line);border-radius:10px}.original-vocal-range label{min-width:0}.original-vocal-range input,.original-vocal-range select{width:100%;min-width:0}.original-vocal-range button{align-self:end}
 @media(max-width:600px){.original-vocal-range select{grid-column:1/-1}.original-vocal-range button{grid-column:2;min-height:40px}}
+
+/* Translated labels wrap without changing the recording layout or controls. */
+:lang(en) button{white-space:normal;overflow-wrap:break-word}
+:lang(en) .section-top{flex-wrap:wrap;gap:10px}
+.language-picker{font-size:12px}
+.language-picker select{min-width:108px}
+:lang(en) header{flex-wrap:wrap;gap:16px}
+:lang(en) .header-controls{flex:1 1 560px}
+:lang(en) .ab-editor-heading{flex-wrap:wrap}
+:lang(en) .ab-editor-switch{flex-wrap:wrap;max-width:100%}
+:lang(en) .ab-editor-switch button{flex:1 1 110px;min-width:0}
+:lang(en) .audition-transport{grid-template-columns:repeat(3,minmax(0,1fr))}
+:lang(en) .audition-transport button{min-width:0}
+@media(max-width:600px){:lang(en) .audition-transport{grid-template-columns:repeat(2,minmax(0,1fr))}:lang(en) .audition-transport #post-audition-stop{grid-column:1/-1}}

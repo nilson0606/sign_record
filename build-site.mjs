@@ -11,11 +11,12 @@ assets.push('recording-segments.mjs','recording-segment-ui.mjs','recording-live-
 assets.push('recording-repair.mjs','recording-repair-client.mjs','recording-repair-worker.mjs');
 assets.push('voicelab-client.mjs','voicelab-settings.mjs','arrangement-client.mjs','arrangement-settings.mjs');
 assets.push('mv-client.mjs','media-source.mjs','local-media-client.mjs','local-video-player.mjs');
-assets.push('voicelab-storage-client.mjs');
+assets.push('voicelab-storage-client.mjs','i18n.mjs','i18n-catalog.mjs');
+export const pages=['index.html','manual.html','manual.en.html'];
 const root = fileURLToPath(new URL('./',import.meta.url));
 export async function buildSite(output = path.join(root,'_site'), source = root) {
   const files = new Map();
-  for (const file of ['index.html','manual.html',...assets]) files.set(file,(await readFile(path.join(source,file),'utf8')).replaceAll('\r\n','\n'));
+  for (const file of [...pages,...assets]) files.set(file,(await readFile(path.join(source,file),'utf8')).replaceAll('\r\n','\n'));
   const hash=createHash('sha256');
   for (const [name,content] of files) hash.update(name+'\0'+content+'\0');
   const version=hash.digest('hex').slice(0,16), prefix=`assets/${version}/`;
@@ -27,7 +28,11 @@ export async function buildSite(output = path.join(root,'_site'), source = root)
   for(const asset of assets) html=html.replaceAll(`"${asset}"`,`"${prefix}${asset}"`);
   html=html.replace('</head>',`<meta name="app-build" content="${version}">\n</head>`);
   await writeFile(path.join(output,'index.html'),html);
-  await writeFile(path.join(output,'manual.html'),files.get('manual.html'));
+  for(const page of pages.filter(file=>file!=='index.html')){
+    let content=files.get(page);
+    for(const asset of assets)content=content.replaceAll(`"${asset}"`,`"${prefix}${asset}"`);
+    await writeFile(path.join(output,page),content);
+  }
   await writeFile(path.join(output,'.nojekyll'),'');
   return version;
 }

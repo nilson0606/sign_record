@@ -1,3 +1,4 @@
+import {localizedConfirm} from './i18n.mjs';
 import {remixRecording,wavBlob} from './recording-process.mjs';
 
 export function recordingReviewKey(ref){
@@ -77,7 +78,7 @@ export function createRecordingReview({store,pause,loadStem,onChanged,isRecordin
   async function remove(){
     if(working||isRecording()||!currentSelection())return;
     const row=selected;
-    if(!confirm(`刪除待確認錄音「${row.title} · ${new Date(row.created).toLocaleString()}」？此版錄音與人聲將刪除，無法復原。`))return;
+    if(!localizedConfirm(`刪除待確認錄音「${row.title} · ${new Date(row.created).toLocaleString()}」？此版錄音與人聲將刪除，無法復原。`))return;
     working=true;clear();pause();controls();
     try{await store.delete(row.id);await onChanged();status('已刪除此版待確認錄音。');}
     finally{working=false;controls();}
@@ -91,7 +92,7 @@ export function createRecordingReview({store,pause,loadStem,onChanged,isRecordin
       const targets=(await store.list()).filter(r=>r.postPending&&!r.segmentTake&&songKey(r)===key);
       if(isRecording()||key!==currentKey())return;
       if(!targets.length){await onChanged();status('這首歌已沒有待確認錄音。');return;}
-      if(!confirm(`刪除「${row.title}」同一 Key 的全部 ${targets.length} 筆待確認錄音？\n\n只刪除這首的待確認整首錄音與人聲；其他歌曲、其他 Key、分段錄音及已存到錄音後處理的成品都保留。\n刪除後無法復原。`)){status('已取消清除，錄音保留。');return;}
+      if(!localizedConfirm(`刪除「${row.title}」同一 Key 的全部 ${targets.length} 筆待確認錄音？\n\n只刪除這首的待確認整首錄音與人聲；其他歌曲、其他 Key、分段錄音及已存到錄音後處理的成品都保留。\n刪除後無法復原。`)){status('已取消清除，錄音保留。');return;}
       clear();pause();
       status(`正在清除這首的 ${targets.length} 筆待確認錄音…`);
       for(const target of targets){

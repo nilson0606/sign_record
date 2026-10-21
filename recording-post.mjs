@@ -1,3 +1,4 @@
+import {localizedConfirm} from './i18n.mjs';
 import { recordingTuningSuffix } from './recording-tune.mjs';
 import {isPostRecording} from './recording-store.mjs';
 import {createArrangement} from './arrangement-client.mjs';
@@ -219,7 +220,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
   });
   $('selected-recording-delete').addEventListener('click',()=>{
     if(busy||!selected)return;
-    if(!confirm('刪除這筆錄音、原始歌聲及其後處理資料？此操作無法復原。\n'+selected.title+' · '+new Date(selected.created).toLocaleString()))return;
+    if(!localizedConfirm('刪除這筆錄音、原始歌聲及其後處理資料？此操作無法復原。\n'+selected.title+' · '+new Date(selected.created).toLocaleString()))return;
     run(async row=>{clearAudio();await store.delete(row.id);await onDelete();choose();status('已刪除選取的錄音。');});
   });
   $('post-delete-all').addEventListener('click',()=>{
@@ -227,7 +228,7 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
     const receipt=$('post-clear-result'),report=text=>{receipt.hidden=false;receipt.textContent=text;};
     if(isRecording()){report('請先結束錄音，再清除後處理清單。');return;}
     const targets=[...rows];
-    if(!confirm(`清除錄音後處理清單的全部 ${targets.length} 筆？包含所有歌曲的已保存錄音、Voice Lab 與後製成品，以及各筆附帶的人聲和後處理資料。\n待確認錄音、分段素材、歌曲庫、配樂庫及音色模型保留。此操作無法復原。`))return;
+    if(!localizedConfirm(`清除錄音後處理清單的全部 ${targets.length} 筆？包含所有歌曲的已保存錄音、Voice Lab 與後製成品，以及各筆附帶的人聲和後處理資料。\n待確認錄音、分段素材、歌曲庫、配樂庫及音色模型保留。此操作無法復原。`))return;
     run(async()=>{
       clearAudio();let deleted=0;const errors=[];
       report(`正在清除：0／${targets.length} 筆…`);

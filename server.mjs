@@ -15,6 +15,8 @@ for(const name of ['voicelab-client.mjs','voicelab-settings.mjs','arrangement-cl
 for(const name of ['voicelab-storage-client.mjs','mv-client.mjs'])files.set('/'+name,[name,'text/javascript']);
 for(const name of ['recording-diagnostics.mjs','recording-diagnostics-worklet.mjs'])files.set('/'+name,[name,'text/javascript']);
 for(const name of ['media-source.mjs','local-media-client.mjs','local-video-player.mjs'])files.set('/'+name,[name,'text/javascript']);
+for(const name of ['i18n.mjs','i18n-catalog.mjs'])files.set('/'+name,[name,'text/javascript']);
+files.set('/manual.en.html',['manual.en.html','text/html']);
 const server = http.createServer(async (req, res) => {
   // Older open pages still use 4273; only the recording helper owns diagnostic
   // sessions and files, so both routes share one token, queue and clear guard.
@@ -26,7 +28,7 @@ const server = http.createServer(async (req, res) => {
   }
   if (!['GET', 'HEAD'].includes(req.method)) { res.writeHead(405); res.end(); return; }
   const pathname = new URL(req.url, 'http://localhost').pathname;
-  const versioned = /^\/assets\/[a-f0-9]{16}\/([a-z-]+\.(?:mjs|css))$/.exec(pathname);
+  const versioned = /^\/assets\/[a-f0-9]{16}\/([a-z0-9-]+\.(?:mjs|css))$/.exec(pathname);
   const route = files.get(versioned ? '/' + versioned[1] : pathname);
   if (!route) { res.writeHead(404); res.end('Not found'); return; }
   try {

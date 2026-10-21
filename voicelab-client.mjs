@@ -1,3 +1,4 @@
+import {userOption} from './i18n.mjs';
 import {arrangementCovers,recordingBackingRoute} from './arrangement-settings.mjs';
 import {wavBlob} from './recording-process.mjs';
 import {createVoiceLabStorage} from './voicelab-storage-client.mjs';
@@ -87,7 +88,7 @@ export function createVoiceLab({store,getSelected,getPosition,getReference=()=>n
     try{
       const state=await(await request('/voicelab')).json(),previous=$('model').value;
       models=(state.models??[]).map(m=>({id:m.id,label:m.label||VOICELAB_MODELS[m.id]||m.id}));
-      $('model').replaceChildren(...models.map(m=>new Option(m.label+(m.id===VOICELAB_DEFAULTS.model?'（預設）':''),m.id)));
+      $('model').replaceChildren(...models.map(m=>m.id===VOICELAB_DEFAULTS.model?new Option(m.label+'（預設）',m.id):userOption(m.label,m.id)));
       if(!models.length)$('model').add(new Option('未找到完整模型',''));
       $('model').value=models.find(m=>m.id===previous)?.id??models.find(m=>m.id===VOICELAB_DEFAULTS.model)?.id??models[0]?.id??'';
       $('model-root').textContent=state.modelsRoot||'本機設定的模型目錄';
@@ -235,7 +236,7 @@ export function createVoiceLab({store,getSelected,getPosition,getReference=()=>n
   }
   async function refreshBackings(){
     const cacheId=source()?.post?.reference?.cacheId;
-    try{const data=await(await request('/arrangements/library')).json();if(cacheId!==source()?.post?.reference?.cacheId)return;const previous=$('backing-choice').value;savedBackings=data.records.filter(m=>m.cacheId===cacheId);$('backing-choice').replaceChildren(new Option('錄音原配樂',''));for(const m of savedBackings)$('backing-choice').add(new Option(m.title,m.id));if(savedBackings.some(m=>m.id===previous))$('backing-choice').value=previous;else if(previous){mixes=null;rendering++;player.pause();}}
+    try{const data=await(await request('/arrangements/library')).json();if(cacheId!==source()?.post?.reference?.cacheId)return;const previous=$('backing-choice').value;savedBackings=data.records.filter(m=>m.cacheId===cacheId);$('backing-choice').replaceChildren(new Option('錄音原配樂',''));for(const m of savedBackings)$('backing-choice').add(userOption(m.title,m.id));if(savedBackings.some(m=>m.id===previous))$('backing-choice').value=previous;else if(previous){mixes=null;rendering++;player.pause();}}
     catch{/* Original accompaniment remains available on older helpers. */}
   }
   $('backing-refresh').addEventListener('click',()=>void refreshBackings());window.addEventListener('arrangement-saved',()=>void refreshBackings());
