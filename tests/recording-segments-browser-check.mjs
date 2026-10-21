@@ -51,7 +51,7 @@ try{
     const samples=row.segmentComposition?row.post.samples:Array.from({length:Math.ceil(raw.duration/.1)},(_,i)=>({offset:i*.1,hz:443.27}));
     const meta={...row,mode,balance:JSON.parse(localStorage.getItem('karaoke.recording-balance.v1')||'{"manual":false,"voice":70,"backing":30}'),post:{...row.post,samples},postEdit:{version:1,start:0,end:row.segmentComposition?row.seconds:raw.duration,fadeIn:0,fadeOut:0}};
     delete meta.fixedMixGains;delete meta.segmentTake;delete meta.segmentComposition;
-    return await remixRecording(raw,tracks,meta,200);
+    return await remixRecording(raw,tracks,meta,300);
    }finally{await c.close();}
   };
   window.audioError=(a,b)=>{let error=0;for(let i=100;i<Math.min(a.length,b.length)-15000;i++)error=Math.max(error,Math.abs(a[i]-b[i]));return error;};
@@ -63,7 +63,7 @@ try{
  const librarySong=page.locator('.song-choice[data-song-id="segment-fixture"]');
  await page.waitForFunction(()=>document.querySelectorAll('.song-choice').length===3);
  assert.equal(await librarySong.locator('.song-pending-badge').isHidden(),true);
- await $('segment-open').click();assert.equal(await $('segment-delay').inputValue(),'200');
+ await $('segment-open').click();assert.equal(await $('segment-delay').inputValue(),'300');
  for(const id of ['segment-guide-mode','sing-guide-mode'])assert.equal(await $(id).inputValue(),'original');
  assert.equal(await $('sing-guide-mode').isHidden(),true);
  for(const id of ['segment-take-mode-selected'])assert.equal(await $(id).inputValue(),'mix');
@@ -161,20 +161,20 @@ try{
  const laterTake=await page.evaluate(async()=>{const id=document.getElementById('segment-take').value,row=(await fixtureStore.list()).find(r=>r.id===id),c=new AudioContext({sinkId:{type:'none'}}),mix=await c.decodeAudioData(await(await fetch(document.getElementById('segment-take-audio').src)).arrayBuffer()),expected=await expectedWhole(row,'mix');await c.close();return {start:row.post.segments[0].songTime,error:audioError(mix.getChannelData(0),expected.getChannelData(0))};});assert.ok(laterTake.start>.8);assert.ok(laterTake.error<.00012,JSON.stringify(laterTake));
  assert.equal(await page.evaluate(()=>localStorage.getItem('karaoke.scores.v1')),beforeScore,'segment mode never writes whole-song scores');
  assert.match(await $('segment-coverage').textContent(),/所有段落/);
- // Default mix uses +200 once, has exact song length, and saves clean source for post.
+ // Default mix uses +300 once, has exact song length, and saves clean source for post.
  await $('segment-compose').click();await page.waitForFunction(()=>!document.getElementById('segment-export').disabled);
  assert.equal(await $('post-recording').locator('option').count(),0,'trial composition is not published');assert.equal((await page.evaluate(()=>fixtureStore.list())).filter(r=>r.segmentComposition).length,0);
- assert.match(await $('segment-status').textContent(),/200 ms/);await $('segment-export').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('已存到錄音後處理'));assert.equal(await $('segment-export').isDisabled(),true);
+ assert.match(await $('segment-status').textContent(),/300 ms/);await $('segment-export').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('已存到錄音後處理'));assert.equal(await $('segment-export').isDisabled(),true);
  await page.evaluate(async()=>{await document.getElementById('segment-audio').play();fixturePlayer.playVideo();});assert.equal(await $('segment-audio').evaluate(el=>el.paused),true,'video playback stops composed preview');await page.evaluate(()=>fixturePlayer.pauseVideo());
- const mix=(await page.evaluate(()=>fixtureStore.list())).find(r=>r.segmentComposition);assert.ok(mix);assert.equal(mix.mode,'mix');assert.equal(mix.appliedDelayMs,200);assert.equal(mix.seconds,8);assert.deepEqual(mix.stems,['accompaniment']);
+ const mix=(await page.evaluate(()=>fixtureStore.list())).find(r=>r.segmentComposition);assert.ok(mix);assert.equal(mix.mode,'mix');assert.equal(mix.appliedDelayMs,300);assert.equal(mix.seconds,8);assert.deepEqual(mix.stems,['accompaniment']);
  const audio=await page.evaluate(async meta=>{const c=new AudioContext({sinkId:{type:'none'}}),buffer=await c.decodeAudioData(await(await fixtureStore.blob(meta)).arrayBuffer());await c.close();return {length:buffer.length,rate:buffer.sampleRate};},mix);assert.equal(audio.length/audio.rate,8);
  assert.equal(await page.evaluate(async row=>hash(await fixtureStore.blob(row,'voice')),first),firstHash);
  assert.equal(await $('post-recording').inputValue(),mix.id,'new composition integrates with post editing');
  assert.equal(await $('post-recording').locator('option').count(),1);
  await $('post-remix').click();await page.waitForFunction(id=>document.getElementById('post-recording').value!==id,mix.id);await page.waitForFunction(()=>!document.getElementById('post-remix').disabled);
- const edited=(await page.evaluate(()=>fixtureStore.list())).find(r=>r.parentId===mix.id);assert.ok(edited);assert.equal(edited.appliedDelayMs,200);assert.equal(edited.seconds,8);assert.equal(await page.evaluate(async r=>hash(await fixtureStore.blob(r,'voice')),edited),await page.evaluate(async r=>hash(await fixtureStore.blob(r,'voice')),mix));
+ const edited=(await page.evaluate(()=>fixtureStore.list())).find(r=>r.parentId===mix.id);assert.ok(edited);assert.equal(edited.appliedDelayMs,300);assert.equal(edited.seconds,8);assert.equal(await page.evaluate(async r=>hash(await fixtureStore.blob(r,'voice')),edited),await page.evaluate(async r=>hash(await fixtureStore.blob(r,'voice')),mix));
  await $('segment-output').selectOption('voice');assert.equal(await $('segment-export').isDisabled(),true);await $('segment-compose').click();await page.waitForFunction(()=>!document.getElementById('segment-export').disabled);assert.equal(await $('post-recording').locator('option').count(),2,'another trial does not enter post menu');await $('segment-export').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('已存到錄音後處理'));
- const voice=(await page.evaluate(()=>fixtureStore.list())).find(r=>r.segmentComposition&&r.mode==='voice');assert.ok(voice);assert.equal(voice.appliedDelayMs,200);assert.deepEqual(voice.stems,[]);
+ const voice=(await page.evaluate(()=>fixtureStore.list())).find(r=>r.segmentComposition&&r.mode==='voice');assert.ok(voice);assert.equal(voice.appliedDelayMs,300);assert.deepEqual(voice.stems,[]);
  const alignment=await page.evaluate(async({voice,mix})=>{
   const c=new AudioContext({sampleRate:48000,sinkId:{type:'none'}}),decode=async(r,track)=>c.decodeAudioData(await(await fixtureStore.blob(r,track)).arrayBuffer());
   const v=await decode(voice),m=await decode(mix),expectedVoice=await expectedWhole(voice,'voice'),expectedMix=await expectedWhole(mix,'mix');
@@ -365,5 +365,5 @@ try{
  assert.ok(await page.evaluate(()=>{const d=JSON.parse(localStorage.getItem('karaoke.segment-draft.v1.segment-fixture'));return [d,...d.undoHistory].every(plan=>plan.parts.every(p=>!p.takeId));}),'undo history cannot revive cleared sources');
  await page.reload();await initialize();await $('segment-open').click();assert.equal(await $('segment-delete-song-takes').isDisabled(),true);assert.equal(await $('segment-take').locator('option').count(),1);
  assert.deepEqual(errors,[]);assert.ok(!requests.some(r=>r.startsWith('DELETE /library')));
- console.log(JSON.stringify({undoToOne:true,persistedUndo:true,legacyMergeAll:true,mergePreservesRecordings:true,splitWhilePlaying:true,dragPreciseUndo:true,cancelPreparation:true,pauseResume:true,realPCM:true,twoSegmentCapture:true,default200ms:true,backingClockUnchanged:true,missingCoverageBlocked:true,fullLength:true,rawUnchanged:true,pureVoice:true,postEdit:true,reload:true,wholeSongScoring:true,errors}));
+ console.log(JSON.stringify({undoToOne:true,persistedUndo:true,legacyMergeAll:true,mergePreservesRecordings:true,splitWhilePlaying:true,dragPreciseUndo:true,cancelPreparation:true,pauseResume:true,realPCM:true,twoSegmentCapture:true,default300ms:true,backingClockUnchanged:true,missingCoverageBlocked:true,fullLength:true,rawUnchanged:true,pureVoice:true,postEdit:true,reload:true,wholeSongScoring:true,errors}));
 }finally{await browser?.close();server.kill();}

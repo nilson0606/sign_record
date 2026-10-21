@@ -70,7 +70,7 @@ export function sourceOffset(meta,time) {
   const s=meta?.post?.segments?.find(s=>time>=s.songTime&&time<s.songTime+s.duration);
   return s?s.offset+time-s.songTime:null;
 }
-export function missingSegmentRanges(draft,rows,delayMs=200,useOriginal=false) {
+export function missingSegmentRanges(draft,rows,delayMs=300,useOriginal=false) {
   validateSegmentDraft(draft);const shift=delayMs/1000,result=[];
   const replaced=useOriginal?originalVocalRanges(draft.originalVocalRanges,draft.duration).filter(r=>r.mode==='original'):[];
   for(const p of draft.parts){
@@ -90,7 +90,7 @@ export function missingSegmentRanges(draft,rows,delayMs=200,useOriginal=false) {
   }
   return result;
 }
-export function composeSegmentVoice(draft,sources,{sampleRate=48000,delayMs=200,crossfade=.012}={}) {
+export function composeSegmentVoice(draft,sources,{sampleRate=48000,delayMs=300,crossfade=.012}={}) {
   validateSegmentDraft(draft);
   if(!Number.isFinite(delayMs)||Math.abs(delayMs)>2000||!Number.isFinite(crossfade)||crossfade<0||crossfade>.1)throw Error('合成校正或交叉淡化設定無效。');
   const shift=delayMs/1000,length=Math.ceil((draft.duration+Math.max(0,shift))*sampleRate),out=new AudioBuffer({numberOfChannels:1,length,sampleRate}),data=out.getChannelData(0);

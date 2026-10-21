@@ -105,7 +105,7 @@ try {
   await page.waitForFunction(()=>document.querySelector('#prepare-status').textContent.startsWith('已就緒'));
   assert.equal(await page.locator('#recording-mode').inputValue(),'mix');
   await page.locator('#recording-mode').selectOption('voice');
-  assert.equal(await page.locator('#recording-delay').inputValue(),'200');
+  assert.equal(await page.locator('#recording-delay').inputValue(),'300');
   assert.equal(await page.locator('#recording-manual').isChecked(),false);
   assert.ok(await page.locator('#recording-voice-level').isDisabled());
   // Testing the microphone alone must not store audio.
@@ -136,7 +136,7 @@ try {
   assert.ok(voiceAudio.voice>.05,JSON.stringify(voiceAudio));assert.ok(voiceAudio.backing<.01,JSON.stringify(voiceAudio));assert.equal(backingRequests,0);
   await page.locator('#finish-song').click();await page.waitForFunction(()=>document.querySelector('#score-status').textContent.includes('已結算'));
   assert.equal((await records()).length,1,'manual scoring after stopping must not duplicate recording');
-  assert.equal(voice.appliedDelayMs,200,await page.locator('#recording-status').textContent());assert.equal(voice.post.offsetMs,200);assert.equal(voice.mime,'audio/wav');assert.equal(voice.rawMime,'audio/wav');assert.equal(voice.captureClock.source,'audio-worklet-pcm');
+  assert.equal(voice.appliedDelayMs,300,await page.locator('#recording-status').textContent());assert.equal(voice.post.offsetMs,300);assert.equal(voice.mime,'audio/wav');assert.equal(voice.rawMime,'audio/wav');assert.equal(voice.captureClock.source,'audio-worklet-pcm');
   await page.locator('#recording-mode').selectOption('mix');
   await page.locator('#recording-balance summary').click();
   await page.locator('#recording-manual').check();
@@ -236,7 +236,7 @@ try {
     const expected=rescoreRecording({...row.post,scoring,reference:r.reference},175);
     assert.equal(r.scoring.difficulty,difficulty);assert.equal(r.score,expected.score);assert.equal(r.rhythm,expected.rhythm);
     assert.deepEqual(r.baseline,rescoreRecording({...row.post,scoring,reference:r.reference},0));
-    assert.deepEqual(row.post.scoring,harmonyRecord.post.scoring);assert.equal(row.bytes,harmonyRecord.bytes);assert.equal(row.appliedDelayMs,200);
+    assert.deepEqual(row.post.scoring,harmonyRecord.post.scoring);assert.equal(row.bytes,harmonyRecord.bytes);assert.equal(row.appliedDelayMs,300);
     assert.match(await page.locator('#post-score').textContent(),new RegExp(label));difficultyScores[difficulty]=r.score;
   }
   assert.ok(difficultyScores.strict<=difficultyScores.standard&&difficultyScores.standard<=difficultyScores.relaxed);

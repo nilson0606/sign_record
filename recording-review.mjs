@@ -41,6 +41,7 @@ export function createRecordingReview({store,pause,loadStem,onChanged,isRecordin
   function referenceChanged(){if(currentKey()!==scope)refresh(allRows);else controls();}
   async function listen(){
     if(working||loading||isRecording()||!currentSelection())return;
+    // Legacy takes without a stored correction retain their original 200 ms default.
     const row=selected,mode=$('mode').value,delay=row.recordingDelayMs??200,ref=row.post.reference;
     if(mode==='mix'&&!ref.hasPreview)throw Error('沒有已保存的伴樂，請補建音軌或選「純人聲」。');
     clear();pause();const token=request,cancelled=()=>token!==request||isRecording()||songKey(row)!==currentKey();loading=true;controls();status('正在準備試聽…');
