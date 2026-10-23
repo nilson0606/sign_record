@@ -11,6 +11,7 @@ const run=promisify(execFile);
 let active=null;
 const json=(res,code,data)=>{res.writeHead(code,{'Content-Type':'application/json'});res.end(JSON.stringify(data));};
 export function stopNativeMicrophone(){active?.stop();}
+export const nativeMicrophoneActive=()=>!!active;
 let logQueue=Promise.resolve(),queuedLogs=0;
 function captureLog(captureId,event){
  if(queuedLogs>=32)return;

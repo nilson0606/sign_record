@@ -62,6 +62,10 @@ test('helper enforces setup, auth and idle-only changes; selected library surviv
     const diagnosticInfo=await(await fetch(base+'/diagnostics',{headers:{Origin:origin,'X-Diagnostic-Token':diagnosticSession.token}})).json();
     assert.equal(diagnosticInfo.path,path.join(dir,'.runtime','recording-diagnostics'));
     assert.equal((await request('/library/location', 'GET', undefined, false)).status, 403);
+    const idle = await request('/busy', 'GET', undefined, false);
+    assert.equal(idle.status, 200);
+    assert.deepEqual(await idle.json(), { preparing: false, voicelab: false, mv: false, arrangement: false, localMedia: false, microphone: false, library: false, busy: false });
+    assert.equal((await fetch(base + '/busy', { headers: { Origin: 'https://example.com' } })).status, 403);
     assert.equal((await request('/voicelab', 'GET', undefined, false)).status, 403);
     assert.equal((await request('/voicelab/storage', 'DELETE', {ids:[]}, false)).status, 403);
     assert.equal((await request('/mv/library', 'DELETE', {ids:[]}, false)).status, 403);

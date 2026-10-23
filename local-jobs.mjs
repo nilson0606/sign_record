@@ -1,7 +1,7 @@
 import {keyShift,transposeReference,keyLabel} from './song-key.mjs';
 import {handleLocalMedia,localMediaInfo,localMediaBusy,stopLocalMedia} from './local-media-server.mjs';
 import {isLocalMediaId} from './media-source.mjs';
-import {handleNativeMicrophone} from './native-microphone-server.mjs';
+import {handleNativeMicrophone,nativeMicrophoneActive} from './native-microphone-server.mjs';
 import {handleVoiceLab,voicelabBusy,stopVoiceLab} from './voicelab-server.mjs';
 import {handleMV,mvBusy,stopMV} from './mv-server.mjs';
 import {handleArrangements,arrangementBusy,stopArrangements} from './arrangement-server.mjs';
@@ -220,6 +220,8 @@ export async function handleLocalJobs(req, res) {
     await handleLocalMedia(req,res,{library:lib?.root,authorized:req.headers['x-karaoke-token']===token});return true;
   }
   if (req.url === '/session' && req.method === 'GET') { json(res, 200, { token, playbackTraceActive: existsSync(path.join(root, '.runtime', 'playback-trace.enabled')), features: ['local-media','local-audio','library', 'stem-preview', 'library-location', 'separation-progress', 'rebuild-song', 'lead-vocals', 'separation-models', 'score-masks', 'pitch-methods', 'residual-separation', 'mel-roformer', 'recording-mp3', 'recording-library', 'recording-raw-mime', 'playback-trace', 'native-microphone', 'native-speaker-output', 'song-key-versions'] }); return true; }
+  // Read-only activity summary (booleans only, no token) so a local launcher can warn before /shutdown cancels work.
+  if (req.url === '/busy' && req.method === 'GET') { json(res, 200, busyStatus()); return true; }
   if (!req.url.startsWith('/mv/') && !req.url.startsWith('/arrangements') && !req.url.startsWith('/voicelab') && !req.url.startsWith('/microphone/') && !req.url.startsWith('/jobs') && !req.url.startsWith('/library') && req.url !== '/shutdown' && req.url !== '/playback-trace' && !req.url.startsWith('/recordings')) return false;
   if (req.headers['x-karaoke-token'] !== token) { json(res, 403, { error: 'Session token required' }); return true; }
   if(req.url.startsWith('/mv/')){await handleMV(req,res,{getLibrary:async()=>{if(changingLocation)throw Error('歌曲庫資料夾正在變更，請稍候。');return (await location.get()).path;}});return true;}
@@ -336,6 +338,10 @@ export async function handleLocalJobs(req, res) {
 setInterval(() => {
   for (const job of jobs.values()) if (Date.now() - job.updated > 15 * 60000) erase(job).catch(() => {});
 }, 60000).unref();
+export function busyStatus() {
+  const status = { preparing: [...jobs.values()].some(j => !['ready','failed'].includes(j.stage)), voicelab: voicelabBusy(), mv: mvBusy(), arrangement: arrangementBusy(), localMedia: localMediaBusy(), microphone: nativeMicrophoneActive(), library: changingLocation || editingMasks.size > 0 };
+  return { ...status, busy: Object.values(status).some(Boolean) };
+}
 export async function clearAllJobs() { if (folderPicker) { folderPicker.cancelled = true; await stopChild(folderPicker.child); } await Promise.allSettled([...jobs.values()].map(erase)); await stopVoiceLab(); await stopArrangements(); await stopMV(); await stopLocalMedia(); }
 export async function clearStaleJobs() {
   await mkdir(jobsRoot, { recursive: true });
