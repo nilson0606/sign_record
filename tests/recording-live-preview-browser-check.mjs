@@ -32,7 +32,7 @@ try{
   window.preview=createLiveRecordingPreview(previewAudio,{settings:()=>settings,onError:e=>{throw e;}});
   preview.set({raw,tracks:[backing,original],meta,ms:300});
   previewAudio.src=URL.createObjectURL(wavBlob(rendered));await previewAudio.play();
-  window.measure=()=>{const x=new Float32Array(probe.fftSize);probe.getFloatTimeDomainData(x);const power=hz=>{let re=0,im=0;for(let i=0;i<x.length;i++){re+=x[i]*Math.cos(2*Math.PI*hz*i/probe.context.sampleRate);im+=x[i]*Math.sin(2*Math.PI*hz*i/probe.context.sampleRate);}return 2*Math.hypot(re,im)/x.length;};return{voice:power(440),backing:power(660),original:power(880),rms:Math.sqrt(x.reduce((s,v)=>s+v*v,0)/x.length),time:previewAudio.currentTime,paused:previewAudio.paused,src:previewAudio.src};};
+  window.measure=()=>{const x=new Float32Array(probe.fftSize);probe.getFloatTimeDomainData(x);const power=hz=>{let re=0,im=0,weight=0;for(let i=0;i<x.length;i++){const w=.5-.5*Math.cos(2*Math.PI*i/(x.length-1));weight+=w;re+=w*x[i]*Math.cos(2*Math.PI*hz*i/probe.context.sampleRate);im+=w*x[i]*Math.sin(2*Math.PI*hz*i/probe.context.sampleRate);}return 2*Math.hypot(re,im)/weight;};return{voice:power(440),backing:power(660),original:power(880),rms:Math.sqrt(x.reduce((s,v)=>s+v*v,0)/x.length),time:previewAudio.currentTime,paused:previewAudio.paused,src:previewAudio.src};};
  });
  await page.waitForTimeout(1200);const initial=await page.evaluate(()=>measure());
  assert.ok(initial.voice>.04&&initial.backing>.04,JSON.stringify(initial));

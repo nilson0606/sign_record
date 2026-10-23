@@ -14,7 +14,9 @@ export function createLiveRecordingPreview(audio,{settings,onError=()=>{}}) {
   }
   function ensureContext(){
     if(context)return;
-    context=new AudioContext();media=context.createMediaElementSource(audio);
+    // These are saved tracks, not microphone monitoring. Prefer playback
+    // buffering so brief device/CPU load spikes have more output headroom.
+    context=new AudioContext({latencyHint:'playback'});media=context.createMediaElementSource(audio);
     master=context.createGain();master.connect(context.destination);
     // Keep pulling the media stream so its native transport clock keeps running.
     mediaGain=context.createGain();media.connect(mediaGain);mediaGain.connect(context.destination);
