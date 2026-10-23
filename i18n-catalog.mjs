@@ -2,6 +2,7 @@
 // Templates: [source, English, UI-fragment slots, generated-segment-name slots].
 // Other slots preserve user data. Unknown messages are displayed unchanged.
 export const messages = {
+  "請先選擇要錄製的段落。": "Choose a segment to record first.",
   "律動：開啟": "Motion: on",
   "律動：關閉": "Motion: off",
   "裝置已設定減少動態效果。": "Your device is set to reduce motion.",
@@ -1691,6 +1692,7 @@ export const messages = {
 };
 
 export const templates = [
+  ["錄製第 {0} 段", "Record segment {0}", [0]],
   ["顯示 {0}／{1} 個歌曲基準。", "Showing {0} of {1} song references."],
   [
     "本機回應 {0}",
