@@ -200,7 +200,10 @@ export function createRecordingPost({store,stop,pause,download,onDelete,referenc
         const raw=await context.decodeAudioData(await source.arrayBuffer());
         // Audition the saved recipe, never pending edits or a re-scoring offset.
         const delayMs=row.appliedDelayMs??(row.parentId?row.delayMs:0)??0;
-        blob=wavBlob(await remixRecording(raw,[],row,delayMs,{softening:row.vocalSoftening?.strength||'off',volume:row.postVolume,effects:row.vocalEffects,progress:status}));
+        // Original-singer replacement belongs to the full mix. Solo needs only
+        // the recorded singer; retain the mix mode so saved gain stays identical.
+        const singerOnly={...row,post:{...row.post,originalVocals:null}};
+        blob=wavBlob(await remixRecording(raw,[],singerOnly,delayMs,{softening:row.vocalSoftening?.strength||'off',volume:row.postVolume,effects:row.vocalEffects,progress:status}));
       }finally{await context.close();}
     }
     url=URL.createObjectURL(blob);$('post-audio').src=url;$('post-audio').hidden=false;await $('post-audio').play();
