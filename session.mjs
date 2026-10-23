@@ -4,6 +4,7 @@ import {selectedMediaId,selectMediaSource,isLocalMediaId} from './media-source.m
 import {keyLabel,keyShift} from './song-key.mjs';
 import {recordingReviewKey} from './recording-review.mjs';
 import {libraryRecordingCounts,updateLibraryRecordingBadges} from './library-recordings.mjs';
+import {createLibrarySearch} from './library-search.mjs';
 import {createKeyPlayback} from './key-playback.mjs';
 import { youtubeId, noteOf } from './audio.mjs';
 import { createSingerRecorder } from './recording.mjs';
@@ -37,6 +38,7 @@ export function createKaraokeSession(options) {
   let phase = 'idle', loadedVideo = null, lastProgress = 0, rangeComplete = false;
   let libraryLocation = null, locationBusy = false;
   let libraryCounts=new Map();
+  const librarySearch=createLibrarySearch({input:$('library-search'),clear:$('library-search-clear'),status:$('library-search-status'),list:$('library-list')});
   function recordingInventoryChanged(rows){
     libraryCounts=libraryRecordingCounts(rows);
     updateLibraryRecordingBadges($('library-list'),libraryCounts);
@@ -323,10 +325,10 @@ export function createKaraokeSession(options) {
     $('library-refresh').disabled = true;
     try {
       await ensureSession();
-      if (!libraryLocation.configured) { $('library-list').replaceChildren(); $('library-status').textContent = '請先指定歌曲庫資料夾。'; return; }
+      if (!libraryLocation.configured) { $('library-list').replaceChildren(); librarySearch.update([]); $('library-status').textContent = '請先指定歌曲庫資料夾。'; return; }
       const [{songs}]=await Promise.all([api('/library'),recording.store.list().then(recordingInventoryChanged)]);
       if (!Array.isArray(songs)) throw new Error('本機工具回應不相容，請重新啟動。');
-      const list = $('library-list'); list.replaceChildren();
+      const list = $('library-list'), searchRows=[]; list.replaceChildren();
       const keyVideos=new Set(songs.filter(song=>song.pitchShift).map(song=>song.videoId)),groups=new Map();
       for (const song of songs) {
         const li = document.createElement('li'), title = document.createElement('strong'), detail = document.createElement('small');
@@ -367,12 +369,14 @@ export function createKaraokeSession(options) {
           } catch (error) { $('library-status').textContent = '刪除失敗：' + error.message; remove.disabled = load.disabled = false; }
         });
         li.append(load, remove);
+        searchRows.push({row:li,song});
         if(keyVideos.has(song.videoId)){
           if(!groups.has(song.videoId)){const group=document.createElement('li'),fold=document.createElement('details'),heading=document.createElement('summary'),versions=document.createElement('ul');group.className='song-key-group';fold.open=true;heading.dataset.i18nUser='';heading.textContent=song.baseTitle || song.title;versions.className='library-list key-versions';fold.append(heading,versions);group.append(fold);list.append(group);groups.set(song.videoId,versions);}
           groups.get(song.videoId).append(li);
         }else list.append(li);
       }
       updateLibraryRecordingBadges(list,libraryCounts);
+      librarySearch.update(searchRows);
       $('library-status').textContent = `這台電腦已保存 ${songs.length} 個歌曲基準。金色標記表示有整首待確認或分段錄音。`; controls();
     } catch (error) { $('library-status').textContent = '無法讀取歌曲庫：' + error.message; }
     finally { $('library-refresh').disabled = false; }

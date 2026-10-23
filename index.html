@@ -258,7 +258,14 @@
     </section>
     <section id="library-section" class="card library-card" aria-label="本機歌曲庫">
       <details id="library-panel" tabindex="-1"><summary>本機歌單 · 點一首就載入</summary>
-        <button id="library-refresh" class="secondary">重新整理歌曲庫</button><p id="library-status" class="status">啟動本機工具後可查看已保存歌曲。</p><ul id="library-list" class="library-list"></ul>
+        <button id="library-refresh" class="secondary">重新整理歌曲庫</button><p id="library-status" class="status">啟動本機工具後可查看已保存歌曲。</p>
+        <label for="library-search">搜尋本機歌單</label>
+        <div class="library-search-row">
+          <input id="library-search" type="search" placeholder="輸入歌名或歌手關鍵字" autocomplete="off" aria-controls="library-list" aria-describedby="library-search-status">
+          <button id="library-search-clear" type="button" class="secondary" disabled>清除搜尋</button>
+        </div>
+        <p id="library-search-status" class="status" role="status" hidden></p>
+        <ul id="library-list" class="library-list"></ul>
         <p class="footnote">刪除會移除這首歌的本機基準與試聽音軌，不影響演唱成績。完整歌曲與不同長度的片段分開保存。</p>
       </details>
     </section>

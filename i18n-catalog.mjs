@@ -2,6 +2,10 @@
 // Templates: [source, English, UI-fragment slots, generated-segment-name slots].
 // Other slots preserve user data. Unknown messages are displayed unchanged.
 export const messages = {
+  "搜尋本機歌單": "Search local songs",
+  "輸入歌名或歌手關鍵字": "Enter a song title or artist keyword",
+  "清除搜尋": "Clear search",
+  "找不到符合的歌曲，請換個關鍵字或清除搜尋。": "No matching songs. Try another keyword or clear the search.",
   "唱錄系統 · 桌機本機實驗室": "Sing & Record · Local Desktop Studio",
   "唱錄系統": "Sing & Record",
   "本機分析 · 錄音留在本機": "Local analysis · Recordings stay on your computer",
@@ -1683,6 +1687,7 @@ export const messages = {
 };
 
 export const templates = [
+  ["顯示 {0}／{1} 個歌曲基準。", "Showing {0} of {1} song references."],
   [
     "本機回應 {0}",
     "Local response {0}",
