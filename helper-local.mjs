@@ -58,4 +58,18 @@ server.on('error', err => { console.error(err.message); process.exitCode = 1; })
 server.listen(port, '127.0.0.1', () => console.log(`Local tool status: http://127.0.0.1:${port}/health`));
 
 await clearStaleJobs();
-for (const signal of ['SIGINT','SIGTERM']) process.on(signal, async () => { stopNativeMicrophone(); await clearAllJobs(); server.close(() => process.exit(0)); });
+const sockets = new Set();
+server.on('connection', socket => { sockets.add(socket); socket.once('close', () => sockets.delete(socket)); });
+let stopping = false;
+for (const signal of ['SIGINT','SIGTERM']) process.on(signal, async () => {
+  if (stopping) return; stopping = true;
+  stopNativeMicrophone(); await clearAllJobs();
+  // Let the /shutdown reply leave, then reset every open connection. A paused media stream or a half-sent
+  // request would otherwise keep server.close() waiting, and after a forced exit Windows keeps the port
+  // listening as PID 0 (FIN_WAIT) for minutes, so the next start fails with EADDRINUSE.
+  setTimeout(() => {
+    for (const socket of sockets) socket.resetAndDestroy();
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 2000).unref();
+  }, 200);
+});

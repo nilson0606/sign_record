@@ -6,7 +6,8 @@ param([switch]$List)
 # so copies started outside start-local.ps1 (tests, other tools) are found too; other Node programs are never touched.
 # The helper is first asked to shut down (it cancels its own jobs and child processes); anything still alive
 # afterwards is ended with taskkill /T. Orphaned job processes (python/ffmpeg running files under .runtime\ or
-# tools\ whose parent is gone) are ended as well. Finally ports 4273/4274 must be free, otherwise exit code 1.
+# tools\ whose parent is gone) are ended as well. Finally no other program may hold 4273/4274 (exit code 1 otherwise);
+# a socket Windows is still closing (owner PID 0) is only reported, since it frees itself.
 # -List only prints what would be stopped.
 $ErrorActionPreference = 'Stop'
 $taskRoot = $PSScriptRoot
@@ -108,9 +109,12 @@ foreach ($s in $taskServices) {
 foreach ($s in $taskServices) {
     for ($i = 0; $i -lt 50 -and (Get-Listeners $s.Port).Count -gt 0; $i++) { Start-Sleep -Milliseconds 200 }
     $left = @(Get-Listeners $s.Port)
-    if ($left.Count -gt 0) {
+    if (@($left | Where-Object { [int]$_.OwningProcess -ne 0 }).Count -gt 0) {
         Write-Host ('WARNING: port ' + $s.Port + ' is still in use by PID ' + (($left | ForEach-Object { $_.OwningProcess } | Select-Object -Unique) -join ', ') + '.')
         $taskFailed = $true
+    } elseif ($left.Count -gt 0) {
+        # PID 0 = the program is gone and Windows is still closing its old connections; it frees itself.
+        Write-Host ('NOTE: Windows is still releasing port ' + $s.Port + ' (connections of the stopped program are closing); it clears by itself.')
     }
 }
 if ($found['helper'].Count -eq 0 -and $found['site'].Count -eq 0 -and $orphans.Count -eq 0 -and -not $taskFailed) { Write-Host 'Nothing to stop (this project only).' }

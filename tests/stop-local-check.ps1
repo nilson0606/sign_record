@@ -69,7 +69,7 @@ Check 'D tools\ script whose parent (PID 1) is alive untouched; other folders un
 Reset; $global:procs = $other; $global:listen = @([pscustomobject]@{LocalPort=4274;OwningProcess=0}); $global:lingerUntil = 10
 $r = Run; Check 'E lingering socket that clears in time -> exit 0' ($r.code -eq 0) $r.out
 Reset; $global:procs = $other; $global:listen = @([pscustomobject]@{LocalPort=4274;OwningProcess=0})
-$r = Run; Check 'E socket that never clears -> warning, exit 1, nothing killed' ($r.code -eq 1 -and $r.out -match 'port 4274 is still in use by PID 0' -and -not ($global:calls -match 'taskkill')) $r.out
+$r = Run; Check 'E PID 0 socket still closing -> note only, exit 0, nothing killed' ($r.code -eq 0 -and $r.out -match 'still releasing port 4274' -and $r.out -notmatch 'WARNING' -and -not ($global:calls -match 'taskkill')) $r.out
 
 # F helper does not answer -> forced
 Reset; $global:procs = $other + @((P 100 1 'node.exe' "node `"$hl`""), (P 101 100 'python.exe' 'py job')); $global:listen = @([pscustomobject]@{LocalPort=4274;OwningProcess=100}); $global:shutdownWorks = $false
