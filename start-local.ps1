@@ -8,13 +8,17 @@ New-Item -ItemType Directory -Path $taskRuntime -Force | Out-Null
 
 function Start-ProjectService([string]$Name, [string]$File, [int]$Port) {
     $taskScript = Join-Path $taskRoot $File
-    $taskListener = @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue)
+    # A socket left by a program that just exited can linger for a few seconds; wait for it instead of failing.
+    for ($taskWait = 0; $taskWait -lt 50; $taskWait++) {
+        $taskListener = @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue)
+        $taskOurs = @($taskListener | Where-Object { $o = Get-CimInstance Win32_Process -Filter "ProcessId=$($_.OwningProcess)"; $o -and $o.Name -eq 'node.exe' -and ([string]$o.CommandLine).ToLowerInvariant().Contains($taskScript.ToLowerInvariant()) })
+        if ($taskListener.Count -eq 0 -or $taskOurs.Count -eq $taskListener.Count) { break }
+        Start-Sleep -Milliseconds 200
+    }
     if ($taskListener.Count -gt 0) {
-        foreach ($taskConnection in $taskListener) {
-            $taskOwner = Get-CimInstance Win32_Process -Filter "ProcessId=$($taskConnection.OwningProcess)"
-            if (-not $taskOwner.CommandLine -or -not $taskOwner.CommandLine.Contains(('"' + $taskScript + '"'))) {
-                throw "Port $Port belongs to another service. It was left untouched."
-            }
+        if ($taskOurs.Count -ne $taskListener.Count) {
+            $taskOthers = ($taskListener | ForEach-Object { $_.OwningProcess } | Select-Object -Unique) -join ', '
+            throw "Port $Port is held by another program (PID $taskOthers). It was left untouched. Run stop-local.ps1 -List to see what it is."
         }
         $taskListener[0].OwningProcess | Set-Content -LiteralPath (Join-Path $taskRuntime "$Name.pid")
         return
@@ -24,7 +28,10 @@ function Start-ProjectService([string]$Name, [string]$File, [int]$Port) {
     for ($taskAttempt = 0; $taskAttempt -lt 20; $taskAttempt++) {
         Start-Sleep -Milliseconds 250
         $taskChild.Refresh()
-        if ($taskChild.HasExited) { throw "$Name exited. See .runtime/$Name.stderr.log." }
+        if ($taskChild.HasExited) {
+            $taskError = Get-Content -LiteralPath (Join-Path $taskRuntime "$Name.stderr.log") -Tail 5 -ErrorAction SilentlyContinue
+            throw ("$Name exited. See .runtime/$Name.stderr.log." + $(if ($taskError) { ' Last lines: ' + ($taskError -join ' | ') } else { '' }))
+        }
         if (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -eq $taskChild.Id }) { return }
     }
     throw "$Name startup timed out. See .runtime/$Name.stderr.log."

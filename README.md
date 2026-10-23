@@ -25,7 +25,8 @@ The interface defaults to Traditional Chinese. Choose **English** in the header;
 - 本機頁面：http://localhost:4273/
 - 本機工具：`127.0.0.1:4274`，與原專案的 4174 分開。
 - `start-local.ps1` 啟動此目錄的工具與開發頁面，預設開啟本機頁面；也可自行使用上方 Pages 網站。
-- `stop-local.ps1` 只停止經路徑核對的本專案行程。
+- `stop-local.ps1` 只停止本專案的行程：除了 `.runtime/*.pid` 記錄的，也會找出佔用 4273／4274、或命令列是本資料夾 `server.mjs`／`helper-local.mjs` 的 node.exe（例如不是由 start-local 啟動的舊小幫手），以及上層已結束、仍在跑 `.runtime\`、`tools\` 檔案的殘留工作。小幫手會先透過自己的 `/shutdown` 取消工作，仍未結束才用 `taskkill /T`；最後確認兩個埠都已釋放，否則顯示警告並以結束碼 1 結束。加 `-List` 只列出會停止哪些行程、不停止。其他 Node 程式（含其他專案的 server.mjs）不會被動到。
+- 本機小幫手提供唯讀的 `GET /busy`（只檢查 Origin、不需 token），回報準備歌曲、Voice Lab、MV、配樂、本機影音、本機收音、歌曲庫變更是否進行中，供 AI_COVER_MV 入口頁在「全部關閉」前提醒。
 - 開發環境詳見 [ENVIRONMENT.md](ENVIRONMENT.md)。下方為沿用的功能說明；新版操作入口與固定的新歌設定以 HTML 操作手冊為準。
 
 ## 使用方式
@@ -39,7 +40,7 @@ The interface defaults to Traditional Chinese. Choose **English** in the header;
 7. 新歌固定保留分離音軌；完成後展開「分離與音高設定 · 遮罩與試聽」，可切換人聲／伴奏。試聽會暫停 YouTube，唱歌時會停止試聽。若舊基準沒有音軌，試聽區會明確提示；按「補建試聽音軌」即可沿用該歌曲與分析範圍重新分離並保存，不必刪歌。進行中的演唱需先結束並結算，再補建。要重做現有結果可按「重新分離並覆蓋」：跳過快取重新處理該首歌與分析範圍，完整結果寫好後才替換舊基準／音軌；失敗的新產物會清除，其他歌曲不受影響。
 8. 演唱結束後在瀏覽器保存歌名與分數；從頭開始唱預設保存「歌唱者＋配樂／和音」，可改選只錄歌唱者或不錄音；一般兩軌版本加入伴奏，主唱四軌版本加入伴奏＋和音，不混入原唱主唱／全部人聲。歌曲庫刪除會移除該歌曲基準及保留的試聽檔，不影響成績。
 
-結束本機工具：`powershell -NoProfile -ExecutionPolicy Bypass -File .\stop-local.ps1`。
+結束本機工具：`powershell -NoProfile -ExecutionPolicy Bypass -File .\stop-local.ps1`（先看會停止什麼：加 `-List`）。啟停腳本的模擬測試（任何有 PowerShell 7 的系統）：`pwsh -NoProfile -File tests/stop-local-check.ps1`、`pwsh -NoProfile -File tests/start-local-check.ps1`。
 
 重開機不會移除安裝，但需要重新啟動工具。Windows 重設／重灌或搬到新電腦後應重建 Python 虛擬環境，即使原工具資料夾仍在。若沒有 Python Launcher，可用 `setup-local.ps1 -PythonPath 'C:\path\to\python.exe'` 指定 Python 3.12。
 
