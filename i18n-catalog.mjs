@@ -2,6 +2,10 @@
 // Templates: [source, English, UI-fragment slots, generated-segment-name slots].
 // Other slots preserve user data. Unknown messages are displayed unchanged.
 export const messages = {
+  "律動：開啟": "Motion: on",
+  "律動：關閉": "Motion: off",
+  "裝置已設定減少動態效果。": "Your device is set to reduce motion.",
+  "開啟或關閉介面裝飾動畫": "Turn decorative interface animation on or off",
   "搜尋本機歌單": "Search local songs",
   "輸入歌名或歌手關鍵字": "Enter a song title or artist keyword",
   "清除搜尋": "Clear search",
