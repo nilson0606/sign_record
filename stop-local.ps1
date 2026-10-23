@@ -2,7 +2,7 @@ param([switch]$List)
 # Stops this project's local services (site 4273, helper 4274) and nothing else. ASCII only (PowerShell 5.1).
 # A service is recognised by node.exe running THIS folder's server.mjs / helper-local.mjs:
 #   - full path on the command line (any port), or
-#   - the bare file name when the process owns the service port or is the PID in .runtime\<name>.pid
+#   - the bare file name only when the process owns the service port (other tools run their own 'node ./server.mjs')
 # so copies started outside start-local.ps1 (tests, other tools) are found too; other Node programs are never touched.
 # The helper is first asked to shut down (it cancels its own jobs and child processes); anything still alive
 # afterwards is ended with taskkill /T. Orphaned job processes (python/ffmpeg running files under .runtime\ or
@@ -34,13 +34,9 @@ function Find-Service($All, $Service) {
     $found = @{}
     $node = @($All | Where-Object { $_.Name -eq 'node.exe' })
     foreach ($p in $node) { if (Test-FullPath $p $Service.File) { $found[[int]$p.ProcessId] = $p } }
-    $ids = @(Get-Listeners $Service.Port | ForEach-Object { [int]$_.OwningProcess })
-    $pidFile = Join-Path $taskRuntime ($Service.Name + '.pid')
-    if (Test-Path -LiteralPath $pidFile) {
-        $saved = 0
-        if ([int]::TryParse(([string](Get-Content -LiteralPath $pidFile -Raw)).Trim(), [ref]$saved)) { $ids += $saved }
-    }
-    foreach ($id in $ids) {
+    # Bare file name only counts when that node owns this service's port: other tools run their own
+    # 'node ./server.mjs' (e.g. Codex), and a PID in the pid file may have been reused.
+    foreach ($id in @(Get-Listeners $Service.Port | ForEach-Object { [int]$_.OwningProcess })) {
         $p = $node | Where-Object { [int]$_.ProcessId -eq $id }
         if ($p -and ((Test-FullPath $p $Service.File) -or (Test-BareName $p $Service.File))) { $found[$id] = $p }
     }

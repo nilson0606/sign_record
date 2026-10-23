@@ -50,11 +50,12 @@ $r = Run
 Check 'B leftover helper (not in pid file) stopped' (-not ($global:procs | Where-Object ProcessId -eq 23732)) $r.out
 Check 'B exit 0, codex untouched' ($r.code -eq 0 -and @($global:procs | Where-Object { $_.ProcessId -in 31368,4772 }).Count -eq 2)
 
-# C helper not listening, started with bare name and only known through pid file; another project's server.mjs on 4273
-Reset; $global:procs = $codex + $other + @((P 300 1 'node.exe' 'node.exe helper-local.mjs'), (P 400 1 'node.exe' 'node C:\other\server.mjs'))
-$global:listen = @([pscustomobject]@{LocalPort=4273;OwningProcess=400}); '300' | Set-Content "$rt/helper.pid"
+# C bare-name helper that owns 4274; Codex's own 'node ./server.mjs' whose PID sits in site.pid; another project's server.mjs on 4273
+Reset; $global:procs = $codex + $other + @((P 300 1 'node.exe' 'node.exe helper-local.mjs'), (P 400 1 'node.exe' 'node C:\other\server.mjs'), (P 24896 23256 'node.exe' '"C:\Users\User\AppData\Local\OpenAI\Codex\runtimes\cua_node\bin\node.exe"  ./server.mjs'))
+$global:listen = @([pscustomobject]@{LocalPort=4274;OwningProcess=300}, [pscustomobject]@{LocalPort=4273;OwningProcess=400}); '24896' | Set-Content "$rt/site.pid"
 $r = Run
-Check 'C bare-name helper from pid file stopped (taskkill)' ((-not ($global:procs | Where-Object ProcessId -eq 300)) -and ($global:calls -contains 'taskkill 300')) ($global:calls -join ',')
+Check 'C bare-name helper owning 4274 stopped' (-not ($global:procs | Where-Object ProcessId -eq 300)) ($global:calls -join ',')
+Check 'C Codex node ./server.mjs (PID in site.pid, no port) untouched' (@($global:procs | Where-Object ProcessId -eq 24896).Count -eq 1 -and -not ($global:calls -contains 'taskkill 24896')) ($global:calls -join ',')
 Check 'C other project server.mjs on 4273 left alone, reported, exit 1' ((@($global:procs | Where-Object ProcessId -eq 400).Count -eq 1) -and $r.code -eq 1 -and $r.out -match 'port 4273 is still in use by PID 400') $r.out
 Check 'C bare "node server.mjs" on port 5000 untouched' (@($global:procs | Where-Object ProcessId -eq 900).Count -eq 1)
 
