@@ -1,6 +1,7 @@
 // Temporary A/B renders share a source-time interval. They never write to the archive.
 import {reverbSpaces} from './recording-soften.mjs';
 import {recordingEmotionLabel} from './recording-scenes.mjs';
+import {wavBlob} from './recording-process.mjs';
 const $=id=>document.getElementById('post-audition-'+id);
 // Compare displayed settings, including inactive effect parameters, without touching audio.
 export function settingDifferences(a,b,{includeBacking=true}={}){
@@ -43,7 +44,8 @@ export function comparisonLevels(buffers,matched=true){
   return rms.map(x=>matched&&x>1e-6&&target?Math.min(1,target/x):1);
 }
 export function createRecordingAudition({read,defaults,apply,render,run,beforePlay,onEditor=()=>{},getPosition=()=>0}){
-  let row=null,slots={},defaultSlots={},cache={},editor='b',busy=false,context=null,active=null,origin=0,source=null,gain=null,timer=null,generation=0,loading=null;
+  let row=null,slots={},defaultSlots={},cache={},editor='b',busy=false,active=null,timer=null,generation=0,loading=null,url=null;
+  const player=new Audio();player.loop=true;
   const say=text=>$('status').textContent=text;
   function showTab(name){editor=name;for(const key of ['a','b']){const current=key===name;$(key+'-tab').setAttribute('aria-selected',String(current));$(key+'-tab').tabIndex=current?0:-1;$(key+'-pane').hidden=!current;$(key+'-edit').setAttribute('aria-pressed',String(current));}$('reset').textContent=`還原 ${name.toUpperCase()} 預設設定`;onEditor(name);refreshDifferences();}
   function refreshDifferences(){
@@ -61,7 +63,7 @@ export function createRecordingAudition({read,defaults,apply,render,run,beforePl
   function remember(){if(!slots[editor])return;const next=structuredClone(read());if(JSON.stringify(next)!==JSON.stringify(slots[editor])){if(active)stop();delete cache[editor];slots[editor]=next;describe(editor);}}
   function selectTab(name){remember();if(slots[name])apply(structuredClone(slots[name]));showTab(name);}
   function switchEditor(name){try{selectTab(name);say(`正在調整 ${name.toUpperCase()}，兩組設定各自保留；按試聽才會播放新效果。`);return true;}catch(e){say(e.message);return false;}}
-  function stop(){generation++;if(source){try{source.stop();}catch{}source.disconnect();source=null;}gain?.disconnect();gain=null;active=null;clearInterval(timer);timer=null;$('position').textContent='';if(context){void context.close();context=null;}controls(busy);}
+  function stop(){generation++;player.pause();player.removeAttribute('src');player.load();if(url)URL.revokeObjectURL(url);url=null;active=null;clearInterval(timer);timer=null;$('position').textContent='';controls(busy);}
   function invalidate(){stop();cache={};}
   function controls(value=busy){busy=value;const enabled=!!(row?.complete&&row.rawBytes&&row.post?.segments?.length);$('fields').disabled=busy||!enabled;
     for(const name of ['a','b'])$(name+'-edit').disabled=busy||!enabled;
@@ -91,19 +93,28 @@ export function createRecordingAudition({read,defaults,apply,render,run,beforePl
   function range(){const start=$('start').value===''?NaN:Number($('start').value),end=$('end').value===''?NaN:Number($('end').value);
     if(!Number.isFinite(start)||!Number.isFinite(end)||start<0||end<=start||end>3600||end-start>30)throw Error('試聽需設定有效起訖，每段最多 30 秒。');return {start,end};}
   function matchGain(){const names=Object.keys(cache),levels=comparisonLevels(names.map(n=>cache[n]),$('match').checked);return levels[names.indexOf(active)]??1;}
+  function loadAudio(name,offset){
+    active=name;
+    // Bake volume matching into the file too; playback has no DSP graph.
+    const buffer=cache[name],level=matchGain();
+    let output=buffer;
+    if(level!==1){output=new AudioBuffer({numberOfChannels:buffer.numberOfChannels,length:buffer.length,sampleRate:buffer.sampleRate});for(let c=0;c<buffer.numberOfChannels;c++){const input=buffer.getChannelData(c),data=output.getChannelData(c);for(let i=0;i<data.length;i++)data[i]=input[i]*level;}}
+    const next=URL.createObjectURL(wavBlob(output)),previous=url;url=next;
+    player.src=next;player.currentTime=offset%buffer.duration;
+    if(previous)URL.revokeObjectURL(previous);
+  }
   function play(name){return run(async selected=>{
     if(!slots[name])throw Error('請先記住這組設定。');
     selectTab(name);
     const interval=range(),token=generation;
     if(!cache[name]){say(`正在準備 ${name.toUpperCase()} 片段…`);loading=name;controls();try{const audio=await render(selected,slots[name],interval,$('mode').value==='voice');if(token!==generation)return;cache[name]=audio;}finally{loading=null;controls();}}
     beforePlay();
-    if(!context)context=new AudioContext();await context.resume();if(token!==generation)return;
-    const now=context.currentTime,offset=active?(now-origin)%cache[name].duration:0;
-    const oldSource=source,oldGain=gain;
-    source=context.createBufferSource();source.buffer=cache[name];source.loop=true;gain=context.createGain();active=name;
-    gain.gain.setValueAtTime(0,now);gain.gain.linearRampToValueAtTime(matchGain(),now+.012);source.connect(gain);gain.connect(context.destination);source.start(now,offset);origin=now-offset;
-    if(oldSource){oldGain.gain.cancelScheduledValues(now);oldGain.gain.setValueAtTime(oldGain.gain.value,now);oldGain.gain.linearRampToValueAtTime(0,now+.012);oldSource.stop(now+.015);oldSource.onended=()=>{oldSource.disconnect();oldGain.disconnect();};}
-    clearInterval(timer);timer=setInterval(()=>{if(context&&active)$('position').textContent=`${active.toUpperCase()} · 原始錄音 ${(interval.start+(context.currentTime-origin)%cache[active].duration).toFixed(2)} 秒 · 循環試聽中`;},100);
+    if(token!==generation)return;
+    const offset=active?player.currentTime:0;
+    loadAudio(name,offset);
+    try{await player.play();}catch(error){if(token!==generation||error.name==='AbortError')return;stop();throw error;}
+    if(token!==generation)return;
+    clearInterval(timer);timer=setInterval(()=>{if(active)$('position').textContent=`${active.toUpperCase()} · 原始錄音 ${(interval.start+player.currentTime).toFixed(2)} 秒 · 循環試聽中`;},100);
     say(`正在比較 ${name.toUpperCase()}：${interval.start}～${interval.end} 秒${$('match').checked?' · 近似音量匹配':''}。試聽不另存錄音。`);controls();
   },'post-audition-status');}
   for(const name of ['a','b']){
@@ -117,11 +128,11 @@ export function createRecordingAudition({read,defaults,apply,render,run,beforePl
   $('stop').addEventListener('click',()=>{stop();say('比較已停止，A／B 設定仍保留。');});
   $('reset').addEventListener('click',restoreEditor);
   for(const id of ['start','end','mode'])$(id).addEventListener('change',invalidate);
-  $('match').addEventListener('change',()=>{if(gain)gain.gain.setTargetAtTime(matchGain(),context.currentTime,.02);});
+  $('match').addEventListener('change',()=>{if(active){loadAudio(active,player.currentTime);void player.play().catch(error=>{if(error.name!=='AbortError'){stop();say(error.message);}});}});
   // Delegation includes added/removed regions and preset/reset buttons. Reading drafts
   // here must not invalidate a playing buffer or overwrite the other group's settings.
   for(const event of ['input','change','click'])document.getElementById('post-ab-editor').addEventListener(event,refreshDifferences);
   document.getElementById('post-delay').addEventListener('input',refreshDifferences);
   window.addEventListener('pagehide',stop);
-  return {reset,remember,stop,controls,playCurrent:()=>play(editor),playing:()=>!!active,position:()=>active?Number($('start').value)+(context.currentTime-origin)%cache[active].duration:null};
+  return {reset,remember,stop,controls,playCurrent:()=>play(editor),playing:()=>!!active,position:()=>active?Number($('start').value)+player.currentTime:null};
 }

@@ -202,7 +202,9 @@ try{
  await page.evaluate(async()=>{const a=document.getElementById('segment-audio');a.currentTime=1;await a.play();});
  const liveSource=await $('segment-audio').getAttribute('src');
  await level('segment-voice-level',0);await level('segment-backing-level',0);
- assert.equal(await $('segment-audio').getAttribute('src'),liveSource,'sliders keep the same transport instead of rebuilding playback');
+ await page.waitForFunction(()=>document.getElementById('segment-audio').dataset.previewUpdating==='false');
+ assert.notEqual(await $('segment-audio').getAttribute('src'),liveSource,'new levels produce a complete WAV before playback resumes');
+ assert.ok(await $('segment-audio').evaluate(el=>el.currentTime>=1),'remixing retains the playback position');
  assert.equal(await $('segment-audio').evaluate(el=>el.paused),false);
  await $('segment-export').click();await page.waitForFunction(()=>document.getElementById('segment-status').textContent.includes('已存到錄音後處理'));
  const mutedSaved=(await page.evaluate(()=>fixtureStore.list())).find(r=>r.segmentComposition&&r.balance?.manual);

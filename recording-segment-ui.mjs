@@ -3,7 +3,7 @@ import {revealPlayerVideo} from './player-view.mjs';
 import {segmentDraft,validateSegmentDraft,normalizeSegmentNames,splitSegment,moveBoundary,mergeBoundary,formatSegmentTime as fmt,parseSegmentTime,missingSegmentRanges,composeSegmentVoice,segmentMixMetadata} from './recording-segments.mjs';
 import {remixRecording,wavBlob,delaySeconds,originalVocalRanges} from './recording-process.mjs';
 import {recordingSceneDefaultsVersion} from './recording-scenes.mjs';
-import {createLiveRecordingPreview} from './recording-live-preview.mjs';
+import {createRenderedRecordingPreview} from './recording-live-preview.mjs';
 
 export function createSegmentRecording(options) {
   const $=id=>document.getElementById('segment-'+id),store=options.recording.store;
@@ -16,8 +16,8 @@ export function createSegmentRecording(options) {
   let guideMode='original';
   const guideModeIds=['guide-mode'];
   const status=text=>{$('status').textContent=text;},busy=()=>work||!!capture,reference=()=>options.reference(),part=()=>draft?.parts[selected];
-  const liveOptions={settings:()=>options.recording.balanceSettings(),onError:error=>status('試聽無法播放：'+error.message)};
-  const takePreview=createLiveRecordingPreview($('take-audio'),liveOptions),trialPreview=createLiveRecordingPreview($('audio'),liveOptions);
+  const previewOptions={settings:()=>options.recording.balanceSettings(),onError:error=>status('試聽無法播放：'+error.message)};
+  const takePreview=createRenderedRecordingPreview($('take-audio'),previewOptions),trialPreview=createRenderedRecordingPreview($('audio'),previewOptions);
   const clearResult=text=>{$('clear-result').textContent=text;$('clear-result').hidden=!text;};
   const storageKey=()=>`karaoke.segment-draft.v1.${key}`;
   const takeName=row=>{
@@ -347,7 +347,7 @@ export function createSegmentRecording(options) {
       if(trial.saved){trial.meta={...trial.meta,id:crypto.randomUUID(),created:Date.now()};trial.saved=false;}
       trial.meta.balance=options.recording.balanceSettings();trial.dirty=true;
     }
-    render();if(enabled)status(takeSourceId&&takeMode==='voice'?'音量已記住。純人聲原檔試聽不套用音量，請選「人聲＋伴樂／和音」邊聽邊調整。':'音量已即時套用，可繼續邊聽邊調整。滿意後試合完整一版並存到錄音後處理；已試合的版本可直接保存最新音量。');
+    render();if(enabled)status(takeSourceId&&takeMode==='voice'?'音量已記住。純人聲原檔試聽不套用音量，請選「人聲＋伴樂／和音」邊聽邊調整。':'音量已記住；試聽會先完成整段混音，再接續目前位置播放。滿意後可保存最新音量到錄音後處理。');
   });
   for(const id of takeModeIds)$(id).onchange=()=>{takeMode=$(id).value==='voice'?'voice':'mix';clearTakePreview();render();status(`已切換為${takeModeLabel()}，請按「試聽本段錄音」。`);};
   for(const id of guideModeIds)$(id).onchange=()=>{guideMode=$(id).value==='backing'?'backing':'original';render();status(guideMode==='backing'?'下次分段錄音只用伴樂／和音帶唱。':'下次分段錄音播放原唱＋伴樂帶唱。');};
