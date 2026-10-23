@@ -80,8 +80,9 @@ if ($owner.Count -gt 0) {
         $taskHeaders = @{ Origin = 'http://localhost:4273' }
         $taskSession = Invoke-RestMethod -Uri 'http://127.0.0.1:4274/session' -Headers $taskHeaders -TimeoutSec 5
         $taskHeaders['X-Karaoke-Token'] = $taskSession.token
-        Invoke-RestMethod -Uri 'http://127.0.0.1:4274/shutdown' -Method Post -Headers $taskHeaders -TimeoutSec 20 | Out-Null
-        if (Wait-Exit ([int]$owner[0].OwningProcess) 20) { Write-Host ('helper stopped (PID ' + $owner[0].OwningProcess + ').') }
+        Invoke-RestMethod -Uri 'http://127.0.0.1:4274/shutdown' -Method Post -Headers $taskHeaders -TimeoutSec 10 | Out-Null
+        # The helper gives its own cleanup at most 3 s and then exits within about 2 s.
+        if (Wait-Exit ([int]$owner[0].OwningProcess) 8) { Write-Host ('helper stopped (PID ' + $owner[0].OwningProcess + ').') }
     } catch { Write-Host ('helper did not answer the shutdown request: ' + $_.Exception.Message) }
 }
 foreach ($s in $taskServices) {

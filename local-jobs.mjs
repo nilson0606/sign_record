@@ -305,7 +305,8 @@ export async function handleLocalJobs(req, res) {
     json(res, 405, { error: 'Unsupported method' }); return true;
   }
   if (req.url === '/shutdown' && req.method === 'POST') {
-    await clearAllJobs(); json(res, 200, { stopped: true });
+    // A job that will not stop (e.g. a stuck media child) must not keep the helper alive: give cleanup 3 s.
+    await clearAllJobsWithin(3000); json(res, 200, { stopped: true });
     setImmediate(() => process.emit('SIGTERM')); return true;
   }
   if (req.url === '/jobs' && req.method === 'POST') {
@@ -341,6 +342,10 @@ setInterval(() => {
 export function busyStatus() {
   const status = { preparing: [...jobs.values()].some(j => !['ready','failed'].includes(j.stage)), voicelab: voicelabBusy(), mv: mvBusy(), arrangement: arrangementBusy(), localMedia: localMediaBusy(), microphone: nativeMicrophoneActive(), library: changingLocation || editingMasks.size > 0 };
   return { ...status, busy: Object.values(status).some(Boolean) };
+}
+export function clearAllJobsWithin(ms) {
+  let timer;
+  return Promise.race([clearAllJobs().catch(() => {}), new Promise(resolve => { timer = setTimeout(resolve, ms); })]).finally(() => clearTimeout(timer));
 }
 export async function clearAllJobs() { if (folderPicker) { folderPicker.cancelled = true; await stopChild(folderPicker.child); } await Promise.allSettled([...jobs.values()].map(erase)); await stopVoiceLab(); await stopArrangements(); await stopMV(); await stopLocalMedia(); }
 export async function clearStaleJobs() {

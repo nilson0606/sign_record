@@ -2,7 +2,7 @@ import {stopNativeMicrophone} from './native-microphone-server.mjs';
 import {createDiagnosticsHandler} from './recording-diagnostics-server.mjs';
 // Loopback-only service. Recording export receives audio locally; nothing is uploaded to cloud.
 import http from 'node:http';
-import { handleLocalJobs, clearAllJobs, clearStaleJobs } from './local-jobs.mjs';
+import { handleLocalJobs, clearAllJobsWithin, clearStaleJobs } from './local-jobs.mjs';
 import { access } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -54,16 +54,16 @@ const server = http.createServer(async (req, res) => {
   try { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(await health())); }
   catch { res.writeHead(500); res.end(JSON.stringify({ error: 'Local environment check failed' })); }
 });
+// Track every connection from the first one on (registered before listen), so shutdown can reset all of them.
+const sockets = new Set();
+server.on('connection', socket => { sockets.add(socket); socket.once('close', () => sockets.delete(socket)); });
 server.on('error', err => { console.error(err.message); process.exitCode = 1; });
 server.listen(port, '127.0.0.1', () => console.log(`Local tool status: http://127.0.0.1:${port}/health`));
 
-await clearStaleJobs();
-const sockets = new Set();
-server.on('connection', socket => { sockets.add(socket); socket.once('close', () => sockets.delete(socket)); });
 let stopping = false;
 for (const signal of ['SIGINT','SIGTERM']) process.on(signal, async () => {
   if (stopping) return; stopping = true;
-  stopNativeMicrophone(); await clearAllJobs();
+  stopNativeMicrophone(); await clearAllJobsWithin(3000);
   // Let the /shutdown reply leave, then reset every open connection. A paused media stream or a half-sent
   // request would otherwise keep server.close() waiting, and after a forced exit Windows keeps the port
   // listening as PID 0 (FIN_WAIT) for minutes, so the next start fails with EADDRINUSE.
@@ -73,3 +73,5 @@ for (const signal of ['SIGINT','SIGTERM']) process.on(signal, async () => {
     setTimeout(() => process.exit(0), 2000).unref();
   }, 200);
 });
+// After the shutdown handlers are in place, so an early /shutdown is never ignored.
+await clearStaleJobs();

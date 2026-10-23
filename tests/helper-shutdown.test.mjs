@@ -29,7 +29,12 @@ test('helper /shutdown resets open connections and exits promptly', async () => 
     // A client that sends half a request and never finishes it.
     const hanging = net.connect(port, '127.0.0.1');
     await new Promise(resolve => hanging.once('connect', resolve));
-    hanging.write('GET /health HTTP/1.1\r\nHost: 127.0.0.1:' + port + '\r\n');
+    // First a complete request on this connection, so the helper has surely accepted it (a connection still
+    // waiting in the OS backlog is not the helper's to reset), then half of a second request that never ends.
+    const firstReply = new Promise(resolve => hanging.once('data', resolve));
+    hanging.write('GET /session HTTP/1.1\r\nHost: 127.0.0.1:' + port + '\r\nOrigin: http://localhost:4273\r\n\r\n');
+    assert.match(String(await firstReply), /^HTTP\/1\.1 200/);
+    hanging.write('GET /session HTTP/1.1\r\nHost: 127.0.0.1:' + port + '\r\n');
     const events = []; hanging.on('end', () => events.push('end')); hanging.resume();
     const hangEnded = new Promise(resolve => { hanging.once('error', error => resolve(error.code)); hanging.once('close', () => resolve(events.join(',') || 'closed')); });
     const token = (await (await fetch(base + '/session', { headers: { Origin: origin } })).json()).token;
@@ -42,6 +47,39 @@ test('helper /shutdown resets open connections and exits promptly', async () => 
     assert.equal(await hangEnded, 'ECONNRESET', 'open connection should be reset, not left half-closed');
     // The port is free again right away.
     await new Promise((resolve, reject) => { const probe = net.createServer().once('error', reject).listen(port, '127.0.0.1', () => probe.close(resolve)); });
+  } finally {
+    if (child && child.exitCode === null) child.kill();
+    if (path.basename(dir).startsWith('karaoke-shutdown-')) await rm(dir, { recursive: true, force: true, maxRetries: 5 });
+  }
+});
+
+test('helper /shutdown still exits when a job refuses to stop', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'karaoke-shutdown-')); let child;
+  try {
+    const src = fileURLToPath(new URL('../', import.meta.url));
+    for (const file of await readdir(src)) if (file.endsWith('.mjs')) await copyFile(path.join(src, file), path.join(dir, file));
+    const helper = path.join(dir, 'helper-local.mjs');
+    let source = await readFile(helper, 'utf8');
+    source = source.replace('`127.0.0.1:${port}`, `localhost:${port}`', '`127.0.0.1:${server.address().port}`, `localhost:${server.address().port}`').replace('${port}/health', '${server.address().port}/health');
+    await writeFile(helper, source);
+    // Simulate a job whose cleanup never finishes.
+    const jobsFile = path.join(dir, 'local-jobs.mjs');
+    await writeFile(jobsFile, (await readFile(jobsFile, 'utf8')).replace('export async function clearAllJobs() {', 'export async function clearAllJobs() { await new Promise(() => {});'));
+    child = spawn(process.execPath, [helper], { windowsHide: true, env: { ...process.env, KARAOKE_HELPER_PORT: '0' }, stdio: ['ignore', 'pipe', 'pipe'] });
+    const exited = new Promise(resolve => child.once('exit', code => resolve(code)));
+    const base = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('helper startup timeout')), 10000);
+      child.stdout.once('data', chunk => { clearTimeout(timer); resolve(chunk.toString().match(/http:\/\/127\.0\.0\.1:\d+/)[0]); });
+    });
+    const origin = 'http://localhost:4273';
+    const token = (await (await fetch(base + '/session', { headers: { Origin: origin } })).json()).token;
+    const started = Date.now();
+    const reply = await fetch(base + '/shutdown', { method: 'POST', headers: { Origin: origin, 'X-Karaoke-Token': token } });
+    assert.deepEqual(await reply.json(), { stopped: true });
+    assert.ok(Date.now() - started < 4000, '/shutdown answered after ' + (Date.now() - started) + ' ms');
+    const code = await Promise.race([exited, new Promise(resolve => setTimeout(() => resolve('timeout'), 8000))]);
+    assert.equal(code, 0, 'helper should exit by itself');
+    assert.ok(Date.now() - started < 8000, 'exit took ' + (Date.now() - started) + ' ms');
   } finally {
     if (child && child.exitCode === null) child.kill();
     if (path.basename(dir).startsWith('karaoke-shutdown-')) await rm(dir, { recursive: true, force: true, maxRetries: 5 });
