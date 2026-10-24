@@ -1,10 +1,12 @@
-const key = 'karaoke.theme.v1';
+// v2：預設改成「控台」（跟 AI 翻唱的控台外觀一致）；v1 存的選擇不沿用，第一次打開一律是控台。
+const key = 'karaoke.theme.v2';
 const picker = document.getElementById('theme-select');
+const themeColors = { console: '#0b1118', current: '#070b15', warm: '#120f16' };
 function applyTheme(value) {
-  const theme = value === 'warm' ? 'warm' : 'current';
+  const theme = Object.hasOwn(themeColors, value) ? value : 'console';
   document.documentElement.dataset.theme = theme;
   picker.value = theme;
-  document.querySelector('meta[name="theme-color"]').content = theme === 'warm' ? '#120f16' : '#070b15';
+  document.querySelector('meta[name="theme-color"]').content = themeColors[theme];
   window.dispatchEvent(new Event('karaoke-theme-change'));
 }
 let saved;

@@ -34,7 +34,7 @@ try{
   await mkdir('test-results',{recursive:true});
   for(const language of ['zh-Hant','en']){
     await page.locator('#language-select').selectOption(language);
-    for(const theme of ['current','warm']){
+    for(const theme of ['console','current','warm']){
       await page.locator('#theme-select').selectOption(theme);
       for(const width of [1440,1024,760,390]){
         await page.setViewportSize({width,height:1000});

@@ -87,7 +87,7 @@ try {
     await route.fulfill({json:value,headers:{'Access-Control-Allow-Origin':site}});
   });
   await page.goto(site+'/');
-  for(const theme of ['current','warm']){
+  for(const theme of ['console','current','warm']){
     await page.setViewportSize({width:1440,height:1000});await page.locator('#theme-select').selectOption(theme);
     await page.screenshot({path:`test-results/studio-${theme}-entry.png`});
   }
@@ -184,7 +184,7 @@ try {
   assert.ok(await page.locator('#mic-stop').isDisabled());
   await page.locator('#library-panel > summary').click();
   // Verify the real desktop section order in both themes.
-  for(const theme of ['current','warm'])for(const width of [1440]){
+  for(const theme of ['console','current','warm'])for(const width of [1440]){
     await page.setViewportSize({width,height:1100});await page.locator('#theme-select').selectOption(theme);
     const order=['player-section','voice-section','prepare-section','library-section','recording-post','timing-section','recording-section'];
     assert.deepEqual(await page.locator('.layout > [id]:not([hidden])').evaluateAll(nodes=>nodes.map(n=>n.id)),order);
@@ -209,7 +209,7 @@ try {
   }
   // Direct links, scroll-following highlight, and sticky anchors on desktop/mobile.
   await page.emulateMedia({reducedMotion:'reduce'});
-  for(const theme of ['current','warm'])for(const width of [1440,390,320]){
+  for(const theme of ['console','current','warm'])for(const width of [1440,390,320]){
     await page.setViewportSize({width,height:900});await page.locator('#theme-select').selectOption(theme);
     await page.locator('.section-nav a[href="#voice-settings"]').click();
     await page.waitForFunction(()=>document.querySelector('.nav-links [aria-current]')?.hash==='#voice-settings');

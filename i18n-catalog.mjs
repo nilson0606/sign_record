@@ -15,6 +15,7 @@ export const messages = {
   "唱錄系統": "Sing & Record",
   "本機分析 · 錄音留在本機": "Local analysis · Recordings stay on your computer",
   "配色": "Theme",
+  "控台": "Console",
   "科技藍": "Tech blue",
   "暖色調": "Warm",
   "收音設定": "Audio input",
