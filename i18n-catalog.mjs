@@ -635,6 +635,7 @@ export const messages = {
   "本機媒體載入失敗，請重新載入。": "Local media failed to load. Please reload it.",
   "本機音檔": "Local audio",
   "影片已切換，請在播放器內按播放。": "Video changed. Press play inside the player.",
+  "正在唱歌、錄音或準備歌曲，網址不會自動切換；結束後請按「載入影片」。": "Singing, recording, or song preparation is in progress, so the link will not switch automatically. Click “Load video” when you finish.",
   "瀏覽器未提供可讀取的串流。": "The browser did not provide a readable stream.",
   "回應超過測試大小上限。": "Response exceeds the test size limit.",
   "請先填入有效的 YouTube 影片網址。": "Enter a valid YouTube video URL first.",

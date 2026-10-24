@@ -226,11 +226,12 @@ function initializePlayer(id) {
   });
   return playerReady;
 }
+let autoLoadTimer=0, videoLoading=false;
 async function loadVideo(e) {
-  e?.preventDefault();
+  e?.preventDefault(); clearTimeout(autoLoadTimer);
   const id = selectedMediaId();
   if (!id) return status('請輸入有效的 YouTube 網址，或先選擇本機 MV／音檔。');
-  const button = $('song-form').querySelector('button'); button.disabled = true;
+  const button = $('song-form').querySelector('button'); button.disabled = true; videoLoading = true;
   status(isLocalMediaId(id)?'正在載入本機媒體…':'正在載入 YouTube 播放器…');
   try {
     tracePlayback('load-video-request',{videoId:id});
@@ -255,9 +256,24 @@ async function loadVideo(e) {
     await initializePlayer(id);
     if (existing) { player.cueVideoById(id); status('影片已切換，請在播放器內按播放。'); }
     tracePlayback('load-video-ready',{videoId:id}); return true;
-  } catch (err) { status(err.message); return false; } finally { button.disabled = false; }
+  } catch (err) { status(err.message); return false; } finally { button.disabled = false; videoLoading = false; }
 }
 $('song-form').addEventListener('submit', loadVideo);
+// 貼上或打完 YouTube 網址約 0.5 秒後自動載入；同一部影片不重載；唱歌、錄音、準備中只提示不切換。
+function autoLoadBlocked(){
+  let w={};try{w=JSON.parse($('player-section').dataset.workflow||'{}');}catch{}
+  return !!(w.hasTake||w.busy||['singing','preparing','finishing','restarting'].includes(w.phase)||$('url').disabled||$('song-form').querySelector('button').disabled);
+}
+function loadedYoutubeId(){try{return player&&player.sourceKind!=='local'?player.getVideoData?.()?.video_id||null:null;}catch{return null;}}
+$('url').addEventListener('input',()=>{
+  clearTimeout(autoLoadTimer);
+  autoLoadTimer=setTimeout(()=>{
+    const id=youtubeId($('url').value.trim());
+    if(!id||videoLoading||id===loadedYoutubeId())return;
+    if(autoLoadBlocked())return status('正在唱歌、錄音或準備歌曲，網址不會自動切換；結束後請按「載入影片」。');
+    void loadVideo();
+  },500);
+});
 function resetPlayer(){
   if(playerAttempt)playerAttempt.active=false;playerAttempt=null;
   player?.destroy?.();player=null;playerReady=null;
