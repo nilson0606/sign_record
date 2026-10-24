@@ -17,32 +17,35 @@ try{
     const req=route.request(),url=new URL(req.url());
     if(url.hostname==='127.0.0.1'&&url.port==='4274'){
       if(url.pathname==='/session')return route.fulfill({json:{token:'test'}});
-      if(url.pathname==='/arrangements/library')return route.fulfill({json:{records:[]}});
-      if(url.pathname==='/voicelab')return route.fulfill({json:{installed:true,models:[{id:'ver3'}]}});
-      if(url.pathname==='/voicelab/jobs')return route.fulfill({json:{id:'fixture',stage:'ready',result:{settings:req.postDataJSON().settings,sampleRate:48000,sourceSamples:n,outputSamples:n}}});
-      if(url.pathname.startsWith('/voicelab/jobs/')||url.pathname.startsWith('/library/'))return route.fulfill({body:wav,contentType:'audio/wav'});
+      if(url.pathname.startsWith('/library/'))return route.fulfill({body:wav,contentType:'audio/wav'});
       if(url.pathname==='/mv/jobs'&&req.method()==='POST')uploadedAudio=req.postDataBuffer();
       const response=await fetch(base+url.pathname+url.search,{method:req.method(),headers:{'Content-Type':'application/octet-stream'},...(req.method()==='POST'?{body:req.postDataBuffer()}: {})});
       return route.fulfill({status:response.status,contentType:response.headers.get('content-type'),body:Buffer.from(await response.arrayBuffer())});
     }
     if(url.pathname==='/app.mjs')return route.fulfill({body:'',contentType:'text/javascript'});
-    if(url.hostname==='mv.test')try{const name=url.pathname==='/'?'index.html':url.pathname.slice(1);if(!/^[a-z-]+\.(html|mjs|css)$/.test(name))return route.abort();return route.fulfill({body:await readFile(name),contentType:name.endsWith('.mjs')?'text/javascript':name.endsWith('.css')?'text/css':'text/html'});}catch{return route.abort();}
+    if(url.hostname==='mv.test')try{const name=url.pathname==='/'?'index.html':url.pathname.slice(1);if(!/^[a-z0-9-]+\.(html|mjs|css)$/.test(name))return route.abort();return route.fulfill({body:await readFile(name),contentType:name.endsWith('.mjs')?'text/javascript':name.endsWith('.css')?'text/css':'text/html'});}catch{return route.abort();}
     return route.abort();
   });
   await page.goto('http://mv.test/');
   await page.evaluate(async bytes=>{const {createRecordingPost}=await import('/recording-post.mjs');window.savedMix=new Blob([new Uint8Array(bytes)],{type:'audio/wav'});window.post=createRecordingPost({store:{async blob(row){window.mvBlobRow=row.id;return savedMix;}},stop:async()=>{},pause(){},download(){},onDelete(){},reference:()=>({cacheId:'fixture',title:'親愛的你怎麼不在身邊',duration:4,hasPreview:true})});post.refresh([]);},Array.from(wav));
   assert.equal(await page.locator('#selected-recording-mv').isDisabled(),true);
-  assert.equal(await page.locator('#voicelab-panel #mv-panel').count(),0);
   assert.equal(await page.locator('#recording-post > #mv-panel').count(),1);
-  await page.locator('#voicelab-panel > summary').click();await page.locator('#voicelab-enable').check();await page.waitForFunction(()=>document.getElementById('voicelab-status').textContent.includes('已就緒'));
-  await page.locator('#voicelab-generate').click();await page.waitForFunction(()=>!document.getElementById('voicelab-result').hidden);
-  await page.locator('#voicelab-backing').uncheck();
-  await page.locator('#voicelab-mv').click();await page.waitForFunction(()=>document.getElementById('mv-title').value==='親愛的你怎麼不在身邊');
-  assert.match(await page.locator('#mv-source').textContent(),/Voice Lab/);
+  // 從已保存的後製成品製作 MV（Voice Lab 已移除，MV 只從錄音清單帶入）
+  await page.evaluate(()=>post.refresh([{id:'saved-post',title:'親愛的你怎麼不在身邊',created:Date.now(),seconds:4,complete:true,mode:'mix',bytes:savedMix.size}]));
+  assert.equal(await page.locator('#selected-recording-mv').isEnabled(),true);
+  await page.locator('#selected-recording-mv').click();
+  await page.waitForFunction(()=>document.getElementById('mv-title').value==='親愛的你怎麼不在身邊');
+  assert.equal(await page.evaluate(()=>mvBlobRow),'saved-post');
+  assert.match(await page.locator('#mv-source').textContent(),/已保存後處理成品/);
+  assert.equal(await page.locator('#mv-panel').isVisible(),true);
   await page.locator('#mv-generate').click();assert.match(await page.locator('#mv-status').textContent(),/請填寫/);assert.equal(mvBusy(),false);
-  await page.locator('#mv-artist').fill('測試翻唱者');await page.locator('#mv-generate').click();
+  await page.locator('#mv-artist').fill('測試翻唱者');
+  // 改選別的錄音也不影響：MV 用帶入當下的成品音檔
+  await page.evaluate(()=>post.refresh([]));
+  await page.locator('#mv-generate').click();
   await page.waitForFunction(()=>!document.getElementById('mv-result').hidden||document.getElementById('mv-status').textContent.includes('失敗'),null,{timeout:120000});
   const status=await page.locator('#mv-status').textContent();assert.match(status,/MV 已完成/);
+  assert.deepEqual(uploadedAudio,wav,'exact saved mix is used, even after changing selected recording');
   await page.waitForFunction(()=>document.getElementById('mv-video').readyState>=1);
   const video=await page.locator('#mv-video').evaluate(v=>({width:v.videoWidth,height:v.videoHeight,seconds:v.duration,readyState:v.readyState}));assert.equal(video.width,1920);assert.equal(video.height,1080);assert.ok(Math.abs(video.seconds-4)<.1);
   const file=status.split('保存位置：')[1];assert.equal(path.dirname(file),path.join(root,'vedio'));
@@ -55,22 +58,7 @@ try{
   const downloadPromise=page.waitForEvent('download');await page.locator('#mv-download').click();const download=await downloadPromise;assert.match(download.suggestedFilename(),/\.mp4$/);
   assert.deepEqual(errors,[]);
   console.log(JSON.stringify({status:'PASS',...video,audioRms:rms,animatedSpectrum:true,download:download.suggestedFilename(),file}));
-  // Postprocessing uses the selected saved mix, without re-applying pending controls.
-  await page.locator('#voicelab-enable').uncheck();
-  await page.evaluate(()=>post.refresh([{id:'saved-post',title:'已後製成品',created:Date.now(),seconds:4,complete:true,mode:'mix',bytes:savedMix.size}]));
-  assert.equal(await page.locator('#selected-recording-mv').isEnabled(),true);
-  await page.locator('#selected-recording-mv').click();
-  await page.waitForFunction(()=>document.getElementById('mv-title').value==='已後製成品');
-  assert.equal(await page.evaluate(()=>mvBlobRow),'saved-post');
-  assert.match(await page.locator('#mv-source').textContent(),/已保存後處理成品/);
-  assert.equal(await page.locator('#mv-panel').isVisible(),true,'MV works with Voice Lab disabled');
-  await page.evaluate(()=>post.refresh([]));
-  await page.locator('#mv-generate').click();
-  await page.waitForFunction(()=>!document.getElementById('mv-result').hidden,null,{timeout:120000});
-  assert.deepEqual(uploadedAudio,wav,'exact saved mix is used, even after changing selected recording');
-  assert.match(await page.locator('#mv-status').textContent(),/MV 已完成/);
-  assert.deepEqual(errors,[]);
-  console.log('PASS: saved postprocessing mix renders to MV with Voice Lab disabled; exact audio snapshot preserved.');
+  console.log('PASS: saved postprocessing mix renders to MV; exact audio snapshot preserved.');
   // Verify cancellation closes the encoder and returns a terminal state.
   const created=await(await fetch(base+'/mv/jobs?'+new URLSearchParams({title:'取消測試',artist:'測試'}),{method:'POST',body:wav})).json();
   const cancelled=await(await fetch(base+'/mv/jobs/'+created.id,{method:'DELETE'})).json();assert.equal(cancelled.stage,'cancelled');assert.equal(mvBusy(),false);

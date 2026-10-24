@@ -15,7 +15,7 @@
   <nav class="section-nav" aria-label="頁面區段導覽">
     <div class="nav-links">
       <a href="#voice-settings">收音設定</a><a href="#local-section">本機工具</a><a href="#library-panel">歌曲庫</a><a href="#player-section">播放／錄音</a><a href="#prepare-section">歌曲準備／Key</a><a href="#score-section">評分／結算</a><a href="#recording-post">錄音後處理</a>
-      <a href="#voice-section">收音測試</a><a href="#timing-section">延遲校正</a><a href="#recording-section">評分與錄音設定</a><a href="#voicelab-panel">Voice Lab</a><a href="#arrangement-panel">配樂實驗室</a><a data-language-manual href="manual.html" target="_blank" rel="noopener">說明 ↗</a>
+      <a href="#voice-section">收音測試</a><a href="#timing-section">延遲校正</a><a href="#recording-section">評分與錄音設定</a><a data-language-manual href="manual.html" target="_blank" rel="noopener">說明 ↗</a>
     </div>
     <div class="nav-workflow" aria-label="錄唱下一步">
       <p id="workflow-message" role="status"><strong>1／8 確認收音</strong><span>先選收音方式與麥克風，再開麥試聲。</span></p>
@@ -74,7 +74,7 @@
         <p id="local-media-help" class="help">MP4／MOV／MKV／WebM，最多 2 GB、15 分鐘。影片副本保存在歌曲庫的 .local-mv 資料夾，原檔保留，不上傳雲端；必要時自動轉為 MP4。</p>
         <label for="local-media-saved">已匯入的 MV</label><select id="local-media-saved"><option value="">選擇已匯入的 MV</option></select>
         <div class="button-row"><button id="local-media-load" type="button">載入 MV</button><button id="local-media-refresh" type="button" class="secondary">重新整理</button><button id="local-media-cancel" type="button" class="secondary" hidden>取消匯入</button></div>
-        <p id="local-media-status" class="status" role="status">選擇檔案後，可用相同流程準備基準、評分、分段、錄音、升降 Key 與 Voice Lab。</p>
+        <p id="local-media-status" class="status" role="status">選擇檔案後，可用相同流程準備基準、評分、分段、錄音與升降 Key。</p>
       </div>
       <p id="player-status" class="status" role="status">貼上網址後，影片會在這裡播放。</p>
       <div class="video-shell"><div id="video-placeholder"><span>▶</span><p>你的下一首歌</p><small>播放器與麥克風分別啟動</small></div><div id="player"></div><video id="local-video" controls playsinline preload="metadata" crossorigin="anonymous" hidden></video><div id="local-audio-panel" hidden><div class="local-audio-art" aria-hidden="true"><svg viewBox="0 0 384 200" fill="none"><path class="signal-grid" d="M0 50H384M0 100H384M0 150H384M72 0V200M192 0V200M312 0V200"/><ellipse class="signal-orbit" cx="192" cy="100" rx="170" ry="82"/><g class="signal-bars"><rect x="36" y="94.0" width="4" height="12" rx="2"/><rect x="48" y="90.0" width="4" height="20" rx="2"/><rect x="60" y="84.0" width="4" height="32" rx="2"/><rect x="72" y="91.0" width="4" height="18" rx="2"/><rect x="84" y="76.0" width="4" height="48" rx="2"/><rect x="96" y="64.0" width="4" height="72" rx="2"/><rect x="108" y="78.0" width="4" height="44" rx="2"/><rect x="120" y="53.0" width="4" height="94" rx="2"/><rect x="132" y="40.0" width="4" height="120" rx="2"/><rect x="144" y="60.0" width="4" height="80" rx="2"/><rect x="156" y="26.0" width="4" height="148" rx="2"/><rect x="168" y="46.0" width="4" height="108" rx="2"/><rect x="180" y="18.0" width="4" height="164" rx="2"/><rect x="192" y="34.0" width="4" height="132" rx="2"/><rect x="204" y="54.0" width="4" height="92" rx="2"/><rect x="216" y="27.0" width="4" height="146" rx="2"/><rect x="228" y="45.0" width="4" height="110" rx="2"/><rect x="240" y="62.0" width="4" height="76" rx="2"/><rect x="252" y="41.0" width="4" height="118" rx="2"/><rect x="264" y="57.0" width="4" height="86" rx="2"/><rect x="276" y="73.0" width="4" height="54" rx="2"/><rect x="288" y="66.0" width="4" height="68" rx="2"/><rect x="300" y="82.0" width="4" height="36" rx="2"/><rect x="312" y="76.0" width="4" height="48" rx="2"/><rect x="324" y="88.0" width="4" height="24" rx="2"/><rect x="336" y="93.0" width="4" height="14" rx="2"/></g><path class="signal-line" d="M0 100H24L32 96L40 104L48 100H336L344 96L352 104L360 100H384"/></svg></div><p class="eyebrow">LOCAL AUDIO / 本機音檔</p><h3 id="local-audio-title" data-i18n-user></h3><p class="help">預設聲波畫面 · 可整首演唱或分段錄製</p><audio id="local-audio" controls preload="metadata" crossorigin="anonymous" aria-label="本機音檔播放器"></audio></div></div>
@@ -215,15 +215,15 @@
         <details id="preparation-advanced" class="post-effects">
           <summary><strong>進階分離設定 · 展開可調整</strong><span id="preparation-summary" class="help"></span></summary>
           <fieldset id="preparation-fields"><legend>準備歌曲時使用</legend>
-          <div class="soulx-grid">
+          <div class="field-grid">
             <label>分析範圍<select id="clip-seconds"><option value="0">完整歌曲（最長 15 分鐘，預設）</option><option value="15">先試前 15 秒</option><option value="30">先試前 30 秒</option><option value="60">先試前 60 秒</option></select></label>
             <label>基準音高擷取<select id="pitch-method"><option value="rmvpe" selected>RMVPE（預設）</option><option value="yin">YIN（原有方式）</option></select></label>
             <label>聲曲分離模型<select id="separation-model"><option value="demucs" selected>Demucs／htdemucs（預設）</option><option value="bs-roformer">BS-RoFormer／Viperx 1297</option><option value="mel-roformer">Mel-Band RoFormer／Kim 人聲</option></select></label>
             <label>處理流程<select id="separation-method"><option value="single" selected>單次分離（預設）</option><option value="residual">伴奏二次分離＋反向相減</option></select></label>
-            <label>分離模式<select id="vocal-mode"><option value="all" selected>人聲／伴奏分離（預設）</option><option value="lead">主唱／和音分離（供主唱換聲）</option></select></label>
+            <label>分離模式<select id="vocal-mode"><option value="all" selected>人聲／伴奏分離（預設）</option><option value="lead">主唱／和音分離（伴樂保留原唱和音）</option></select></label>
           </div>
-          <label><input id="keep-preview" type="checkbox" checked> 保留分離音軌（Voice Lab 與試聽需要）</label>
-          <p class="help">想在 Voice Lab 只換主唱、保留其他聲音，選「主唱／和音分離」並保留音軌，再按「準備歌曲基準」。只有人聲／伴奏的舊歌需要建立這個新版本；已有主唱／和音版本可直接載入。分離模型可能誤判，先試聽主唱與和音確認。</p>
+          <label><input id="keep-preview" type="checkbox" checked> 保留分離音軌（試聽、只有伴樂與錄音合成需要）</label>
+          <p class="help">想在「只有伴樂」時保留原唱的和音，選「主唱／和音分離」並保留音軌，再按「準備歌曲基準」。只有人聲／伴奏的舊歌需要建立這個新版本；已有主唱／和音版本可直接載入。分離模型可能誤判，先試聽主唱與和音確認。</p>
           <button id="preparation-reset" type="button" class="secondary">還原分離預設</button>
           </fieldset>
         </details>
@@ -288,155 +288,17 @@
     <audio id="post-audio" controls hidden></audio>
         <details id="mv-panel" class="post-effects" hidden>
           <summary><strong>翻唱 MV｜歌名・翻唱者・節奏畫面</strong></summary>
-          <p id="mv-source" class="help">使用選取的已保存錄音或 Voice Lab 成品製作 MV。</p>
-          <div class="soulx-grid">
+          <p id="mv-source" class="help">使用選取的已保存錄音製作 MV。</p>
+          <div class="field-grid">
             <div><label for="mv-title">歌名</label><input id="mv-title" type="text" maxlength="60" placeholder="輸入歌名"></div>
             <div><label for="mv-artist">翻唱者</label><input id="mv-artist" type="text" maxlength="50" placeholder="輸入翻唱者名稱"></div>
           </div>
           <p class="help">使用帶入時的成品音檔，保留已保存的音量、效果與剪輯；若剛調整後製設定，請先重新合成並選取新成品。輸出 1080p、30 fps MP4，頻譜隨音樂跳動；支援 1 秒至 10 分鐘。影片另存歌曲庫的「vedio」資料夾。</p>
           <div class="button-row"><button id="mv-generate" type="button" disabled>開始製作翻唱 MV</button><button id="mv-cancel" type="button" class="secondary" disabled>取消製作</button></div>
           <progress id="mv-progress" max="100" value="0" hidden aria-label="翻唱 MV 製作進度"></progress>
-          <p id="mv-status" class="status" role="status">選取已保存錄音後按「製作 MV」，或從 Voice Lab 帶入成品。</p>
+          <p id="mv-status" class="status" role="status">選取已保存錄音後按「製作 MV」。</p>
           <div id="mv-result" hidden><video id="mv-video" controls playsinline preload="metadata" style="width:100%;aspect-ratio:16/9;background:#101d2c;border-radius:12px"></video><button id="mv-download" type="button" class="secondary">下載翻唱 MV（MP4）</button></div>
         </details>
-    <details id="voicelab-panel" class="post-effects soulx-panel">
-      <summary><span class="post-effects-heading"><strong>Voice Lab｜我的音色實驗室</strong><span>歌聲／音色轉換 · 預設關閉 · 與 A／B 分開</span></span><span class="post-effects-toggle"><span class="when-closed">點此展開</span><span class="when-open">收合設定</span></span></summary>
-      <label class="soulx-enable"><input id="voicelab-enable" type="checkbox" autocomplete="off"> 啟用 Voice Lab</label>
-      <p class="help">把原曲原唱或自己的錄音換成已訓練的個人音色。預設我的音色 Ver3、原八度；展開「RVC 進階設定」可調整換聲參數與歌聲半音，配樂保持不變。先試聽短段，滿意後再轉整首並保存。</p>
-      <p id="voicelab-status" class="status" role="status">Voice Lab 已關閉；展開不會載入模型。</p>
-      <details id="voicelab-storage" class="post-effects">
-        <summary><strong>檔案管理／清理暫存與 MV</strong></summary>
-        <p class="help">不需啟用換聲或先載入歌曲。勾選要清理的項目，確認後永久刪除；已保存錄音請到錄音清單管理。</p>
-        <section aria-label="Voice Lab 轉換暫存">
-          <h4>轉換暫存</h4><p id="voicelab-storage-temp-path" class="help"></p>
-          <p class="help">包含舊試聽、轉換中間檔與診斷。正在轉換及本頁目前試聽的暫存會保留；未保存的其他試聽刪除後需重新產生。</p>
-          <div class="button-row"><button id="voicelab-storage-temp-refresh" type="button" class="secondary">重新整理暫存</button><button id="voicelab-storage-temp-all" type="button" class="secondary" disabled>全選可清理項目</button><button id="voicelab-storage-temp-delete" type="button" class="secondary" disabled>清除勾選暫存</button></div>
-          <p id="voicelab-storage-temp-status" role="status" aria-live="polite"></p><div id="voicelab-storage-temp-list" class="storage-list"></div>
-        </section>
-        <section aria-label="已保存翻唱 MV">
-          <h4>已保存 MV</h4><p id="voicelab-storage-mv-path" class="help"></p>
-          <p class="help">列出本工具產生的 MP4，可播放確認後再刪除。刪除影片不會刪除來源音檔。</p>
-          <div class="button-row"><button id="voicelab-storage-mv-refresh" type="button" class="secondary">重新整理 MV</button><button id="voicelab-storage-mv-all" type="button" class="secondary" disabled>全選 MV</button><button id="voicelab-storage-mv-delete" type="button" class="secondary" disabled>刪除勾選 MV</button></div>
-          <p id="voicelab-storage-mv-status" role="status" aria-live="polite"></p><div id="voicelab-storage-mv-list" class="storage-list"></div>
-          <video id="voicelab-storage-mv-video" controls playsinline preload="metadata" hidden style="width:100%;aspect-ratio:16/9;background:#101d2c;border-radius:12px"></video>
-        </section>
-      </details>
-      <section id="voicelab-progress" class="soulx-progress" hidden aria-label="Voice Lab 轉換進度">
-        <div class="soulx-progress-heading"><strong id="voicelab-progress-stage">準備音訊</strong><span id="voicelab-elapsed">已用時間 0:00</span></div>
-        <progress id="voicelab-progress-bar" max="100" aria-labelledby="voicelab-progress-stage" aria-describedby="voicelab-progress-detail"></progress>
-        <p id="voicelab-progress-detail" class="help">正在準備來源人聲與個人音色模型…</p>
-      </section>
-      <div id="voicelab-content" hidden>
-        <label for="voicelab-source">① 待轉換的歌（來源）</label>
-        <select id="voicelab-source" disabled><option value="original">原曲原唱（目前載入歌曲）</option><option value="recording">我的錄音（上方選取的錄音）</option></select>
-        <p class="help">使用已訓練的個人音色模型換聲，不需要再提供參考音檔。先在歌曲庫載入歌曲，或選取自己的錄音。只取分離人聲來轉換，最後配回同一首的伴奏；未分離主唱時，人聲軌可能含和聲。</p>
-        <p id="voicelab-source-info" class="help">請在上方選擇保留原始人聲的錄音。</p>
-        <p id="voicelab-source-routing" class="help" role="status"></p>
-        <p class="help">需要建立主唱版本時，前往<a href="#preparation-advanced">進階分離設定</a>選「主唱／和音分離」，再按「準備歌曲基準」。新版本完成後再回來產生翻唱。</p>
-        <div class="soulx-grid">
-          <div><label for="voicelab-model">② 音色模型</label><select id="voicelab-model" disabled><option value="">請啟用 Voice Lab 讀取本機模型</option></select></div>
-          <div class="soulx-actions"><button id="voicelab-model-refresh" type="button" class="secondary" disabled>自行加入／重新掃描模型</button></div>
-        </div>
-        <p class="help">自行加入：在 <span id="voicelab-model-root">本機模型目錄</span> 新增音色資料夾，放入一個 .pth 與配套 .index，再按「重新掃描模型」。檔名可不同，不需重新訓練或更新網站；模型保留在本機。</p>
-        <p id="voicelab-model-status" class="help" role="status" aria-live="polite"></p>
-        <ul id="voicelab-model-issues" class="help" hidden></ul>
-        <fieldset id="voicelab-fields" disabled>
-          <p id="voicelab-range-info" class="status" role="status"></p>
-          <legend>獨立轉換設定</legend>
-          <div class="soulx-grid">
-            <div><label for="voicelab-start">轉換開始（秒）</label><input id="voicelab-start" type="number" min="0" step="0.01" value="0"></div>
-            <div><label for="voicelab-end">轉換結束（秒）</label><input id="voicelab-end" type="number" min="1" step="0.01" value="20"></div>
-            <div class="soulx-actions"><button id="voicelab-now" type="button" class="secondary">從目前位置取 20 秒</button><button id="voicelab-full" type="button" class="secondary">整首（最多 10 分鐘）</button></div>
-          </div>
-          <p class="help">原曲原唱以歌曲時間為準，不套用麥克風延時；我的錄音則沿用已保存校正。先試 10～20 秒，滿意後按「整首」再產生。變更設定後需重新產生。</p>
-          <div class="soulx-grid" aria-label="Voice Lab 人聲與配樂音量">
-            <div><label for="voicelab-voice-volume">人聲音量 <output id="voicelab-voice-volume-value">100%</output></label><input id="voicelab-voice-volume" type="range" min="0" max="200" step="5" value="100"></div>
-            <div><label for="voicelab-backing-volume">配樂音量 <output id="voicelab-backing-volume-value">100%</output></label><input id="voicelab-backing-volume" type="range" min="0" max="200" step="5" value="100"></div>
-          </div>
-          <p class="help">可先設定人聲／配樂音量。100% 沿用來源音量比例，0% 靜音，最高 200%。生成後也能調整，再按試聽即可，不需重新生成；下載與保存會套用相同音量。</p>
-          <details id="voicelab-advanced" class="post-effects">
-            <summary><strong>RVC 進階設定 · 展開可調整</strong><span id="voicelab-advanced-summary" class="help">RMVPE · 原八度 · 檢索 0.75 · 保護 0.33 · 包絡 1 · 修音關閉</span></summary>
-            <p class="help">預設收合，直接使用原有設定即可。調整後需重新產生翻唱；先用同一段 10～20 秒，每次只改一項比較。</p>
-            <div class="soulx-grid">
-              <div><label for="voicelab-index-rate">音色檢索比例 <output id="voicelab-index-rate-value">0.75</output></label><input id="voicelab-index-rate" type="range" min="0" max="1" step="0.05" value="0.75"><p class="help">預設 0.75。提高會更依賴模型音色索引，太高可能失真。可比較 0.60／0.75／0.90。</p></div>
-              <div><label for="voicelab-protect">子音／氣音保護 <output id="voicelab-protect-value">0.33</output></label><input id="voicelab-protect" type="range" min="0" max="0.5" step="0.01" value="0.33"><p class="help">預設 0.33；越低保護越強，0.5 關閉。咬字或氣音破碎時，可比較 0.33／0.20／0.10。</p></div>
-              <div><label for="voicelab-volume-envelope">音量包絡 <output id="voicelab-volume-envelope-value">1.00</output></label><input id="voicelab-volume-envelope" type="range" min="0" max="1" step="0.05" value="1"><p class="help">預設 1.0，使用換聲後的音量起伏；越接近 0，越跟隨來源人聲的輕重強弱。</p></div>
-              <div><label for="voicelab-f0-method">音高擷取方法</label><select id="voicelab-f0-method"><option value="rmvpe">RMVPE（預設）</option><option value="fcpe">FCPE</option><option value="crepe">CREPE</option></select><p class="help">影響音高辨識。先保留 RMVPE；高低音辨識不穩時，再以同一片段比較其他方法。</p></div>
-              <div><label class="check-option"><input id="voicelab-autotune" type="checkbox" autocomplete="off"> 啟用自動修音（預設關閉）</label><label for="voicelab-autotune-strength">修音強度 <output id="voicelab-autotune-strength-value">100%</output></label><input id="voicelab-autotune-strength" type="range" min="0" max="1" step="0.05" value="1" disabled><p class="help">將音高拉近半音音階；強度越高影響越大，也可能改變滑音與唱腔。</p></div>
-            </div>
-          <div class="soulx-grid">
-            <section class="soulx-pitch" aria-labelledby="voicelab-pitch-heading">
-              <strong id="voicelab-pitch-heading">歌聲移調 · 半音／八度</strong><output id="voicelab-pitch-value">原八度（預設）</output>
-              <div class="button-row" role="group" aria-label="八度快捷設定"><button id="voicelab-pitch-down" data-voicelab-pitch="-12" type="button" class="secondary" aria-pressed="false">降低八度 −12</button><button id="voicelab-pitch-original" data-voicelab-pitch="0" type="button" class="secondary" aria-pressed="true">原八度（預設）</button><button id="voicelab-pitch-up" data-voicelab-pitch="12" type="button" class="secondary" aria-pressed="false">提高八度 +12</button></div>
-              <label for="voicelab-pitch">半音微調（−12～+12，每次 1 半音）</label><input id="voicelab-pitch" type="number" min="-12" max="12" step="1" value="0">
-              <p id="voicelab-pitch-help" class="help">只調整換聲後的歌聲，配樂的 Key 與速度不變。預設 0；±12 為升降一個八度。修改後需重新產生；先用 AI 100% 比較，混入原聲可能聽到不同音高。</p>
-            </section>
-          </div>
-          </details>
-          <div class="button-row"><button id="voicelab-generate" type="button">產生 Voice Lab 試聽</button><button id="voicelab-reset" type="button" class="secondary">設定回預設</button></div>
-        </fieldset>
-        <button id="voicelab-cancel" type="button" class="secondary" disabled>取消生成</button>
-        <section id="voicelab-result" hidden aria-label="Voice Lab 獨立試聽結果">
-          <p id="voicelab-result-info" class="help"></p>
-          <div class="soulx-grid">
-            <div><label for="voicelab-blend">AI 混合比例 <output id="voicelab-blend-value">100%</output></label><input id="voicelab-blend" type="range" min="0" max="100" step="5" value="100"><p class="help">0% 原聲，100% AI；中間值混合兩者，可能有疊音感。這是試聽混音，不需重新生成。</p></div>
-<div><label><input id="voicelab-backing" type="checkbox" checked> 加入配樂</label><label for="voicelab-backing-choice">搭配的配樂</label><select id="voicelab-backing-choice"><option value="">錄音原配樂</option></select><button id="voicelab-backing-refresh" class="secondary" type="button">重新整理已保存配樂</button><label><input id="voicelab-match" type="checkbox" checked> 人聲音量匹配</label><label><input id="voicelab-loop" type="checkbox" checked> 循環試聽</label><p class="help">可選同一首歌的已保存新配樂，不必重新生成歌聲。片段配樂需涵蓋本次歌聲範圍。</p></div>
-            <div class="soulx-actions"><button id="voicelab-listen-original" type="button" class="secondary" aria-pressed="false">▶ 原聲</button><button id="voicelab-listen-ai" type="button" aria-pressed="false">▶ Voice Lab</button></div>
-          </div>
-          <audio id="voicelab-audio" controls></audio>
-          <p id="voicelab-listen-status" class="help" role="status"></p>
-          <div class="button-row"><button id="voicelab-save" type="button">儲存到已保存錄音</button><button id="voicelab-download" type="button" class="secondary">下載 Voice Lab 試聽 WAV</button><button id="voicelab-mv" type="button">產生翻唱 MV</button></div>
-          <p class="help">保存已生成範圍及目前 AI 混合／配樂設定，另存新錄音與獨立人聲，可繼續後製。要轉完整錄音，先按「整首」再產生；只改範圍不會補轉。片段會在名稱標明秒數。</p>
-        </section>
-
-      </div>
-    </details>
-    <details id="arrangement-panel" class="post-effects arrangement-panel">
-      <summary><span class="post-effects-heading"><strong>MIDI-SAG 配樂編曲實驗室</strong><span>依原唱旋律編曲 · 預設關閉 · 原唱搭配試聽</span></span></summary>
-      <label><input id="arrangement-enable" type="checkbox" autocomplete="off"> 啟用本機配樂編曲（預設關閉）</label>
-      <p id="arrangement-status" role="status">先載入歌曲庫中的歌曲，再啟用。</p>
-      <div id="arrangement-content" hidden>
-        <p id="arrangement-source"></p>
-        <p class="help">分析已分離原唱的旋律與拍點，再安排和弦、生成新伴奏；原唱保留原音與時間位置。整首採分段延續，仍需試聽和聲、拍點與銜接是否適合。</p>
-        <p id="arrangement-model-state" role="status">正在等待本機模型狀態。</p>
-        <fieldset id="arrangement-fields" disabled><legend>編曲設定</legend>
-          <h4>和聲設定</h4>
-          <div class="soulx-grid">
-            <label>和弦類型<select id="arrangement-chordStyle"></select></label>
-            <label>和弦變化<select id="arrangement-chordsPerBar"><option value="1">每小節一次（推薦）</option><option value="2">每半小節一次</option></select><span class="help">半小節模式會安排更密集的和弦變化；不代表每次一定換成不同和弦。</span></label>
-            <label>歌曲調性<select id="arrangement-key"></select><span class="help">自動分析可能判錯，聽到和聲不合時可手動指定；不會改變原唱音高。</span></label>
-          </div>
-          <h4>音色與曲風方向</h4><p class="help">以下會轉成模型的文字提示；樂器與氣氛是生成方向，不是可獨立開關的樂器音軌。</p>
-          <div class="soulx-grid"><label>推薦組合<select id="arrangement-preset"></select></label><label>曲風<select id="arrangement-style"></select></label><label>氣氛<select id="arrangement-mood"></select></label></div>
-          <p>自選樂器（1～8 種）</p><div id="arrangement-instruments" class="arrangement-instruments"></div>
-          <div class="soulx-grid">
-            <label>豐富程度<select id="arrangement-density"><option value="light">簡潔，留給歌聲空間</option><option value="balanced">適中</option><option value="rich">豐富多層</option></select></label>
-            <label>隨機種子<input id="arrangement-seed" type="number" min="0" max="2147483647" value="20261004"><button id="arrangement-random" type="button" class="secondary">換一個種子</button></label>
-          </div>
-          <h4>生成範圍</h4><div class="soulx-grid">
-            <label>開始（歌曲秒數）<input id="arrangement-start" type="number" min="0" step="0.01" value="0"></label>
-            <label>結束（歌曲秒數）<input id="arrangement-end" type="number" min="1" step="0.01" value="30"></label>
-            <div class="arrangement-stack"><button id="arrangement-full" type="button" class="secondary">整首（最多 10 分鐘）</button><button id="arrangement-clip" type="button" class="secondary">從試聽位置取 30 秒</button></div>
-          </div>
-          <details><summary>段落設定（選填）</summary>
-            <p class="help">留白時沿用同一編曲方向分段延續，不會自動辨識主副歌。指定段落可讓模型知道何時進入副歌或間奏；較長段落會自動拆成連續小段。</p>
-            <label>每行填「歌曲秒數 段落代碼」<textarea id="arrangement-sections" rows="5" placeholder="0 intro&#10;20 verse&#10;55 chorus"></textarea></label>
-            <p class="help">intro 前奏 · verse 主歌 · chorus 副歌 · inst 間奏 · bridge 橋段 · outro 尾奏 · break 過門 · solo 獨奏。秒數以整首歌曲為準。</p>
-          </details>
-          <button id="arrangement-generate" type="button" disabled>產生 MIDI-SAG 配樂</button>
-        </fieldset>
-        <div id="arrangement-progress" hidden><p id="arrangement-progress-label"></p><progress id="arrangement-progress-bar" max="100"></progress><span id="arrangement-elapsed"></span></div>
-        <button id="arrangement-cancel" type="button" class="secondary" disabled>取消生成</button>
-        <section id="arrangement-result" hidden>
-          <p id="arrangement-result-info"></p>
-          <div class="soulx-grid"><label>試聽內容<select id="arrangement-listen-mode"><option value="mix">原唱＋配樂</option><option value="solo">只聽配樂</option></select></label><label><input id="arrangement-match" type="checkbox" checked> 新舊配樂音量匹配</label><label><input id="arrangement-loop" type="checkbox"> 循環試聽</label></div>
-          <div class="arrangement-switch"><button id="arrangement-listen-original" type="button" class="secondary" aria-pressed="false">▶ 原配樂</button><button id="arrangement-listen-new" type="button" class="secondary" aria-pressed="false">▶ 新配樂</button></div>
-          <audio id="arrangement-audio" controls preload="metadata"></audio><p id="arrangement-listen-status" role="status">同位置切換比較。</p>
-          <div class="arrangement-switch"><button id="arrangement-save" type="button">保存配樂到本機配樂庫</button><button id="arrangement-download" type="button" class="secondary">下載新配樂試聽 WAV</button></div>
-        </section>
-        <fieldset><legend>已保存配樂</legend><label>全部已保存配樂<select id="arrangement-library" aria-describedby="arrangement-library-relation"></select></label><p id="arrangement-library-relation" role="status"></p><div class="arrangement-switch"><button id="arrangement-refresh" type="button" class="secondary">重新整理</button><button id="arrangement-load" type="button" class="secondary">載入並試聽</button><button id="arrangement-delete" type="button" class="secondary" disabled>刪除選取配樂</button></div><p id="arrangement-library-path" class="help">保存後可到 Voice Lab「搭配的配樂」選用，與歌聲一起另存錄音。</p></fieldset>
-      </div>
-    </details>
 
     <details id="post-audition-panel" class="post-effects"><summary><span class="post-effects-heading"><strong>片段試聽／A、B 比較</strong><span>同一句循環播放 · 先聽效果再另存</span></span></summary>
       <div class="audition-transport" role="group" aria-label="切換比較版本"><button id="post-audition-a-play" type="button" aria-pressed="false" disabled>▶ 試聽 A</button><button id="post-audition-b-play" type="button" aria-pressed="false" disabled>▶ 試聽 B</button><button id="post-audition-stop" type="button" class="secondary" disabled>停止比較</button></div>
@@ -469,7 +331,7 @@
     <p id="post-status" class="status" role="status">請選擇一筆錄音。</p>
     <p id="post-info" class="help"></p><p id="recording-storage-status" class="help" role="status">連接本機錄音目錄中…</p>
     <div id="post-ab-editor" class="audition-slot-b" data-slot="b" aria-labelledby="post-ab-editor-heading">
-      <div class="ab-editor-heading"><div><h3 id="post-ab-editor-heading">正在調整 B 組</h3><p class="help">另存保留 A／B 各自設定。還原只重設目前組：原音、大廳殘響 20%、回聲 10%、音量 100%、校正 300 ms（AI 換聲成品為 0）；剪輯保留。</p></div><div class="ab-editor-switch" role="group" aria-label="切換正在編輯的設定"><button id="post-audition-a-edit" class="audition-slot-a" type="button" aria-pressed="false" disabled>A 設定</button><button id="post-audition-b-edit" class="audition-slot-b" type="button" aria-pressed="true" disabled>B 設定</button><button id="post-audition-reset" class="secondary" type="button" disabled title="還原目前組別的系統預設音量、延時與效果；另一組、剪輯與已保存錄音保留">還原 B 預設設定</button></div></div>
+      <div class="ab-editor-heading"><div><h3 id="post-ab-editor-heading">正在調整 B 組</h3><p class="help">另存保留 A／B 各自設定。還原只重設目前組：原音、大廳殘響 20%、回聲 10%、音量 100%、校正 300 ms；剪輯保留。</p></div><div class="ab-editor-switch" role="group" aria-label="切換正在編輯的設定"><button id="post-audition-a-edit" class="audition-slot-a" type="button" aria-pressed="false" disabled>A 設定</button><button id="post-audition-b-edit" class="audition-slot-b" type="button" aria-pressed="true" disabled>B 設定</button><button id="post-audition-reset" class="secondary" type="button" disabled title="還原目前組別的系統預設音量、延時與效果；另一組、剪輯與已保存錄音保留">還原 B 預設設定</button></div></div>
     <div class="recording-levels">
       <div><label for="post-voice-level">歌唱者音量 <output id="post-voice-value" for="post-voice-level">100%</output></label><input id="post-voice-level" type="range" min="0" max="200" step="5" value="100" disabled aria-describedby="post-volume-help"></div>
       <div><label for="post-backing-level">配樂／和音音量 <output id="post-backing-value" for="post-backing-level">100%</output></label><input id="post-backing-level" type="range" min="0" max="200" step="5" value="100" disabled aria-describedby="post-volume-help"></div>

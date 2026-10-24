@@ -9,9 +9,8 @@ assets.push('recording-review.mjs','recording-diagnostics.mjs','recording-diagno
 assets.push('library-recordings.mjs','library-search.mjs');
 assets.push('recording-segments.mjs','recording-segment-ui.mjs','recording-live-preview.mjs');
 assets.push('recording-repair.mjs','recording-repair-client.mjs','recording-repair-worker.mjs');
-assets.push('voicelab-client.mjs','voicelab-settings.mjs','arrangement-client.mjs','arrangement-settings.mjs');
 assets.push('mv-client.mjs','media-source.mjs','local-media-client.mjs','local-video-player.mjs');
-assets.push('voicelab-storage-client.mjs','i18n.mjs','i18n-catalog.mjs');
+assets.push('i18n.mjs','i18n-catalog.mjs');
 assets.push('player-view.mjs');
 export const pages=['index.html','manual.html','manual.en.html'];
 const root = fileURLToPath(new URL('./',import.meta.url));

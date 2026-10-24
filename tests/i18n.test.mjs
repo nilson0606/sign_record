@@ -21,8 +21,7 @@ test('nested UI fragments translate, while song titles and paths remain literal'
  assert.equal(translateMessage('錄製第 2 段','en'),'Record segment 2');
  assert.equal(translateMessage('下一步 3／8 · 選歌','en'),'Next 3/8 · Choose a song');
  assert.equal(translateMessage('歌曲庫位置：D:\\音樂\\開始。已記住這台電腦的設定。','en'),'Library location: D:\\音樂\\開始. Saved for this computer.');
- assert.equal(translateMessage('已匯入「開始」。可直接播放，或按「準備歌曲基準」使用錄音、評分、分段與 Voice Lab。','en'),'Imported “開始”. Play it directly, or prepare the reference for recording, scoring, segments, and Voice Lab.');
- assert.equal(translateMessage('【同曲同版本】原音','en'),'[Same song and version] 原音');
+ assert.equal(translateMessage('已匯入「開始」。可直接播放，或按「準備歌曲基準」使用錄音、評分與分段。','en'),'Imported “開始”. Play it directly, or prepare the reference for recording, scoring, and segments.');
  assert.equal(translateMessage('正在試聽：開始','en'),'Previewing: 開始');
  assert.equal(translateMessage('第 2 段 · 00:00.000–00:08.000','en'),'Segment 2 · 00:00.000–00:08.000');
  assert.equal(translateMessage('待補錄或涵蓋不足：第 1 段、原音。可改選本段版本，或明確勾選保留靜音。','en'),'Missing or insufficient coverage: Segment 1, 原音. Choose another take or explicitly allow silence.');

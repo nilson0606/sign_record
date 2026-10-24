@@ -505,7 +505,7 @@ export function createKaraokeSession(options) {
     if (maskBusy) return;
     if (!id) { $('prepare-status').textContent = '請先載入 YouTube 影片或選擇本機 MV。'; return; }
     // Normal preparations honor the visible controls; library/rebuild actions
-    // supply the saved version and retain audio for preview and Voice Lab.
+    // supply the saved version and retain audio for preview and backing-only playback.
     if(preserveVersion)$('keep-preview').checked = true;
     requestedKey=keyShift(Number($('song-key').value));
     requestedVocalMode = $('vocal-mode').value; requestedModel = $('separation-model').value; requestedPitch = $('pitch-method').value; requestedMethod = $('separation-method').value;

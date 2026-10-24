@@ -17,7 +17,7 @@ const fixture=path.resolve('.runtime/local-mv-test/fixture.'+(audioMode?'wav':'m
 if(audioMode)execFileSync('ffmpeg',['-y','-v','error','-i',path.resolve('.runtime/local-mv-test/fixture.mp4'),'-vn','-c:a','pcm_s16le',fixture],{windowsHide:true});
 const raw=JSON.parse(await readFile('.runtime/local-mv-test/prepared/reference.json','utf8'));
 if(audioMode){raw.videoId='local_'+createHash('sha256').update(await readFile(fixture)).digest('hex');raw.title='本機音檔測試';}
-const sourceAudio=await readFile('.runtime/voicelab/smoke/input.wav');let prepared=null;
+const sourceAudio=execFileSync('ffmpeg',['-v','error','-i',path.resolve('.runtime/local-mv-test/fixture.mp4'),'-vn','-ac','2','-ar','48000','-c:a','pcm_s16le','-f','wav','pipe:1'],{windowsHide:true,maxBuffer:1<<28});let prepared=null;
 const requests=[],backend=http.createServer(async(req,res)=>{
  if(req.url.startsWith('/local-media'))return handleLocalMedia(req,res,{library:root,authorized:req.headers['x-karaoke-token']==='fixture'});
  res.setHeader('Content-Type','application/json');const send=value=>res.end(JSON.stringify(value));

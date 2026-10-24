@@ -2,9 +2,7 @@ import {keyShift,transposeReference,keyLabel} from './song-key.mjs';
 import {handleLocalMedia,localMediaInfo,localMediaBusy,stopLocalMedia} from './local-media-server.mjs';
 import {isLocalMediaId} from './media-source.mjs';
 import {handleNativeMicrophone,nativeMicrophoneActive} from './native-microphone-server.mjs';
-import {handleVoiceLab,voicelabBusy,stopVoiceLab} from './voicelab-server.mjs';
 import {handleMV,mvBusy,stopMV} from './mv-server.mjs';
-import {handleArrangements,arrangementBusy,stopArrangements} from './arrangement-server.mjs';
 import { handleRecordingArchive, serializeArchive } from './recording-archive.mjs';
 import { exportRecordingMp3 } from './recording-export.mjs';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -222,11 +220,9 @@ export async function handleLocalJobs(req, res) {
   if (req.url === '/session' && req.method === 'GET') { json(res, 200, { token, playbackTraceActive: existsSync(path.join(root, '.runtime', 'playback-trace.enabled')), features: ['local-media','local-audio','library', 'stem-preview', 'library-location', 'separation-progress', 'rebuild-song', 'lead-vocals', 'separation-models', 'score-masks', 'pitch-methods', 'residual-separation', 'mel-roformer', 'recording-mp3', 'recording-library', 'recording-raw-mime', 'playback-trace', 'native-microphone', 'native-speaker-output', 'song-key-versions'] }); return true; }
   // Read-only activity summary (booleans only, no token) so a local launcher can warn before /shutdown cancels work.
   if (req.url === '/busy' && req.method === 'GET') { json(res, 200, busyStatus()); return true; }
-  if (!req.url.startsWith('/mv/') && !req.url.startsWith('/arrangements') && !req.url.startsWith('/voicelab') && !req.url.startsWith('/microphone/') && !req.url.startsWith('/jobs') && !req.url.startsWith('/library') && req.url !== '/shutdown' && req.url !== '/playback-trace' && !req.url.startsWith('/recordings')) return false;
+  if (!req.url.startsWith('/mv/') && !req.url.startsWith('/microphone/') && !req.url.startsWith('/jobs') && !req.url.startsWith('/library') && req.url !== '/shutdown' && req.url !== '/playback-trace' && !req.url.startsWith('/recordings')) return false;
   if (req.headers['x-karaoke-token'] !== token) { json(res, 403, { error: 'Session token required' }); return true; }
   if(req.url.startsWith('/mv/')){await handleMV(req,res,{getLibrary:async()=>{if(changingLocation)throw Error('歌曲庫資料夾正在變更，請稍候。');return (await location.get()).path;}});return true;}
-  if(req.url.startsWith('/arrangements')){await handleArrangements(req,res,{gpuBusy:()=>voicelabBusy()||[...jobs.values()].some(j=>!['ready','failed'].includes(j.stage)),getLibrary:async()=>(await location.get()).path,getSource:async id=>{const lib=await currentLibrary();if(!lib)return null;return {reference:await lib.get(id),directory:lib.directory(id),library:lib.root};}});return true;}
-  if(req.url.startsWith('/voicelab')){await handleVoiceLab(req,res,{gpuBusy:()=>arrangementBusy()||[...jobs.values()].some(j=>!['ready','failed'].includes(j.stage))});return true;}
   if(req.url.startsWith('/microphone/')){await handleNativeMicrophone(req,res,body);return true;}
   if (req.url === '/playback-trace') {
     if(req.method!=='POST'){json(res,405,{error:'POST required'});return true;}
@@ -243,7 +239,7 @@ export async function handleLocalJobs(req, res) {
   }
   if (['/library/location', '/library/location/pick'].includes(req.url) && req.method === 'POST') {
     if (changingLocation) { json(res, 409, { error: '資料夾選擇仍在等待。請完成選擇，或按「取消資料夾選擇」後重試。' }); return true; }
-    if (jobs.size || editingMasks.size || localMediaBusy() || voicelabBusy() || arrangementBusy() || mvBusy()) { json(res, 409, { error: '目前有歌曲、音訊或 MV 工作進行中，請先完成或取消；不會刪除已保存的歌曲。' }); return true; }
+    if (jobs.size || editingMasks.size || localMediaBusy() || mvBusy()) { json(res, 409, { error: '目前有歌曲、音訊或 MV 工作進行中，請先完成或取消；不會刪除已保存的歌曲。' }); return true; }
     changingLocation = true;
     try {
       let selected;
@@ -310,11 +306,10 @@ export async function handleLocalJobs(req, res) {
     setImmediate(() => process.emit('SIGTERM')); return true;
   }
   if (req.url === '/jobs' && req.method === 'POST') {
-    if(voicelabBusy()||arrangementBusy()){json(res,409,{error:'歌聲或配樂正在生成，請完成或取消後再準備歌曲。'});return true;}
     try {
       const data = await body(req);
       if (!/^(?:[\w-]{11}|local_[a-f0-9]{64})$/.test(data.videoId || '') || ![0, 15, 30, 60].includes(data.seconds)) { json(res, 400, { error: '影片網址或片段長度無效。' }); return true; }
-      if (voicelabBusy() || arrangementBusy() || [...jobs.values()].some(j => !['ready','failed'].includes(j.stage))) { json(res, 409, { error: '已有音訊正在處理，請先取消或等待完成。' }); return true; }
+      if ([...jobs.values()].some(j => !['ready','failed'].includes(j.stage))) { json(res, 409, { error: '已有音訊正在處理，請先取消或等待完成。' }); return true; }
       keyShift(data.pitchShift ?? 0);
       if (data.vocalMode !== undefined && !['all','lead'].includes(data.vocalMode)) { json(res, 400, { error: '無效的分離模式。' }); return true; }
       if (data.separationModel !== undefined && !['demucs','bs-roformer','mel-roformer'].includes(data.separationModel)) { json(res, 400, { error: '無效的分離模型。' }); return true; }
@@ -340,14 +335,14 @@ setInterval(() => {
   for (const job of jobs.values()) if (Date.now() - job.updated > 15 * 60000) erase(job).catch(() => {});
 }, 60000).unref();
 export function busyStatus() {
-  const status = { preparing: [...jobs.values()].some(j => !['ready','failed'].includes(j.stage)), voicelab: voicelabBusy(), mv: mvBusy(), arrangement: arrangementBusy(), localMedia: localMediaBusy(), microphone: nativeMicrophoneActive(), library: changingLocation || editingMasks.size > 0 };
+  const status = { preparing: [...jobs.values()].some(j => !['ready','failed'].includes(j.stage)), mv: mvBusy(), localMedia: localMediaBusy(), microphone: nativeMicrophoneActive(), library: changingLocation || editingMasks.size > 0 };
   return { ...status, busy: Object.values(status).some(Boolean) };
 }
 export function clearAllJobsWithin(ms) {
   let timer;
   return Promise.race([clearAllJobs().catch(() => {}), new Promise(resolve => { timer = setTimeout(resolve, ms); })]).finally(() => clearTimeout(timer));
 }
-export async function clearAllJobs() { if (folderPicker) { folderPicker.cancelled = true; await stopChild(folderPicker.child); } await Promise.allSettled([...jobs.values()].map(erase)); await stopVoiceLab(); await stopArrangements(); await stopMV(); await stopLocalMedia(); }
+export async function clearAllJobs() { if (folderPicker) { folderPicker.cancelled = true; await stopChild(folderPicker.child); } await Promise.allSettled([...jobs.values()].map(erase)); await stopMV(); await stopLocalMedia(); }
 export async function clearStaleJobs() {
   await mkdir(jobsRoot, { recursive: true });
   for (const name of await readdir(jobsRoot)) {

@@ -27,7 +27,6 @@ export const messages = {
   "收音測試": "Input test",
   "延遲校正": "Latency calibration",
   "評分與錄音設定": "Scoring and recording settings",
-  "配樂實驗室": "Arrangement lab",
   "說明 ↗": "Help ↗",
   "1／8 確認收音": "1/8 Check your input",
   "先選收音方式與麥克風，再開麥試聲。": "Choose an input mode and microphone, then enable the mic to test it.",
@@ -96,7 +95,7 @@ export const messages = {
   "載入 MV": "Load video",
   "重新整理": "Refresh",
   "取消匯入": "Cancel import",
-  "選擇檔案後，可用相同流程準備基準、評分、分段、錄音、升降 Key 與 Voice Lab。": "Choose a file, then use the same preparation, scoring, segment recording, key change, and Voice Lab workflow.",
+  "選擇檔案後，可用相同流程準備基準、評分、分段、錄音與升降 Key。": "Choose a file, then use the same preparation, scoring, segment recording, and key change workflow.",
   "貼上網址後，影片會在這裡播放。": "Paste a URL to play the video here.",
   "你的下一首歌": "Your next song",
   "播放器與麥克風分別啟動": "Start the player and microphone separately",
@@ -282,9 +281,9 @@ export const messages = {
   "單次分離（預設）": "Single pass (default)",
   "伴奏二次分離＋反向相減": "Second instrumental pass + subtraction",
   "人聲／伴奏分離（預設）": "Vocals / Instrumental (default)",
-  "主唱／和音分離（供主唱換聲）": "Lead / Harmony (for lead voice conversion)",
-  "保留分離音軌（Voice Lab 與試聽需要）": "Keep separated stems (required for Voice Lab and previews)",
-  "想在 Voice Lab 只換主唱、保留其他聲音，選「主唱／和音分離」並保留音軌，再按「準備歌曲基準」。只有人聲／伴奏的舊歌需要建立這個新版本；已有主唱／和音版本可直接載入。分離模型可能誤判，先試聽主唱與和音確認。": "To replace only the lead voice in Voice Lab, choose “Lead / Harmony” and keep stems, then prepare the song reference. Older vocal/instrumental songs need this new version; existing lead/harmony versions can be loaded directly. Separation may misclassify voices, so preview both stems first.",
+  "主唱／和音分離（伴樂保留原唱和音）": "Lead / Harmony (backing keeps the original harmony)",
+  "保留分離音軌（試聽、只有伴樂與錄音合成需要）": "Keep separated stems (required for previews, backing-only playback, and recording mixes)",
+  "想在「只有伴樂」時保留原唱的和音，選「主唱／和音分離」並保留音軌，再按「準備歌曲基準」。只有人聲／伴奏的舊歌需要建立這個新版本；已有主唱／和音版本可直接載入。分離模型可能誤判，先試聽主唱與和音確認。": "To keep the original harmony vocals during “Backing only” playback, choose “Lead / Harmony” and keep stems, then prepare the song reference. Older vocal/instrumental songs need this new version; existing lead/harmony versions can be loaded directly. Separation may misclassify voices, so preview both stems first.",
   "還原分離預設": "Reset separation defaults",
   "分離結果試聽": "Preview separated stems",
   "尚未載入試聽版本。": "No preview version loaded.",
@@ -341,145 +340,20 @@ export const messages = {
   "清除全部 MV": "Clear all music videos",
   "「試聽」播放完整成品；「只聽人聲」播放歌唱者音軌，不加入配樂／和音，沿用這筆錄音已保存的音量、延時與柔化設定。更改後製設定後需先重新合成，才能試聽新效果。": "“Preview” plays the finished mix. “Vocals only” plays the singer’s track with its saved level, timing, and smoothing, without backing or harmonies. Render again after changing production settings to hear the new result.",
   "翻唱 MV｜歌名・翻唱者・節奏畫面": "Cover music video | Song title · Singer · Animated spectrum",
-  "使用選取的已保存錄音或 Voice Lab 成品製作 MV。": "Create a music video from the selected saved recording or Voice Lab result.",
+  "使用選取的已保存錄音製作 MV。": "Create a music video from the selected saved recording.",
   "歌名": "Song title",
   "翻唱者": "Cover singer",
   "使用帶入時的成品音檔，保留已保存的音量、效果與剪輯；若剛調整後製設定，請先重新合成並選取新成品。輸出 1080p、30 fps MP4，頻譜隨音樂跳動；支援 1 秒至 10 分鐘。影片另存歌曲庫的「vedio」資料夾。": "Uses the imported finished audio with its saved levels, effects, and edits. If you just changed production settings, render again and select the new result first. Exports 1080p, 30 fps MP4 with an animated spectrum, from 1 second to 10 minutes. Videos save separately in the library’s “vedio” folder.",
   "開始製作翻唱 MV": "Create cover music video",
   "取消製作": "Cancel creation",
-  "選取已保存錄音後按「製作 MV」，或從 Voice Lab 帶入成品。": "Select a saved recording and click “Create music video”, or import a Voice Lab result.",
+  "選取已保存錄音後按「製作 MV」。": "Select a saved recording and click “Create music video”.",
   "下載翻唱 MV（MP4）": "Download music video (MP4)",
-  "Voice Lab｜我的音色實驗室": "Voice Lab | My voice studio",
-  "歌聲／音色轉換 · 預設關閉 · 與 A／B 分開": "Singing voice conversion · Off by default · Separate from A/B",
   "點此展開": "Expand",
   "收合設定": "Collapse settings",
-  "啟用 Voice Lab": "Enable Voice Lab",
-  "把原曲原唱或自己的錄音換成已訓練的個人音色。預設我的音色 Ver3、原八度；展開「RVC 進階設定」可調整換聲參數與歌聲半音，配樂保持不變。先試聽短段，滿意後再轉整首並保存。": "Convert the original singer or your own recording to a trained personal voice. Defaults to My Voice Ver3 at the original octave. Expand RVC advanced settings to adjust conversion and vocal pitch; backing stays unchanged. Try a short clip, then convert and save the full song when satisfied.",
-  "Voice Lab 已關閉；展開不會載入模型。": "Voice Lab is off. Expanding this panel does not load a model.",
-  "檔案管理／清理暫存與 MV": "File management / Temporary files and music videos",
-  "不需啟用換聲或先載入歌曲。勾選要清理的項目，確認後永久刪除；已保存錄音請到錄音清單管理。": "No need to enable conversion or load a song. Select items to permanently delete after confirmation. Manage saved recordings in the recording list.",
-  "轉換暫存": "Conversion temporary files",
-  "包含舊試聽、轉換中間檔與診斷。正在轉換及本頁目前試聽的暫存會保留；未保存的其他試聽刪除後需重新產生。": "Includes old previews, intermediate files, and diagnostics. Active conversions and the current preview are kept. Other unsaved previews must be generated again after deletion.",
-  "重新整理暫存": "Refresh temporary files",
-  "全選可清理項目": "Select all removable items",
-  "清除勾選暫存": "Clear selected temporary files",
-  "已保存 MV": "Saved music videos",
-  "列出本工具產生的 MP4，可播放確認後再刪除。刪除影片不會刪除來源音檔。": "Lists MP4 files created by this tool. Play them before deleting. Deleting a video does not delete its source audio.",
-  "重新整理 MV": "Refresh videos",
-  "全選 MV": "Select all videos",
-  "刪除勾選 MV": "Delete selected videos",
-  "準備音訊": "Prepare audio",
-  "已用時間 0:00": "Elapsed 0:00",
-  "正在準備來源人聲與個人音色模型…": "Preparing source vocals and personal voice model…",
-  "① 待轉換的歌（來源）": "① Source song",
-  "原曲原唱（目前載入歌曲）": "Original singer (loaded song)",
-  "我的錄音（上方選取的錄音）": "My recording (selected above)",
-  "使用已訓練的個人音色模型換聲，不需要再提供參考音檔。先在歌曲庫載入歌曲，或選取自己的錄音。只取分離人聲來轉換，最後配回同一首的伴奏；未分離主唱時，人聲軌可能含和聲。": "Uses a trained personal voice model; no reference audio is needed. Load a library song or select your recording. Only separated vocals are converted, then mixed with the same song’s backing. Vocals may include harmonies if lead separation has not been done.",
-  "請在上方選擇保留原始人聲的錄音。": "Select a recording above that retains the original vocal track.",
-  "需要建立主唱版本時，前往": "To create a lead-vocal version, go to",
   "進階分離設定": "Advanced separation settings",
-  "選「主唱／和音分離」，再按「準備歌曲基準」。新版本完成後再回來產生翻唱。": "choose “Lead / Harmony”, then prepare the song reference. Return here after the new version is ready.",
-  "② 音色模型": "② Voice model",
-  "請啟用 Voice Lab 讀取本機模型": "Enable Voice Lab to load local models",
-  "自行加入／重新掃描模型": "Add / Rescan models",
-  "自行加入：在": "To add a model, open the",
-  "本機模型目錄": "local model directory",
-  "新增音色資料夾，放入一個 .pth 與配套 .index，再按「重新掃描模型」。檔名可不同，不需重新訓練或更新網站；模型保留在本機。": "and add a voice folder containing one .pth file and its matching .index file. Then rescan models. Filenames can vary; no retraining or website update is needed. Models stay local.",
-  "獨立轉換設定": "Independent conversion settings",
-  "轉換開始（秒）": "Conversion start (seconds)",
-  "轉換結束（秒）": "Conversion end (seconds)",
-  "從目前位置取 20 秒": "Use 20 seconds from current position",
-  "整首（最多 10 分鐘）": "Full song (up to 10 minutes)",
-  "原曲原唱以歌曲時間為準，不套用麥克風延時；我的錄音則沿用已保存校正。先試 10～20 秒，滿意後按「整首」再產生。變更設定後需重新產生。": "Original vocals use song time without mic delay. Your recordings use their saved correction. Try 10–20 seconds first, then select “Full song” and generate. Generate again after changing settings.",
   "人聲音量": "Vocal volume",
-  "配樂音量": "Backing volume",
-  "可先設定人聲／配樂音量。100% 沿用來源音量比例，0% 靜音，最高 200%。生成後也能調整，再按試聽即可，不需重新生成；下載與保存會套用相同音量。": "Set vocal and backing levels before or after generation. 100% preserves the source balance, 0% mutes, and 200% is the maximum. After generation, adjust and preview without generating again. Downloads and saved results use the same levels.",
-  "RVC 進階設定 · 展開可調整": "RVC advanced settings · Expand to customize",
-  "RMVPE · 原八度 · 檢索 0.75 · 保護 0.33 · 包絡 1 · 修音關閉": "RMVPE · Original octave · Index 0.75 · Protection 0.33 · Envelope 1 · Auto-tune off",
-  "預設收合，直接使用原有設定即可。調整後需重新產生翻唱；先用同一段 10～20 秒，每次只改一項比較。": "Collapsed by default; the existing settings work as a starting point. Generate again after changes. Compare the same 10–20 second clip, changing one setting at a time.",
-  "音色檢索比例": "Voice index ratio",
-  "預設 0.75。提高會更依賴模型音色索引，太高可能失真。可比較 0.60／0.75／0.90。": "Default 0.75. Higher values rely more on the model’s voice index but may distort. Compare 0.60 / 0.75 / 0.90.",
-  "子音／氣音保護": "Consonant / breath protection",
-  "預設 0.33；越低保護越強，0.5 關閉。咬字或氣音破碎時，可比較 0.33／0.20／0.10。": "Default 0.33; lower values protect more, and 0.5 disables protection. If consonants or breaths break up, compare 0.33 / 0.20 / 0.10.",
-  "音量包絡": "Volume envelope",
-  "預設 1.0，使用換聲後的音量起伏；越接近 0，越跟隨來源人聲的輕重強弱。": "Default 1.0 uses the converted voice’s dynamics. Values closer to 0 follow the source vocal’s loudness more closely.",
-  "音高擷取方法": "Pitch extraction method",
-  "影響音高辨識。先保留 RMVPE；高低音辨識不穩時，再以同一片段比較其他方法。": "Affects pitch detection. Start with RMVPE; compare other methods on the same clip if high or low notes are unstable.",
-  "啟用自動修音（預設關閉）": "Enable auto-tune (off by default)",
-  "修音強度": "Auto-tune strength",
-  "將音高拉近半音音階；強度越高影響越大，也可能改變滑音與唱腔。": "Pulls pitch toward semitone steps. Higher strength has a greater effect and may alter slides and vocal expression.",
-  "歌聲移調 · 半音／八度": "Vocal transpose · Semitones / Octaves",
-  "原八度（預設）": "Original octave (default)",
-  "降低八度 −12": "Down one octave −12",
-  "提高八度 +12": "Up one octave +12",
-  "半音微調（−12～+12，每次 1 半音）": "Semitone adjustment (−12 to +12, in steps of 1)",
-  "只調整換聲後的歌聲，配樂的 Key 與速度不變。預設 0；±12 為升降一個八度。修改後需重新產生；先用 AI 100% 比較，混入原聲可能聽到不同音高。": "Changes only the converted vocals; backing key and tempo stay unchanged. Default 0; ±12 shifts one octave. Generate again after changes. Compare with AI at 100% first; blending the original may produce different pitches together.",
-  "產生 Voice Lab 試聽": "Generate Voice Lab preview",
-  "設定回預設": "Reset defaults",
-  "取消生成": "Cancel generation",
-  "AI 混合比例": "AI blend",
-  "0% 原聲，100% AI；中間值混合兩者，可能有疊音感。這是試聽混音，不需重新生成。": "0% original, 100% AI. Intermediate values blend both and may sound doubled. This preview mix does not require regeneration.",
   "加入配樂": "Include backing",
-  "搭配的配樂": "Backing track",
-  "錄音原配樂": "Recording’s original backing",
-  "重新整理已保存配樂": "Refresh saved backing tracks",
-  "人聲音量匹配": "Match vocal loudness",
   "循環試聽": "Loop preview",
-  "可選同一首歌的已保存新配樂，不必重新生成歌聲。片段配樂需涵蓋本次歌聲範圍。": "Choose saved alternative backing for the same song without regenerating vocals. A backing clip must cover the generated vocal range.",
-  "▶ 原聲": "▶ Original",
-  "儲存到已保存錄音": "Save to recordings",
-  "下載 Voice Lab 試聽 WAV": "Download Voice Lab preview WAV",
-  "產生翻唱 MV": "Create cover music video",
-  "保存已生成範圍及目前 AI 混合／配樂設定，另存新錄音與獨立人聲，可繼續後製。要轉完整錄音，先按「整首」再產生；只改範圍不會補轉。片段會在名稱標明秒數。": "Saves the generated range and current AI blend / backing settings as a new recording with separate vocals for further production. To convert a full recording, select “Full song” and generate first; changing the range alone does not convert more audio. Clips include their time range in the name.",
-  "MIDI-SAG 配樂編曲實驗室": "MIDI-SAG Arrangement Lab",
-  "依原唱旋律編曲 · 預設關閉 · 原唱搭配試聽": "Arrange from the vocal melody · Off by default · Preview with original vocals",
-  "啟用本機配樂編曲（預設關閉）": "Enable local arrangement (off by default)",
-  "先載入歌曲庫中的歌曲，再啟用。": "Load a song from the library, then enable this feature.",
-  "分析已分離原唱的旋律與拍點，再安排和弦、生成新伴奏；原唱保留原音與時間位置。整首採分段延續，仍需試聽和聲、拍點與銜接是否適合。": "Analyzes melody and beats from separated original vocals, assigns chords, and generates new backing while preserving original vocal audio and timing. Full songs use continued segments; check harmony, beats, and transitions by listening.",
-  "正在等待本機模型狀態。": "Waiting for local model status.",
-  "編曲設定": "Arrangement settings",
-  "和聲設定": "Harmony settings",
-  "和弦類型": "Chord type",
-  "和弦變化": "Chord changes",
-  "每小節一次（推薦）": "Once per bar (recommended)",
-  "每半小節一次": "Once per half-bar",
-  "半小節模式會安排更密集的和弦變化；不代表每次一定換成不同和弦。": "Half-bar mode allows more frequent changes, but does not guarantee a different chord at every step.",
-  "歌曲調性": "Song key",
-  "自動分析可能判錯，聽到和聲不合時可手動指定；不會改變原唱音高。": "Automatic detection can be wrong. Set the key manually if the harmony sounds wrong; this does not transpose the original vocals.",
-  "音色與曲風方向": "Instruments and style",
-  "以下會轉成模型的文字提示；樂器與氣氛是生成方向，不是可獨立開關的樂器音軌。": "These choices become text prompts for the model. Instruments and mood guide generation; they are not separate stems that can be toggled.",
-  "推薦組合": "Suggested combinations",
-  "曲風": "Style",
-  "氣氛": "Mood",
-  "自選樂器（1～8 種）": "Custom instruments (1–8)",
-  "豐富程度": "Arrangement density",
-  "簡潔，留給歌聲空間": "Sparse, with room for vocals",
-  "適中": "Moderate",
-  "豐富多層": "Rich and layered",
-  "隨機種子": "Random seed",
-  "換一個種子": "Choose another seed",
-  "生成範圍": "Generation range",
-  "開始（歌曲秒數）": "Start (song seconds)",
-  "結束（歌曲秒數）": "End (song seconds)",
-  "從試聽位置取 30 秒": "Use 30 seconds from preview position",
-  "段落設定（選填）": "Song sections (optional)",
-  "留白時沿用同一編曲方向分段延續，不會自動辨識主副歌。指定段落可讓模型知道何時進入副歌或間奏；較長段落會自動拆成連續小段。": "Leave blank to continue the same arrangement direction across segments; verse and chorus are not detected automatically. Specifying sections tells the model when a chorus or interlude begins. Long sections are split into consecutive chunks.",
-  "每行填「歌曲秒數 段落代碼」": "One line per section: “song seconds section code”",
-  "intro 前奏 · verse 主歌 · chorus 副歌 · inst 間奏 · bridge 橋段 · outro 尾奏 · break 過門 · solo 獨奏。秒數以整首歌曲為準。": "intro · verse · chorus · inst (interlude) · bridge · outro · break · solo. Times are relative to the full song.",
-  "產生 MIDI-SAG 配樂": "Generate MIDI-SAG backing",
-  "原唱＋配樂": "Original vocals + backing",
-  "只聽配樂": "Backing only",
-  "新舊配樂音量匹配": "Match old / new backing loudness",
-  "▶ 原配樂": "▶ Original backing",
-  "▶ 新配樂": "▶ New backing",
-  "同位置切換比較。": "Switch at the same position to compare.",
-  "保存配樂到本機配樂庫": "Save backing to local library",
-  "下載新配樂試聽 WAV": "Download new backing preview WAV",
-  "已保存配樂": "Saved backing tracks",
-  "全部已保存配樂": "All saved backing tracks",
-  "載入並試聽": "Load and preview",
-  "刪除選取配樂": "Delete selected backing",
-  "保存後可到 Voice Lab「搭配的配樂」選用，與歌聲一起另存錄音。": "After saving, choose it under “Backing track” in Voice Lab and save it with the vocals as a recording.",
   "片段試聽／A、B 比較": "Clip preview / A/B comparison",
   "同一句循環播放 · 先聽效果再另存": "Loop the same phrase · Listen before saving a copy",
   "▶ 試聽 A": "▶ Preview A",
@@ -510,7 +384,7 @@ export const messages = {
   "請選擇一筆錄音。": "Choose a recording.",
   "連接本機錄音目錄中…": "Connecting to local recordings…",
   "正在調整 B 組": "Editing B",
-  "另存保留 A／B 各自設定。還原只重設目前組：原音、大廳殘響 20%、回聲 10%、音量 100%、校正 300 ms（AI 換聲成品為 0）；剪輯保留。": "Saving preserves each set’s settings. Reset affects only the current set: original tone, hall reverb 20%, delay 10%, volume 100%, correction 300 ms (0 for AI conversions). Trimming is preserved.",
+  "另存保留 A／B 各自設定。還原只重設目前組：原音、大廳殘響 20%、回聲 10%、音量 100%、校正 300 ms；剪輯保留。": "Saving preserves each set’s settings. Reset affects only the current set: original tone, hall reverb 20%, delay 10%, volume 100%, correction 300 ms. Trimming is preserved.",
   "還原 B 預設設定": "Reset B to defaults",
   "100% 沿用錄音時的音量平衡；往左降低、往右提高，0% 靜音。配樂與和音一起調整；只錄歌唱者的錄音無配樂可調。按「重新合成」後才會套用，再播放成品試聽；成品會保留目前設定，可繼續後製，每次都從原始歌聲重新計算。": "100% uses the recorded balance. Lower to reduce, raise to boost; 0% mutes. Backing and harmonies adjust together. Vocal-only recordings have no backing level. Click “Render again” to apply, then preview. Results retain settings for further editing; every render starts from the original vocals.",
   "歌聲延時校正（毫秒）": "Vocal timing correction (milliseconds)",
@@ -717,12 +591,6 @@ export const messages = {
   "輸入歌名": "Enter song title",
   "輸入翻唱者名稱": "Enter cover singer’s name",
   "翻唱 MV 製作進度": "Music video creation progress",
-  "Voice Lab 轉換暫存": "Voice Lab temporary conversion files",
-  "已保存翻唱 MV": "Saved cover music videos",
-  "Voice Lab 轉換進度": "Voice Lab conversion progress",
-  "Voice Lab 人聲與配樂音量": "Voice Lab vocal and backing levels",
-  "八度快捷設定": "Octave shortcuts",
-  "Voice Lab 獨立試聽結果": "Voice Lab independent preview",
   "切換比較版本": "Switch comparison version",
   "A／B 設定": "A/B settings",
   "切換正在編輯的設定": "Switch settings being edited",
@@ -1130,7 +998,6 @@ export const messages = {
   "請先保存一段演唱錄音。": "Save a performance recording first.",
   "已保存乾淨歌聲、播放位置與當次基準，可重評／重合成。": "Clean vocals, playback positions, and reference are saved for rescoring / remixing.",
   "此錄音未保存後處理來源，可轉 MP3 下載。": "Production sources were not saved. This recording can be converted to MP3 for download.",
-  "Voice Lab 成品已保留獨立人聲，可繼續後製；來源校正已套用，不需重複校正。": "Voice Lab result has separate vocals for further production. Source correction is already applied; do not apply it twice.",
   "音檔重評": "Audio rescore",
   "舊版即時資料重評": "Legacy live-data rescore",
   "改用已載入基準": "Using loaded reference",
@@ -1160,7 +1027,6 @@ export const messages = {
   "MP3 已轉換並開始下載，但尚未存入錄音目錄：": "MP3 converted and downloading, but not yet saved in the recording folder:",
   "原始歌聲不完整，無法比較。": "Original vocals incomplete; comparison unavailable.",
   "保存至": "Saved to",
-  "已暫存此瀏覽器，待本機工具連線後搬存": "Stored temporarily in this browser; awaiting local tools to migrate",
   "未設定": "Not set",
   "歌聲延時校正": "Vocal timing correction",
   "人聲情緒": "Vocal mood",
@@ -1458,179 +1324,28 @@ export const messages = {
   "人聲處理逾時，請先用片段或降低處理強度。": "Vocal processing timed out. Try a clip or lower the processing strength.",
   "人聲處理無法啟動，請重新整理頁面。": "Cannot start vocal processing. Reload the page.",
   "沒有足夠的無人聲底噪片段，降噪略過；其餘效果保留。": "Insufficient unvoiced background noise. Noise reduction skipped; other effects retained.",
-  "請啟動本機唱錄工具，再使用 Voice Lab。": "Start the local recording tools before using Voice Lab.",
-  "請重新啟動新版本機工具，才能使用 Voice Lab。": "Restart updated local tools to use Voice Lab.",
-  "Voice Lab 本機請求失敗。": "Voice Lab local request failed.",
-  "啟動本機環境": "Starting local environment",
-  "分析旋律": "Analyzing melody",
-  "載入模型": "Loading model",
-  "轉換歌聲": "Converting vocals",
-  "整理與檢查音檔": "Finalizing and checking audio",
   "已完成": "Complete",
   "未完成": "Incomplete",
   "處理中": "Processing",
-  "請輸入 −12～+12 的整數": "Enter an integer from −12 to +12",
-  "已取消轉換；原始音檔保留。": "Conversion canceled. Original audio retained.",
-  "已取消 Voice Lab；原始錄音保留。": "Voice Lab canceled. Original recording retained.",
-  "Voice Lab 已關閉。": "Voice Lab off.",
-  "正在掃描本機音色資料夾…": "Scanning local voice folders…",
   "（預設）": "(default)",
-  "未找到完整模型": "No complete model found",
-  "本機設定的模型目錄": "Locally configured model directory",
-  "新增資料夾後可再次掃描，不需重啟。": "Rescan after adding folders; no restart required.",
-  "本機工具尚未支援自動發現新模型，請更新並重新啟動本機工具。": "Local tools do not yet support model discovery. Update and restart them.",
-  "原選模型已不在清單，請確認目前選擇。": "Previously selected model is no longer listed. Check the current selection.",
-  "Voice Lab 已就緒。選個人模型與範圍，再按「產生 Voice Lab 試聽」。": "Voice Lab ready. Choose a personal model and range, then generate a preview.",
-  "找不到可用模型或換聲環境，請確認 Applio 與下方模型掃描結果。": "No usable model or conversion environment. Check Applio and model scan results below.",
-  "掃描未完成：": "Scan incomplete:",
-  "將轉換：": "To convert:",
-  "請設定有效的轉換起訖範圍。": "Set a valid conversion start / end range.",
-  "設定與已生成結果一致，可以試聽或保存。": "Settings match the generated result. Preview or save it.",
-  "參數／範圍已修改；目前仍是上次結果，請重新產生後再保存。": "Parameters / range changed. The previous result is still shown; generate again before saving.",
-  "每次最多 10 分鐘，請分段選取。": "Maximum 10 minutes per conversion. Select smaller sections.",
-  "來源人聲不完整，無法轉換。": "Source vocals are incomplete; cannot convert.",
-  "請先停止收音，再生成 Voice Lab，避免影響錄製。": "Stop microphone input before generating Voice Lab to avoid affecting recording.",
-  "準備來源人聲與個人音色模型…": "Preparing source vocals and personal voice model…",
-  "本機工具尚未支援歌聲移調，請更新並重新啟動本機工具。": "Local tools do not support vocal transposition yet. Update and restart them.",
-  "請更新並重新啟動本機工具，才能套用 RVC 進階設定。": "Update and restart local tools to apply advanced RVC settings.",
-  "模型已完成，正在取得音檔並確認取樣長度…": "Model complete. Fetching audio and checking sample length…",
-  "生成逾時，請重新嘗試。": "Generation timed out. Try again.",
-  "模型回報的移調值與設定不符，未接受結果；請更新本機工具後重試。": "Reported transposition differs from settings; result rejected. Update local tools and retry.",
-  "模型回報的 RVC 參數與設定不符，未接受結果；請更新本機工具後重試。": "Reported RVC parameters differ from settings; result rejected. Update local tools and retry.",
-  "輸出長度與選取範圍不符，未接受結果。": "Output duration differs from the selected range; result rejected.",
-  "原曲原唱": "Original singer",
   "我的錄音": "My recording",
-  "已完成。按「原聲／Voice Lab」同位置切換比較；原錄音與 A／B 設定保留。": "Complete. Switch Original / Voice Lab at the same position to compare. Original recording and A/B settings retained.",
-  "音檔長度檢查通過，可以試聽。": "Audio length check passed. Ready to preview.",
-  "請先產生 Voice Lab。": "Generate Voice Lab first.",
-  "所選配樂未涵蓋這段歌聲，請選整首或範圍相符的配樂。": "Selected backing does not cover these vocals. Choose full-song or matching-range backing.",
-  "準備試聽音訊…": "Preparing preview audio…",
-  "試聽設定已變更，請再按一次。": "Preview settings changed. Click again.",
-  "已保存的新配樂": "Saved new backing",
-  "同一份配樂": "Same backing",
-  "＋原和音": "+ original harmonies",
-  "· 音量匹配": "· Loudness matching",
-  "試聽混音已改，按「原聲／Voice Lab」聽新效果；不需重新生成。": "Preview mix changed. Click Original / Voice Lab to hear it; no regeneration needed.",
-  "正在保存 Voice Lab 成品與獨立人聲…": "Saving Voice Lab result and separate vocals…",
-  "選取錄音已變更，未保存。": "Selected recording changed. Not saved.",
-  "已另存 Voice Lab 至錄音清單；原錄音保留。": "Voice Lab saved as a new recording. Original retained.",
-  "Voice Lab 保存未完成：": "Voice Lab save incomplete:",
-  "來源已變更，請重新選取。": "Source changed. Select it again.",
-  "請先從歌曲庫載入含分離音軌的歌曲，不需要先錄音。": "Load a song with separated stems from the library first. No need to record beforehand.",
-  "已載入主唱／和音版本：只轉換主唱，原和音與配樂一起混回，跟隨配樂音量；改用新配樂仍保留原和音。": "Lead / harmony version loaded: converts lead only and mixes original harmonies back with the backing level. Alternative backing still keeps original harmonies.",
-  "目前是人聲／伴奏兩軌：人聲中的和音也會一起換聲。要保留非主唱聲音，請先建立並載入主唱／和音版本。": "Current version has vocals / instrumental only, so harmonies in the vocal stem will also be converted. To preserve non-lead voices, create and load a lead / harmony version first.",
-  "轉換自己的錄音人聲；有獨立和音音軌時，會與配樂一起保留。": "Converts your recorded vocals. Separate harmony stems, if available, are kept with the backing.",
-  "從 Voice Lab 試聽位置取 20 秒": "Use 20 seconds from Voice Lab preview position",
-  "所選新配樂已刪除，已切回錄音原配樂，請重新試聽。": "Selected alternative backing was deleted. Switched to the recording’s original backing; preview again.",
-  "我的音色 Ver1": "My Voice Ver1",
-  "我的音色 Ver2": "My Voice Ver2",
-  "我的音色 Ver3": "My Voice Ver3",
-  "降低八度": "Down one octave",
-  "提高八度": "Up one octave",
-  "移調": "Transpose",
-  "這筆錄音沒有原曲音軌資料，請改選自選參考歌聲檔。": "This recording lacks original song stem data. Choose a custom reference vocal file instead.",
-  "請選擇已安裝的個人音色模型。": "Choose an installed personal voice model.",
-  "請選擇支援的音高擷取方法。": "Choose a supported pitch extraction method.",
-  "自動修音設定無效。": "Invalid auto-tune settings.",
-  "轉換範圍需在原始錄音內，每次 1 秒～10 分鐘。": "Conversion must stay within the original recording, 1 second to 10 minutes per operation.",
   "整首": "Full song",
   "片段": "Clip",
-  "生成長度與選取範圍不符，未保存。": "Generated duration differs from selection. Not saved.",
-  "原唱換聲_": "OriginalVoiceConversion_",
-  "_新配樂": "_NewBacking",
-  "請啟動本機唱錄工具。": "Start the local recording tools.",
-  "配樂功能尚未就緒，請重新啟動新版工具。": "Arrangement is not ready. Restart the updated tools.",
-  "試聽音軌長度不一致。": "Preview stem lengths differ.",
-  "同曲同版本": "Same song and version",
-  "同曲・不同分離版本": "Same song, different separation version",
   "其他歌曲": "Other song",
   "未載入歌曲": "No song loaded",
   "目前歌曲": "Current song",
-  "高亮：同曲同版本 · 金色：同曲不同分離版本 · 暗色：其他歌曲。全部都可選取、試聽或刪除。": "Highlighted: same song and version. Gold: same song, different separation. Dim: another song. All can be selected, previewed, or deleted.",
-  "尚未載入歌曲，暫不判斷關聯；仍可試聽或刪除。": "No song loaded, so association is unknown. Preview and deletion remain available.",
-  "自選組合": "Custom combination",
   "自動分析": "Auto-detect",
-  "小調": "Minor",
-  "大調": "Major",
-  "設定已調整，目前試聽仍是上次生成結果；按「產生 MIDI-SAG 配樂」套用。": "Settings changed; preview still uses the previous result. Generate MIDI-SAG backing to apply.",
-  "每次最多 10 分鐘，請選取範圍。": "Maximum 10 minutes per generation. Select a range.",
-  "選擇已保存配樂": "Choose saved backing",
-  "尚無已保存配樂": "No saved backing tracks",
-  "已取消；原曲保留。": "Canceled. Original song retained.",
-  "MIDI-SAG 已通過本機生成驗證。": "MIDI-SAG passed local generation validation.",
-  "MIDI-SAG 尚未安裝與驗證完成，暫不開放生成。": "MIDI-SAG installation and validation are incomplete. Generation unavailable.",
-  "請重新啟動新版本機工具，以使用 MIDI-SAG。": "Restart updated local tools to use MIDI-SAG.",
-  "MIDI-SAG 已就緒，預選整首；可調整和弦與音色方向。": "MIDI-SAG ready with full song selected. Adjust chords and style as needed.",
-  "已刪除選取配樂。": "Selected backing deleted.",
-  "配樂未刪除：": "Backing not deleted:",
-  "自動調性": "Automatic key",
-  "舊版保存配樂（可繼續試聽及使用）": "Legacy saved backing (still available for preview and use)",
-  "補靜音": "padded with silence",
-  "裁去": "trimmed",
-  "請先停止收音，再生成配樂。": "Stop input before generating backing.",
-  "準備生成…": "Preparing generation…",
-  "新配樂長度檢查未通過。": "New backing failed the duration check.",
-  "已完成，可試聽及保存。": "Complete. Ready to preview and save.",
-  "新配樂完成，按「原配樂／新配樂」同位置比較。": "New backing ready. Switch Original / New backing at the same position to compare.",
   "未完成：": "Incomplete:",
-  "請先產生或載入配樂。": "Generate or load backing first.",
   "準備試聽…": "Preparing preview…",
-  "試聽設定已改，請再按一次。": "Preview settings changed. Click again.",
-  "試聽內容已改，請按原配樂或新配樂。": "Preview content changed. Click Original or New backing.",
-  "；可到 Voice Lab 選擇此配樂。": "; select this backing in Voice Lab.",
-  "保存未完成：": "Save incomplete:",
-  "已載入保存配樂，可直接試聽。": "Saved backing loaded. Ready to preview.",
   "配樂": "Backing",
-  "原唱混音": "Original vocal mix",
-  "請先載入保有分離音軌的歌曲。": "Load a song with retained separated stems first.",
-  "鋼琴": "Piano",
-  "電吉他": "Electric guitar",
-  "弦樂": "Strings",
-  "貝斯": "Bass",
-  "鼓組": "Drum kit",
-  "刷鼓": "Brush drums",
-  "柔和合成器": "Soft synth",
-  "薩克斯風": "Saxophone",
-  "長笛": "Flute",
-  "輕打擊": "Light percussion",
-  "電子合成器": "Electronic synth",
   "抒情": "Ballad",
-  "木吉他民謠": "Acoustic folk",
   "流行": "Pop",
-  "爵士": "Jazz",
-  "管弦樂": "Orchestral",
-  "電子": "Electronic",
   "溫暖": "Warm",
-  "浪漫": "Romantic",
   "明亮": "Bright",
-  "感傷": "Melancholic",
-  "壯闊": "Epic",
-  "流行・基本和弦（推薦）": "Pop · Basic chords (recommended)",
-  "流行・豐富和弦": "Pop · Rich chords",
-  "暗色和聲": "Dark harmony",
-  "R&B 和聲": "R&B harmony",
-  "不限制和弦類型": "Unrestricted chord types",
   "主歌": "Verse",
   "副歌": "Chorus",
   "前奏": "Intro",
   "間奏": "Interlude",
-  "橋段": "Bridge",
-  "尾奏": "Outro",
-  "過門": "Break",
-  "獨奏": "Solo",
-  "鋼琴＋弦樂": "Piano + strings",
-  "木吉他＋輕鼓": "Acoustic guitar + light drums",
-  "流行樂團": "Pop band",
-  "爵士小酒館": "Jazz lounge",
-  "電影弦樂": "Cinematic strings",
-  "柔和電子": "Soft electronic",
-  "配樂風格設定無效。": "Invalid backing style settings.",
-  "請選擇 1～8 種樂器。": "Choose 1–8 instruments.",
-  "配樂生成參數超出範圍。": "Backing generation parameters are out of range.",
-  "和弦或調性設定無效。": "Invalid chord or key settings.",
-  "段落起點需依時間遞增，並選擇有效段落類型。": "Section starts must increase in time and use valid section types.",
-  "每行請填「歌曲秒數 段落代碼」，例如 30 chorus。": "Enter “song seconds section code” on each line, such as 30 chorus.",
-  "配樂範圍需在歌曲內，每次 1 秒～10 分鐘。": "Backing range must stay within the song, 1 second to 10 minutes per operation.",
   "請先啟動本機唱錄工具，再製作 MV。": "Start local recording tools before creating a music video.",
   "請更新並重新啟動本機工具，才能製作 MV。": "Update and restart local tools to create music videos.",
   "MV 請求失敗。": "Music video request failed.",
@@ -1667,22 +1382,7 @@ export const messages = {
   "已取消匯入；原檔保留。": "Import canceled. Original file retained.",
   "本機媒體無法播放，請重新載入；若已手動刪除檔案，請重新匯入。": "Cannot play local media. Reload it, or import again if the file was deleted manually.",
   "請按播放器的播放按鈕：": "Press the player’s play button:",
-  "請先啟動本機唱錄工具。": "Start local recording tools first.",
-  "請更新並重新啟動本機工具，才能管理暫存與 MV。": "Update and restart local tools to manage temporary files and videos.",
-  "檔案管理失敗。": "File management failed.",
-  "載入影片：": "Load video:",
-  "預覽：": "Preview:",
-  "正在讀取檔案清單…": "Reading file list…",
-  "· 使用中，保留": "· In use, kept",
   "播放": "Play",
-  "勾選後可刪除。": "Select items to delete.",
-  "目前沒有可清理的檔案。": "No files available for cleanup.",
-  "正在確認目前歌曲庫的 MV 數量與容量…": "Checking music video count and size in the current library…",
-  "清理完成：目前沒有可清理的 MV。": "Cleanup complete. No removable music videos.",
-  "已取消清理，MV 保留。": "Cleanup canceled. Videos retained.",
-  "會永久刪除選取的轉換暫存，未保存的舊試聽將無法再取回。已保存錄音、音色模型及 MV 保留。": "Selected conversion temporary files will be permanently deleted. Old unsaved previews cannot be recovered. Saved recordings, voice models, and music videos are kept.",
-  "會永久刪除選取的本機 MP4，無法復原。原始音檔與已保存錄音保留。": "Selected local MP4 files will be permanently deleted. Original audio and saved recordings are kept.",
-  "清理未全部完成：": "Cleanup incomplete:",
   "錄音診斷本機工具未連線，請啟動本機工具。": "Recording diagnostics are offline. Start the local tools.",
   "原音（預設，不額外調整音色）": "Original (default, no extra tone adjustment)",
   "直接載入本機基準，可試聽分離結果": "Loaded local reference directly, separated stems available for preview",
@@ -2428,15 +2128,6 @@ export const templates = [
     ]
   ],
   [
-    "SoulX 成品已保留獨立人聲，可繼續後製。來源 {0}～{1} 秒；原校正 {2} ms 已套用，不需再填一次。",
-    "SoulX result has separate vocals for further production. Source {0}–{1} seconds; original correction {2} ms already applied, so do not enter it again.",
-    [
-      0,
-      1,
-      2
-    ]
-  ],
-  [
     "{0} · {1} {2} · {3} · 校正 {4} ms · 總分 {5} · 音準 {6} · 進拍 {7} · 完整度 {8} · 可計分旋律 {9} 秒{10}",
     "{0} · {1} {2} · {3} · Correction {4} ms · Total {5} · Pitch {6} · Timing {7} · Completeness {8} · Scorable melody {9} seconds{10}",
     [
@@ -2493,8 +2184,8 @@ export const templates = [
     ]
   ],
   [
-    "清除錄音後處理清單的全部 {0} 筆？包含所有歌曲的已保存錄音、Voice Lab 與後製成品，以及各筆附帶的人聲和後處理資料。\n待確認錄音、分段素材、歌曲庫、配樂庫及音色模型保留。此操作無法復原。",
-    "Clear all {0} entries in the production list? This includes saved recordings, Voice Lab and production results for all songs, with their vocals and production data.\nPending takes, segment sources, song and backing libraries, and voice models are kept. This cannot be undone.",
+    "清除錄音後處理清單的全部 {0} 筆？包含所有歌曲的已保存錄音與後製成品，以及各筆附帶的人聲和後處理資料。\n待確認錄音、分段素材及歌曲庫保留。此操作無法復原。",
+    "Clear all {0} entries in the production list? This includes saved recordings and production results for all songs, with their vocals and production data.\nPending takes, segment sources, and the song library are kept. This cannot be undone.",
     [
       0
     ]
@@ -2634,13 +2325,6 @@ export const templates = [
     "重新合成 {0}（音量／延時／音色／剪輯）",
     "Render {0} again (levels / timing / tone / trim)",
     []
-  ],
-  [
-    "已另存 {0}。{1}；原錄音保留，可繼續調整 EQ、殘響與剪輯。",
-    "Saved a copy of {0}. {1}; original retained. Continue editing EQ, reverb, and trim.",
-    [
-      1
-    ]
   ],
   [
     "保存至 {0}",
@@ -3382,260 +3066,11 @@ export const templates = [
     ]
   ],
   [
-    "已完成 {0}／{1} 段 · 本階段 {2}%。{3}",
-    "Completed {0}/{1} segments · This stage {2}%. {3}",
-    [
-      0,
-      1,
-      2,
-      3
-    ]
-  ],
-  [
-    "旋律分析 {0}%。{1}",
-    "Melody analysis {0}%. {1}",
-    [
-      0,
-      1
-    ]
-  ],
-  [
-    "已用時間 {0}:{1}",
-    "Elapsed {0}:{1}",
-    [
-      0,
-      1
-    ]
-  ],
-  [
-    "{0} · {1} · 檢索 {2} · 保護 {3} · 包絡 {4} · 修音{5}",
-    "{0} · {1} · Index {2} · Protection {3} · Envelope {4} · Auto-tune {5}",
-    [
-      0,
-      1,
-      2,
-      3,
-      4,
-      5
-    ]
-  ],
-  [
-    "已找到 {0} 個音色模型。{1}{2}{3}",
-    "Found {0} voice models. {1}{2}{3}",
-    [
-      0,
-      1,
-      2,
-      3
-    ]
-  ],
-  [
-    "{0} 個資料夾需整理，詳見下方。",
-    "{0} folders need attention; see below.",
-    [
-      0
-    ]
-  ],
-  [
-    "掃描未完成：{0}",
-    "Scan incomplete: {0}",
-    [
-      0
-    ]
-  ],
-  [
-    "將轉換：{0}",
-    "To convert: {0}",
-    [
-      0
-    ]
-  ],
-  [
-    "已轉換：{0} → {1} · {2} · {3} · {4} · 檢索比例 {5} · 子音保護 {6} · 音量包絡 {7} · 修音{8} · 校正 {9} ms。請試聽確認音色與對嘴。",
-    "Converted: {0} → {1} · {2} · {3} · {4} · Index {5} · Consonant protection {6} · Envelope {7} · Auto-tune {8} · Correction {9} ms. Check voice and synchronization by listening.",
-    [
-      0,
-      2,
-      3,
-      4,
-      5,
-      6,
-      7,
-      8,
-      9
-    ]
-  ],
-  [
-    "{0} · 人聲 {1}% · 配樂 {2}% · AI {3}%{4}；切換保留目前播放位置。",
-    "{0} · Vocals {1}% · Backing {2}% · AI {3}%{4}; switching retains playback position.",
-    [
-      0,
-      1,
-      2,
-      3,
-      4
-    ]
-  ],
-  [
-    "{0}_Voice Lab_{1}_{2}-{3}秒{4}_AI{5}%_試聽.wav",
-    "{0}_Voice Lab_{1}_{2}-{3}sec{4}_AI{5}%_Preview.wav",
-    [
-      2,
-      3,
-      4,
-      5
-    ]
-  ],
-  [
-    "_移調{0}{1}半音",
-    "_Transpose{0}{1}semitones",
-    [
-      0,
-      1
-    ]
-  ],
-  [
-    "Voice Lab 保存未完成：{0}",
-    "Voice Lab save incomplete: {0}",
-    [
-      0
-    ]
-  ],
-  [
-    "{0} · Voice Lab · {1} · {2}～{3} 秒 · 人聲 {4}%／配樂 {5}%",
-    "{0} · Voice Lab · {1} · {2}–{3} seconds · Vocals {4}% / Backing {5}%",
-    [
-      2,
-      3,
-      4,
-      5
-    ]
-  ],
-  [
-    "待轉換：{0} · {1} · {2} 秒 · 校正 {3} ms",
-    "To convert: {0} · {1} · {2} seconds · Correction {3} ms",
-    [
-      0,
-      2,
-      3
-    ]
-  ],
-  [
-    "{0}（{1}{2} 半音）",
-    "{0} ({1}{2} semitones)",
-    [
-      0,
-      1,
-      2
-    ]
-  ],
-  [
-    "{0} 超出允許範圍。",
-    "{0} is outside the allowed range.",
-    [
-      0
-    ]
-  ],
-  [
-    "{0} {1}～{2} 秒（{3} 秒／原始 {4} 秒）",
-    "{0} {1}–{2} seconds ({3} seconds / original {4} seconds)",
-    [
-      0,
-      1,
-      2,
-      3,
-      4
-    ]
-  ],
-  [
     "片段{0}-{1}秒",
     "Clip{0}-{1}sec",
     [
       0,
       1
-    ]
-  ],
-  [
-    "✓ 與「{0}」同曲同版本。Voice Lab 可選用，配樂範圍仍需涵蓋歌聲。",
-    "✓ Same song and version as “{0}”. Available in Voice Lab if its range covers the vocals.",
-    []
-  ],
-  [
-    "△ 與「{0}」是同一首歌，但分離版本不同。目前 Voice Lab 只提供同版本配樂選用。",
-    "△ Same song as “{0}”, but a different separation version. Voice Lab currently offers backing from the same version only.",
-    []
-  ],
-  [
-    "這份配樂屬於其他歌曲，與目前載入的「{0}」不同。",
-    "This backing belongs to another song, not the loaded “{0}”.",
-    []
-  ],
-  [
-    "{0} 小調",
-    "{0} minor",
-    [
-      0
-    ]
-  ],
-  [
-    "{0} 大調",
-    "{0} major",
-    [
-      0
-    ]
-  ],
-  [
-    "本機保存位置：{0}。共 {1} 份，包含所有歌曲與分離版本。",
-    "Local storage: {0}. {1} tracks across all songs and separation versions.",
-    [
-      1
-    ]
-  ],
-  [
-    "刪除這份已保存配樂？\n{0}\n\n會移除本機配樂檔案，無法復原。",
-    "Delete this saved backing?\n{0}\n\nLocal backing files will be permanently removed.",
-    []
-  ],
-  [
-    "配樂未刪除：{0}",
-    "Backing not deleted: {0}",
-    [
-      0
-    ]
-  ],
-  [
-    "{0} · {1} · 每小節 {2} 次和弦",
-    "{0} · {1} · {2} chord changes per bar",
-    [
-      0,
-      1,
-      2
-    ]
-  ],
-  [
-    "{0} · {1}～{2} 秒 · {3} · 種子 {4}。{5}請比較和聲、拍點與段落銜接。",
-    "{0} · {1}–{2} seconds · {3} · Seed {4}. {5}Compare harmony, beats, and transitions.",
-    [
-      1,
-      2,
-      3,
-      4,
-      5
-    ]
-  ],
-  [
-    "尾端{0} {1} 秒，沒有拉伸整首。",
-    "Tail {0} by {1} seconds; the full song was not stretched.",
-    [
-      0,
-      1
-    ]
-  ],
-  [
-    "生成進度 {0}%",
-    "Generation progress {0}%",
-    [
-      0
     ]
   ],
   [
@@ -3646,47 +3081,10 @@ export const templates = [
     ]
   ],
   [
-    "{0} · 同位置切換比較",
-    "{0} · Switch at the same position to compare",
-    [
-      0
-    ]
-  ],
-  [
-    "已保存至 {0}；可到 Voice Lab 選擇此配樂。",
-    "Saved to {0}; select this backing in Voice Lab.",
-    [
-      0
-    ]
-  ],
-  [
-    "保存未完成：{0}",
-    "Save incomplete: {0}",
-    [
-      0
-    ]
-  ],
-  [
-    "{0}_新配樂_{1}_{2}-{3}秒_{4}.wav",
-    "{0}_NewBacking_{1}_{2}-{3}sec_{4}.wav",
-    [
-      2,
-      3,
-      4
-    ]
-  ],
-  [
     "來源：{0} · {1} 秒",
     "Source: {0} · {1} seconds",
     [
       1
-    ]
-  ],
-  [
-    "自選・{0}",
-    "Custom · {0}",
-    [
-      0
     ]
   ],
   [
@@ -3707,8 +3105,8 @@ export const templates = [
     ]
   ],
   [
-    "已匯入「{0}」。可直接播放，或按「準備歌曲基準」使用錄音、評分、分段與 Voice Lab。",
-    "Imported “{0}”. Play it directly, or prepare the reference for recording, scoring, segments, and Voice Lab.",
+    "已匯入「{0}」。可直接播放，或按「準備歌曲基準」使用錄音、評分與分段。",
+    "Imported “{0}”. Play it directly, or prepare the reference for recording, scoring, and segments.",
     []
   ],
   [
@@ -3717,16 +3115,6 @@ export const templates = [
     [
       0
     ]
-  ],
-  [
-    "載入影片：{0}",
-    "Load video: {0}",
-    []
-  ],
-  [
-    "預覽：{0}",
-    "Preview: {0}",
-    []
   ],
   [
     "· {0} 秒",
@@ -3743,73 +3131,6 @@ export const templates = [
       1,
       2,
       3
-    ]
-  ],
-  [
-    "清除全部 {0} 部 MV（{1}）？\n位置：{2}\n\n包含目前歌曲庫內所有歌曲由本工具產生的 MV 成品，永久刪除後無法復原。原始影片、歌曲、錄音、音色模型與製作中的暫存都保留。",
-    "Clear all {0} music videos ({1})?\nLocation: {2}\n\nPermanently deletes videos created by this tool for all songs in the current library. Original videos, songs, recordings, voice models, and active temporary files are kept.",
-    [
-      0,
-      1,
-      2
-    ]
-  ],
-  [
-    "正在清理 MV：{0}／{1} 部…",
-    "Cleaning up videos: {0}/{1}…",
-    [
-      0,
-      1
-    ]
-  ],
-  [
-    "清理完成：已刪除 {0} 部 MV，釋出 {1}。原始影片、歌曲與錄音保留。",
-    "Cleanup complete: deleted {0} videos, freed {1}. Original videos, songs, and recordings kept.",
-    [
-      0,
-      1
-    ]
-  ],
-  [
-    "清理未全部完成{0}：{1} 請查看重新整理後的清單。",
-    "Cleanup incomplete{0}: {1} Check the refreshed list.",
-    [
-      0,
-      1
-    ]
-  ],
-  [
-    "（已確認刪除 {0} 部，釋出 {1}）",
-    "(confirmed {0} videos deleted, {1} freed)",
-    [
-      0,
-      1
-    ]
-  ],
-  [
-    "刪除 {0} 項（{1}）？\n位置：{2}\n{3}{4}\n\n{5}",
-    "Delete {0} items ({1})?\nLocation: {2}\n{3}{4}\n\n{5}",
-    [
-      0,
-      1,
-      2,
-      4,
-      5
-    ]
-  ],
-  [
-    "已刪除 {0} 項，釋出 {1}。",
-    "Deleted {0} items, freed {1}.",
-    [
-      0,
-      1
-    ]
-  ],
-  [
-    "清理未全部完成：{0}",
-    "Cleanup incomplete: {0}",
-    [
-      0
     ]
   ],
   [

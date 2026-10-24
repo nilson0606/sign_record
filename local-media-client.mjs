@@ -30,7 +30,7 @@ export function initializeLocalMedia(load){
       while(true){
         if(cancelled){await mediaRequest('/local-media/imports/'+job,{method:'DELETE'});throw Error('已取消匯入。');}
         const state=await mediaRequest('/local-media/imports/'+job);message(state.message);
-        if(state.stage==='ready'){selectMediaSource(state.media.id,document,state.media.kind);await refresh();if(await load())message(`已匯入「${state.media.title}」。可直接播放，或按「準備歌曲基準」使用錄音、評分、分段與 Voice Lab。`);break;}
+        if(state.stage==='ready'){selectMediaSource(state.media.id,document,state.media.kind);await refresh();if(await load())message(`已匯入「${state.media.title}」。可直接播放，或按「準備歌曲基準」使用錄音、評分與分段。`);break;}
         if(['failed','cancelled'].includes(state.stage))throw Error(state.message);
         await new Promise(r=>setTimeout(r,1000));
       }

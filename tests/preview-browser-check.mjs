@@ -220,9 +220,8 @@ try {
     await page.screenshot({path:`test-results/nav-${theme}-${width}.png`});
     await page.locator('#prepare-section').evaluate(el=>el.scrollIntoView({block:'start',behavior:'instant'}));
     await page.waitForFunction(()=>document.querySelector('.nav-links [aria-current]')?.hash==='#prepare-section');
-    await page.locator('.section-nav a[href="#voicelab-panel"]').focus();await page.keyboard.press('Enter');
-    assert.equal(await page.locator('#voicelab-panel').evaluate(el=>el.open&&el===document.activeElement),true);
-    await page.locator('#voicelab-panel > summary').click();
+    await page.locator('.section-nav a[href="#timing-section"]').focus();await page.keyboard.press('Enter');
+    assert.equal(await page.locator('#timing-section').evaluate(el=>el.open&&el===document.activeElement),true);
   }
   assert.deepEqual(errors,[]);assert.deepEqual(bareRequests,[]);
   console.log('UI folds, unchanged defaults and selectable advanced separation, visible progress, preview continuity, masks, legacy rebuild, keyboard/deep-link navigation, recording continuity and both desktop themes passed.');

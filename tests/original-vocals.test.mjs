@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {originalVocalRanges,originalVocalWindows} from '../recording-process.mjs';
 import {segmentDraft,missingSegmentRanges} from '../recording-segments.mjs';
-import {recordingBackingRoute} from '../arrangement-settings.mjs';
 test('original vocal ranges are ordered, bounded and cannot conflict',()=>{
  const rows=[{start:3,end:4,mode:'original'},{start:1,end:2,mode:'duet'}],snapshot=structuredClone(rows);
  assert.deepEqual(originalVocalRanges(rows,5).map(r=>r.mode),['duet','original']);assert.deepEqual(rows,snapshot);
@@ -19,9 +18,4 @@ test('original-only can cover missing recording, duet and pure voice still requi
  assert.deepEqual(missingSegmentRanges(draft,[],200,true),[]);assert.equal(missingSegmentRanges(draft,[],200).length,1);
  draft.originalVocalRanges[0].mode='duet';assert.equal(missingSegmentRanges(draft,[],200,true).length,1);
  draft.originalVocalRanges[0]={start:1,end:4,mode:'original'};assert.equal(missingSegmentRanges(draft,[],200,true).length,1);
-});
-test('replaced accompaniment must not replace original singer stems',()=>{
- const row={arrangement:{id:'new'},post:{reference:{cacheId:'song'}}};
- for(const stem of ['lead','vocals','backing'])assert.equal(recordingBackingRoute(row,stem),`/library/song/${stem}`);
- for(const stem of ['accompaniment','arrangement'])assert.equal(recordingBackingRoute(row,stem),'/arrangements/library/new/audio');
 });

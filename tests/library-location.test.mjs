@@ -49,7 +49,7 @@ test('helper enforces setup, auth and idle-only changes; selected library surviv
   }
   async function stop() { if (child && child.exitCode === null) { const exited = new Promise(resolve => child.once('exit', resolve)); child.kill(); await exited; } }
   try {
-    for (const file of ['local-media-server.mjs','media-source.mjs','audio.mjs','helper-local.mjs', 'recording-diagnostics-server.mjs', 'native-microphone-server.mjs', 'local-jobs.mjs', 'mv-server.mjs', 'media-storage.mjs', 'voicelab-server.mjs', 'voicelab-models.mjs', 'voicelab-settings.mjs', 'arrangement-server.mjs', 'arrangement-settings.mjs', 'recording-export.mjs', 'recording-archive.mjs', 'local-library.mjs', 'library-location.mjs', 'scoring.mjs', 'song-key.mjs']) await copyFile(new URL('../' + file, import.meta.url), path.join(dir, file));
+    for (const file of ['local-media-server.mjs','media-source.mjs','audio.mjs','helper-local.mjs', 'recording-diagnostics-server.mjs', 'native-microphone-server.mjs', 'local-jobs.mjs', 'mv-server.mjs', 'media-storage.mjs', 'recording-export.mjs', 'recording-archive.mjs', 'local-library.mjs', 'library-location.mjs', 'scoring.mjs', 'song-key.mjs']) await copyFile(new URL('../' + file, import.meta.url), path.join(dir, file));
     // Bind a random test port without exposing the helper outside loopback.
     const helper = path.join(dir, 'helper-local.mjs');
     let source = await readFile(helper, 'utf8');
@@ -64,18 +64,13 @@ test('helper enforces setup, auth and idle-only changes; selected library surviv
     assert.equal((await request('/library/location', 'GET', undefined, false)).status, 403);
     const idle = await request('/busy', 'GET', undefined, false);
     assert.equal(idle.status, 200);
-    assert.deepEqual(await idle.json(), { preparing: false, voicelab: false, mv: false, arrangement: false, localMedia: false, microphone: false, library: false, busy: false });
+    assert.deepEqual(await idle.json(), { preparing: false, mv: false, localMedia: false, microphone: false, library: false, busy: false });
     assert.equal((await fetch(base + '/busy', { headers: { Origin: 'https://example.com' } })).status, 403);
-    assert.equal((await request('/voicelab', 'GET', undefined, false)).status, 403);
-    assert.equal((await request('/voicelab/storage', 'DELETE', {ids:[]}, false)).status, 403);
     assert.equal((await request('/mv/library', 'DELETE', {ids:[]}, false)).status, 403);
     assert.equal((await request('/mv/jobs', 'POST', {}, false)).status, 403);
     assert.equal((await request('/mv/jobs?title=Song&artist=Singer', 'POST', {})).status, 400);
-    assert.equal((await request('/arrangements', 'GET', undefined, false)).status, 403);
-    assert.equal((await request('/arrangements/library', 'GET', undefined, false)).status, 403);
-    assert.equal((await request('/arrangements/library/00000000-0000-4000-8000-000000000001', 'DELETE', undefined, false)).status, 403);
-    assert.equal((await (await request('/arrangements')).json()).installed, false);
-    assert.equal((await (await request('/voicelab')).json()).installed, false);
+    // Voice Lab 與 MIDI-SAG 配樂已移除：這些路徑不再存在
+    for (const removed of ['/voicelab', '/voicelab/storage', '/arrangements', '/arrangements/library']) assert.equal((await request(removed)).status, 404, removed);
     assert.ok((await(await request('/session')).json()).features.includes('playback-trace'));
     assert.equal((await request('/playback-trace','POST',{stage:'mic-before'},false)).status,403);
     assert.equal((await request('/playback-trace','POST',{})).status,400);
