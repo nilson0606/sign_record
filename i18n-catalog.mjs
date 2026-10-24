@@ -1388,7 +1388,21 @@ export const messages = {
   "直接載入本機基準，可試聽分離結果": "Loaded local reference directly, separated stems available for preview",
   "直接載入本機基準，音檔已清除": "Loaded local reference directly, audio files cleared",
   "已保存到本機，可試聽分離結果": "Saved locally, separated stems available for preview",
-  "已保存到本機，音檔已清除": "Saved locally, audio files cleared"
+  "已保存到本機，音檔已清除": "Saved locally, audio files cleared",
+  "🎬 已保存 MV": "🎬 Saved music videos",
+  "搜尋 · 播放 · 下載 · 刪除": "Search · Play · Download · Delete",
+  "列出歌曲庫「vedio」資料夾裡本工具做的 MV，最新的在最上面。可搜尋、播放、下載，或勾選後刪除；刪除 MV 不會刪掉錄音與原始音檔。": "Lists the music videos this tool made in the library’s “vedio” folder, newest first. Search, play, download, or tick and delete; deleting a video doesn’t delete recordings or original audio.",
+  "用歌名或翻唱者搜尋": "Search by song or singer",
+  "搜尋已保存 MV": "Search saved music videos",
+  "刪除選取的 MV": "Delete selected videos",
+  "展開後讀取清單。": "The list loads when you expand this section.",
+  "請先啟動本機唱錄工具。": "Start local recording tools first.",
+  "MV 清單讀取失敗。": "Couldn’t read the music video list.",
+  "正在讀取 MV 清單…": "Loading the music video list…",
+  "目前沒有已保存的 MV。": "No saved music videos yet.",
+  "正在確認目前歌曲庫的 MV 數量與容量…": "Checking music video count and size in the current library…",
+  "清理完成：目前沒有可清理的 MV。": "Cleanup complete. No removable music videos.",
+  "已取消清理，MV 保留。": "Cleanup canceled. Videos retained."
 };
 
 export const templates = [
@@ -3225,5 +3239,20 @@ export const templates = [
     "{0} · 結束",
     "{0} · End",
     []
-  ]
+  ],
+  ["正在載入影片：{0}", "Loading video: {0}", []],
+  ["正在播放：{0}", "Playing: {0}", []],
+  ["正在準備下載：{0}", "Preparing download: {0}", []],
+  ["已開始下載：{0}", "Download started: {0}", []],
+  ["位置：{0}", "Location: {0}", []],
+  ["符合「{0}」的有 {1} 部（全部 {2} 部，{3}）。", "{1} match “{0}” ({2} in total, {3}).", [1, 2, 3]],
+  ["共 {0} 部，{1}。", "{0} videos, {1}.", [0, 1]],
+  ["刪除 {0} 部 MV（{1}）？\n位置：{2}\n{3}\n\n會永久刪除選取的 MP4，無法復原。原始音檔與已保存錄音保留。", "Delete {0} music videos ({1})?\nLocation: {2}\n{3}\n\nThe selected MP4 files are permanently deleted and can’t be recovered. Original audio and saved recordings are kept.", [0, 1, 2]],
+  ["已刪除 {0} 部，釋出 {1}。", "Deleted {0} videos, freed {1}.", [0, 1]],
+  ["刪除未全部完成：{0}", "Deletion incomplete: {0}", [0]],
+  ["清除全部 {0} 部 MV（{1}）？\n位置：{2}\n\n包含目前歌曲庫內所有歌曲由本工具產生的 MV 成品，永久刪除後無法復原。原始影片、歌曲與錄音都保留。", "Clear all {0} music videos ({1})?\nLocation: {2}\n\nPermanently deletes videos created by this tool for all songs in the current library. Original videos, songs, and recordings are kept.", [0, 1, 2]],
+  ["正在清理 MV：{0}／{1} 部…", "Cleaning up videos: {0}/{1}…", [0, 1]],
+  ["清理完成：已刪除 {0} 部 MV，釋出 {1}。原始影片、歌曲與錄音保留。", "Cleanup complete: deleted {0} videos, freed {1}. Original videos, songs, and recordings kept.", [0, 1]],
+  ["清理未全部完成{0}：{1} 請查看重新整理後的清單。", "Cleanup incomplete{0}: {1} Check the refreshed list.", [0, 1]],
+  ["（已確認刪除 {0} 部，釋出 {1}）", "(confirmed {0} videos deleted, {1} freed)", [0, 1]]
 ];

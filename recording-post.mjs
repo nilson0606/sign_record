@@ -2,6 +2,7 @@ import {localizedConfirm} from './i18n.mjs';
 import { recordingTuningSuffix } from './recording-tune.mjs';
 import {isPostRecording} from './recording-store.mjs';
 import {createMV} from './mv-client.mjs';
+import {createMVLibrary} from './mv-library-client.mjs';
 import { createRecordingAudition } from './recording-audition.mjs';
 import { recordingScenes, initialRecordingEffects, matchingRecordingScene, recordingEmotions, matchingRecordingEmotion } from './recording-scenes.mjs';
 import { PITCH_DETECTOR_VERSION } from './audio.mjs';
@@ -42,7 +43,8 @@ async function recordedAnalysis(blob, progress, pitchShift=0) {
 export function createRecordingPost({store,stop,pause,download,onDelete,reference=()=>null,isRecording=()=>false}) {
   let rows=[],selected=null,busy=false,url=null,statusTarget='post-status',audition=null,previewSources=null;
   const backingRoute=(row,stem)=>`/library/${row.post.reference.cacheId}/${stem}`;
-  const mv=createMV({beforePlay:()=>{clearAudio();pause();}});
+  const mv=createMV({beforePlay:()=>{clearAudio();pause();mvLibrary?.stopPreview();}});
+  const mvLibrary=createMVLibrary({beforePlay:()=>{clearAudio();mv.pause();pause();}});
   const status=text=>{$(statusTarget).textContent=text;};
   function clearAudio(){audition?.stop();const a=$('post-audio');a.pause();a.removeAttribute('src');a.load();a.hidden=true;if(url)URL.revokeObjectURL(url);url=null;}
   function effectLabels(){

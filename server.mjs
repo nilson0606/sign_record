@@ -12,7 +12,7 @@ files.set('/library-recordings.mjs',['library-recordings.mjs','text/javascript']
 files.set('/library-search.mjs',['library-search.mjs','text/javascript']);
 for(const name of ['recording-segments.mjs','recording-segment-ui.mjs','recording-live-preview.mjs'])files.set('/'+name,[name,'text/javascript']);
 for(const name of ['recording-repair.mjs','recording-repair-client.mjs','recording-repair-worker.mjs'])files.set('/'+name,[name,'text/javascript']);
-for(const name of ['mv-client.mjs'])files.set('/'+name,[name,'text/javascript']);
+for(const name of ['mv-client.mjs','mv-library-client.mjs'])files.set('/'+name,[name,'text/javascript']);
 for(const name of ['recording-diagnostics.mjs','recording-diagnostics-worklet.mjs'])files.set('/'+name,[name,'text/javascript']);
 for(const name of ['media-source.mjs','local-media-client.mjs','local-video-player.mjs'])files.set('/'+name,[name,'text/javascript']);
 for(const name of ['i18n.mjs','i18n-catalog.mjs','player-view.mjs'])files.set('/'+name,[name,'text/javascript']);

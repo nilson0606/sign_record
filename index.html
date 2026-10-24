@@ -299,6 +299,15 @@
           <p id="mv-status" class="status" role="status">選取已保存錄音後按「製作 MV」。</p>
           <div id="mv-result" hidden><video id="mv-video" controls playsinline preload="metadata" style="width:100%;aspect-ratio:16/9;background:#101d2c;border-radius:12px"></video><button id="mv-download" type="button" class="secondary">下載翻唱 MV（MP4）</button></div>
         </details>
+        <details id="mv-library-panel" class="post-effects">
+          <summary><span class="post-effects-heading"><strong>🎬 已保存 MV</strong><span>搜尋 · 播放 · 下載 · 刪除</span></span></summary>
+          <p class="help">列出歌曲庫「vedio」資料夾裡本工具做的 MV，最新的在最上面。可搜尋、播放、下載，或勾選後刪除；刪除 MV 不會刪掉錄音與原始音檔。</p>
+          <p id="mv-library-path" class="help"></p>
+          <div class="mv-library-tools"><input id="mv-library-search" type="search" placeholder="用歌名或翻唱者搜尋" aria-label="搜尋已保存 MV"><button id="mv-library-refresh" type="button" class="secondary">重新整理</button><button id="mv-library-all" type="button" class="secondary" disabled>全選</button><button id="mv-library-delete" type="button" class="secondary" disabled>刪除選取的 MV</button></div>
+          <p id="mv-library-status" class="status" role="status" aria-live="polite">展開後讀取清單。</p>
+          <div id="mv-library-list" class="mv-library-list"></div>
+          <video id="mv-library-video" controls playsinline preload="metadata" hidden style="width:100%;aspect-ratio:16/9;background:#101d2c;border-radius:12px"></video>
+        </details>
 
     <details id="post-audition-panel" class="post-effects"><summary><span class="post-effects-heading"><strong>片段試聽／A、B 比較</strong><span>同一句循環播放 · 先聽效果再另存</span></span></summary>
       <div class="audition-transport" role="group" aria-label="切換比較版本"><button id="post-audition-a-play" type="button" aria-pressed="false" disabled>▶ 試聽 A</button><button id="post-audition-b-play" type="button" aria-pressed="false" disabled>▶ 試聽 B</button><button id="post-audition-stop" type="button" class="secondary" disabled>停止比較</button></div>
